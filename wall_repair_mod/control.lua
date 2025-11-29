@@ -133,6 +133,9 @@ local function draw_damaged_visuals(player, pdata, damaged_walls)
 
     local player_pos = player.position
 
+    -- Use an entity for the line target so it tracks as the player moves.
+    local player_target = player.character or player
+
     for _, wall in pairs(damaged_walls) do
         if wall and wall.valid then
             -- Small filled green circle at the wall's position (dot).
@@ -154,14 +157,14 @@ local function draw_damaged_visuals(player, pdata, damaged_walls)
             -- Line from the wall to the player.
             local line = rendering.draw_line {
                 color = {
-                    r = 0,
-                    g = 1,
+                    r = 1,
+                    g = 0,
                     b = 0,
-                    a = 0.4
-                }, -- semi-transparent green
+                    a = 0.1
+                }, -- semi-transparent red
                 width = 1,
                 from = wall, -- start at wall entity
-                to = player_pos, -- end at player position
+                to = player_target, -- end at player entity (follows movement)
                 surface = wall.surface,
                 only_in_alt_mode = false
             }
@@ -292,53 +295,26 @@ local function is_wall_damaged(wall)
     return wall.health < WALL_MAX_HEALTH
 end
 
--- Find all damaged walls of this force within a radius of a given point.
-local function find_damaged_walls(surface, force, center, radius)
-    local area = {{center.x - radius, center.y - radius}, {center.x + radius, center.y + radius}}
+---------------------------------------------------
+-- WALL / HEALTH HELPERS
+---------------------------------------------------
 
-    -- Find all wall entities in the area.
+-- Find all damaged walls of this force on the given surface
+-- (no longer limited to a radius around a point).
+local function find_damaged_walls(surface, force, center, radius)
+    -- We now search all wall entities of this force on the surface.
+    -- 'center' and 'radius' are kept in the signature for compatibility.
     local candidates = surface.find_entities_filtered {
         type = "wall",
-        force = force,
-        area = area
+        force = force
     }
 
     local damaged = {}
 
-    -- Track maximum of any wall health value we see.
-    local max_wall_health = 0
-
-    -- Optionally: also track maximum prototype max_health, if you care about that too.
-    local max_wall_max_health = 0
-
     for _, wall in pairs(candidates) do
-        if wall and wall.valid and wall.health then
-            game.print("[WallRepair] wall HP: " .. wall.health)
-
-            -- Track maximum current health.
-            if wall.health > max_wall_health then
-                max_wall_health = wall.health
-            end
-
-            -- Track maximum prototype max_health (uses helper).
-            local proto_max = get_entity_max_health(wall)
-            if proto_max and proto_max > max_wall_max_health then
-                max_wall_max_health = proto_max
-            end
-        end
-
         if is_wall_damaged(wall) then
             damaged[#damaged + 1] = wall
         end
-    end
-
-    -- Print summary of maximum values we saw.
-    if max_wall_health > 0 then
-        game.print("[WallRepair] Max current wall HP in area: " .. max_wall_health)
-    end
-
-    if max_wall_max_health > 0 then
-        game.print("[WallRepair] Max prototype max_health in area: " .. max_wall_max_health)
     end
 
     return damaged
@@ -425,9 +401,6 @@ local function rebuild_repair_route(player, pdata, bot)
 
     -- Search for damaged walls around the player.
     local damaged = find_damaged_walls(surface, force, search_center, WALL_SEARCH_RADIUS)
-
-    -- Print how many damaged walls were found
-    player.print("[WallRepair] Found " .. #damaged .. " damaged wall(s).")
 
     -- Always reset markers based on the latest damaged list.
     clear_damaged_markers(pdata)
@@ -547,14 +520,19 @@ local function update_wall_bot_for_player(player, pdata)
     -- Always update the visual highlight around the bot.
     draw_bot_highlight(bot, pdata)
 
+    ---------------------------------------------------
+    -- Always rebuild the damaged-wall route so that:
+    -- - walls repaired by the bot are removed
+    -- - walls repaired by the PLAYER (or anything else)
+    --   are also removed from the list and their
+    --   markers/lines disappear on the next update.
+    ---------------------------------------------------
+    rebuild_repair_route(player, pdata, bot)
+
     -- Make sure we have a current list of damaged walls ordered by nearest-neighbour.
     local targets = pdata.repair_targets
-    if not targets or #targets == 0 then
-        rebuild_repair_route(player, pdata, bot)
-        targets = pdata.repair_targets
-    end
 
-    -- If still no targets, idle (and clear markers).
+    -- If no targets, idle (and clear markers).
     if not targets or #targets == 0 then
         clear_damaged_markers(pdata)
         return
@@ -603,6 +581,10 @@ local function update_wall_bot_for_player(player, pdata)
     if dist_sq <= (WALL_REPAIR_DISTANCE * WALL_REPAIR_DISTANCE) then
         -- Close enough: repair walls around the target.
         repair_walls_near(bot.surface, bot.force, tp, WALL_REPAIR_RADIUS)
+
+        -- Immediately rebuild the damaged-wall list since health changed.
+        rebuild_repair_route(player, pdata, bot)
+        targets = pdata.repair_targets
 
         -- Next tick, proceed to the next wall in the route.
         pdata.current_target_index = idx + 1
