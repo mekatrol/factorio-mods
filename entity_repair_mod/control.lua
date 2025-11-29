@@ -3,7 +3,7 @@
 ---------------------------------------------------
 -- How often (in ticks) to update the repair bot logic.
 -- 60 ticks = 1 second, 1 = every tick (smooth movement).
-local REPAIR_BOT_UPDATE_INTERVAL = 1
+local REPAIR_BOT_UPDATE_INTERVAL = 5
 
 -- Bot movement speed in tiles per second.
 -- Vanilla construction robot is ~4 tiles/second.
@@ -14,11 +14,11 @@ local BOT_SPEED_TILES_PER_SECOND = 4.0
 local MAX_HEALTH_SCAN_INTERVAL = 3600
 
 -- Radius (in tiles) around the player to search for damaged entities.
-local ENTITY_SEARCH_RADIUS = 64
+local ENTITY_SEARCH_RADIUS = 256.0
 
 -- Distance (in tiles) at which the bot considers itself "close enough"
 -- to a target entity to perform repairs.
-local ENTITY_REPAIR_DISTANCE = 20.0
+local ENTITY_REPAIR_DISTANCE = 2.0
 
 -- Radius (in tiles) around the repair target to actually repair entities.
 -- All entities in this radius will be repaired to max health.
@@ -35,7 +35,7 @@ local BOT_FOLLOW_DISTANCE = 1.0
 
 -- Distance the bot moves per update (in tiles).
 -- With REPAIR_BOT_UPDATE_INTERVAL = 1, this is tiles per tick.
-local BOT_STEP_DISTANCE = 0.5
+local BOT_STEP_DISTANCE = 0.8
 
 ---------------------------------------------------
 -- REPAIR TOOL CONFIGURATION
@@ -135,13 +135,14 @@ local function scan_player_entities_for_max_health(force)
                         local line = string.format("[\"%s\"] = %d,\n", name, suggested)
 
                         -- Print in-game so you can see it immediately
-                        game.print("[MekatrolRepair][SCAN] " .. line)
+                        game.print("[MekatrolRepairBot][SCAN] " .. line)
 
                         -- Write to disk if helpers.write_file is available (Factorio 2.0+)
                         if helpers and helpers.write_file then
                             helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
                         else
-                            game.print("[MekatrolRepair][WARN] helpers.write_file not available; cannot write to disk.")
+                            game.print(
+                                "[MekatrolRepairBot][WARN] helpers.write_file not available; cannot write to disk.")
                         end
                     end
                 end
@@ -174,25 +175,25 @@ local function infer_max_health_from_world(name, force)
 
     if max_health_seen > 0 then
         local suggested = math.floor(max_health_seen + 0.5)
-        game.print(string.format("[MekatrolRepair][INFO] Observed max health %.1f for '%s' (force=%s). " ..
+        game.print(string.format("[MekatrolRepairBot][INFO] Observed max health %.1f for '%s' (force=%s). " ..
                                      "Suggested: ENTITY_MAX_HEALTH[\"%s\"] = %d", max_health_seen, name, force.name,
             name, suggested))
 
         local line = string.format("[\"%s\"] = %d,\n", name, suggested)
 
-        game.print("[MekatrolRepair][INFO] " .. line)
+        game.print("[MekatrolRepairBot][INFO] " .. line)
 
         if helpers and helpers.write_file then
             helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
         else
             -- fallback to avoid crashing
-            game.print("[MekatrolRepair][WARN] helpers.write_file not available; cannot write to disk.")
+            game.print("[MekatrolRepairBot][WARN] helpers.write_file not available; cannot write to disk.")
         end
 
         return suggested
     else
         game.print(string.format(
-            "[MekatrolRepair][INFO] Could not infer max health for '%s' (no live entities with health).", name))
+            "[MekatrolRepairBot][INFO] Could not infer max health for '%s' (no live entities with health).", name))
         return nil
     end
 end
@@ -647,15 +648,14 @@ local function spawn_repair_bot_for_player(player, pdata)
         pdata.repair_targets = nil
         pdata.current_target_index = 1
 
-        player.print("[MekatrolRepair] Repair bot spawned.")
+        player.print("[MekatrolRepairBot] Repair bot spawned.")
     else
-        player.print("[MekatrolRepair] Failed to spawn repair bot.")
+        player.print("[MekatrolRepairBot] Failed to spawn repair bot.")
     end
 end
 
 local function move_bot_to(bot, target)
     if not (bot and bot.valid and target) then
-        game.print("[MekatrolRepair][move_bot_to] invalid bot or target (nil)")
         return
     end
 
@@ -704,8 +704,8 @@ local function move_bot_to(bot, target)
     local ny = dy / dist
 
     bot.teleport {
-        x = bp.x + nx * BOT_STEP_DISTANCE,
-        y = bp.y + ny * BOT_STEP_DISTANCE
+        x = bp.x + nx,
+        y = bp.y + ny
     }
 end
 
@@ -725,8 +725,8 @@ local function follow_player(bot, player)
     -- Only move if the bot is “too far” from the player.
     if dist_sq > desired_sq then
         -- Optional: small offset so it doesn't sit exactly on the player
-        local offset_x = 0.5
-        local offset_y = -0.5
+        local offset_x = -1.0
+        local offset_y = -1.0
 
         local target_pos = {
             x = pp.x + offset_x,
@@ -754,7 +754,7 @@ local function repair_entities_near(player, surface, force, center, radius)
         local pdata = get_player_data(player.index)
         if pdata and not pdata.out_of_tools_warned then
             pdata.out_of_tools_warned = true
-            player.print("[MekatrolRepair] No repair tools in your inventory. Bot cannot repair.")
+            player.print("[MekatrolRepairBot] No repair tools in your inventory. Bot cannot repair.")
         end
         return
     end
@@ -832,6 +832,10 @@ local function update_repair_bot_for_player(player, pdata)
 
     -- If no targets, idle (and clear markers).
     if not targets or #targets == 0 then
+        if pdata.last_mode ~= "follow" then
+            player.print("[MekatrolRepairBot] mode: FOLLOWING PLAYER")
+            pdata.last_mode = "follow"
+        end
         clear_damaged_markers(pdata)
         follow_player(bot, player)
         return
@@ -878,6 +882,11 @@ local function update_repair_bot_for_player(player, pdata)
     local dist_sq = dx * dx + dy * dy
 
     if dist_sq <= (ENTITY_REPAIR_DISTANCE * ENTITY_REPAIR_DISTANCE) then
+        if pdata.last_mode ~= "repair" then
+            player.print("[MekatrolRepairBot] mode: REPAIRING DAMAGE")
+            pdata.last_mode = "repair"
+        end
+
         -- Close enough: repair entities around the target,
         -- consuming repair tools from the player's inventory.
         repair_entities_near(player, bot.surface, bot.force, tp, ENTITY_REPAIR_RADIUS)
@@ -922,7 +931,11 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
         if not (pdata.repair_bot and pdata.repair_bot.valid) then
             spawn_repair_bot_for_player(player, pdata)
         end
-        player.print("[MekatrolRepair] Repair bot enabled.")
+
+        -- Set and print mode when enabling
+        pdata.last_mode = "follow"
+        player.print("[MekatrolRepairBot] Repair bot enabled.")
+        player.print("[MekatrolRepairBot] mode: FOLLOWING PLAYER")
     else
         -- Disable: destroy bot and clear state.
         if pdata.repair_bot and pdata.repair_bot.valid then
@@ -945,7 +958,10 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
             pdata.highlight_object = nil
         end
 
-        player.print("[MekatrolRepair] Repair bot disabled.")
+        -- Set and print mode when disabling
+        pdata.last_mode = "off"
+        player.print("[MekatrolRepairBot] Repair bot disabled.")
+        player.print("[MekatrolRepairBot] mode: OFF")
     end
 end)
 
@@ -967,7 +983,7 @@ script.on_event(defines.events.on_tick, function(event)
 
     local pdata = get_player_data(player.index)
     if not pdata then
-        player.print("[MekatrolRepair] Player found but no pdata exists.")
+        player.print("[MekatrolRepairBot] Player found but no pdata exists.")
         return
     end
 
