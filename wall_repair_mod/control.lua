@@ -1,30 +1,154 @@
 ---------------------------------------------------
 -- CONFIGURATION
 ---------------------------------------------------
--- How often (in ticks) to update the wall bot logic.
+-- How often (in ticks) to update the repair bot logic.
 -- 60 ticks = 1 second, so 30 = every 0.5 seconds.
 local WALL_BOT_UPDATE_INTERVAL = 30
 
--- Radius (in tiles) around the player to search for damaged walls.
+-- Radius (in tiles) around the player to search for damaged entities.
+-- (Name kept for compatibility, but this applies to ANY entity with health.)
 local WALL_SEARCH_RADIUS = 64
 
 -- Distance (in tiles) at which the bot considers itself "close enough"
--- to a target wall to perform repairs.
+-- to a target entity to perform repairs.
 local WALL_REPAIR_DISTANCE = 20.0
 
--- Radius (in tiles) around the repair target to actually repair walls.
--- All walls in this radius will be repaired to max health.
+-- Radius (in tiles) around the repair target to actually repair entities.
+-- All entities in this radius will be repaired to max health.
 local WALL_REPAIR_RADIUS = 20.0
 
 ---------------------------------------------------
--- MAX HEALTH TABLE
+-- HEALTH HELPERS / MAX HEALTH OVERRIDES
 ---------------------------------------------------
-local ENTITY_MAX_HEALTH = {
-    ["stone-wall"] = 350 -- vanilla wall
+-- Optional static overrides for max health of specific entity names.
+-- You can fill this if you want to override prototype.max_health for any entity.
+-- Example:
+--   ["stone-wall"] = 350
+--
+-- By default this is empty and the mod uses prototype.max_health.
+local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
+    ["stone-wall"] = 350,
+    ["gun-turret"] = 400,
+    ["fast-transport-belt"] = 160,
+    ["small-electric-pole"] = 100,
+    ["fast-inserter"] = 150,
+    ["small-lamp"] = 100,
+    ["electric-mining-drill"] = 300,
+    ["inserter"] = 150,
+    ["iron-chest"] = 200,
+    ["character"] = 250,
+    ["fast-splitter"] = 180,
+    ["transport-belt"] = 150,
+    ["splitter"] = 170,
+    ["stone-furnace"] = 200,
+    ["assembling-machine-1"] = 300,
+    ["underground-belt"] = 150,
+    ["burner-inserter"] = 100,
+    ["burner-mining-drill"] = 150,
+    ["long-handed-inserter"] = 160,
+    ["lab"] = 150,
+    ["fast-underground-belt"] = 160,
+    ["wooden-chest"] = 100
 }
 
--- Tracks which unknown entities we have already warned about (by key).
+-- Tracks which entity names we have already warned about (so we don't spam chat).
 local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
+
+-- Scan all entities of this name for this force and return the highest
+-- .health value observed. Also prints a suggested constant to add.
+local function infer_max_health_from_world(name, force)
+    if not name or not force then
+        return nil
+    end
+
+    local max_health_seen = 0
+
+    for _, surface in pairs(game.surfaces) do
+        local entities = surface.find_entities_filtered {
+            name = name,
+            force = force
+        }
+
+        for _, e in pairs(entities) do
+            if e.valid and e.health and e.health > max_health_seen then
+                max_health_seen = e.health
+            end
+        end
+    end
+
+    if max_health_seen > 0 then
+        local suggested = math.floor(max_health_seen + 0.5)
+        game.print(string.format("[WallRepair][INFO] Observed max health %.1f for '%s' (force=%s). " ..
+                                     "Suggested: ENTITY_MAX_HEALTH[\"%s\"] = %d", max_health_seen, name, force.name,
+            name, suggested))
+
+        local line = string.format("ENTITY_MAX_HEALTH[\"%s\"] = %d\n", name, suggested)
+
+        game.print("[WallRepair][INFO] " .. line)
+
+        if helpers and helpers.write_file then
+            helpers.write_file("repair_mod_maxhealth.txt", line, true)
+        else
+            -- fallback to avoid crashing
+            game.print("[WallRepair][WARN] helpers.write_file not available; cannot write to disk.")
+        end
+
+        return suggested
+    else
+        game.print(string.format(
+            "[WallRepair][INFO] Could not infer max health for '%s' (no live entities with health).", name))
+        return nil
+    end
+end
+
+local function get_entity_max_health(entity)
+    if not (entity and entity.valid) then
+        return nil
+    end
+
+    local name = entity.name
+
+    ---------------------------------------------------
+    -- 1) Check explicit table first
+    ---------------------------------------------------
+    local from_table = ENTITY_MAX_HEALTH[name]
+    if type(from_table) == "number" and from_table > 0 then
+        return from_table
+    end
+
+    ---------------------------------------------------
+    -- 2) Try to infer from world once, for this entity type
+    ---------------------------------------------------
+    if not UNKNOWN_ENTITY_WARNED[name] then
+        UNKNOWN_ENTITY_WARNED[name] = true
+        local inferred = infer_max_health_from_world(name, entity.force)
+        if inferred and inferred > 0 then
+            -- Return what we inferred for this run (still not stored in table;
+            -- you can copy from the print and add it to ENTITY_MAX_HEALTH for next version).
+            return inferred
+        end
+    end
+
+    ---------------------------------------------------
+    -- 3) No reliable max health available
+    ---------------------------------------------------
+    return nil
+end
+
+-- Generic damage check for any entity type.
+-- Returns true if the entity has health and is below its max health.
+local function is_entity_damaged(entity)
+    if not (entity and entity.valid and entity.health) then
+        return false
+    end
+
+    local max = get_entity_max_health(entity)
+    if not max then
+        return false
+    end
+
+    return entity.health < max
+end
 
 ---------------------------------------------------
 -- PLAYER STATE / INITIALISATION
@@ -45,13 +169,13 @@ local function init_player(player)
     if not pdata then
         -- First-time initialisation for this player.
         pdata = {
-            -- Whether this player's wall bot is enabled.
+            -- Whether this player's repair bot is enabled.
             wall_bot_enabled = false,
 
-            -- The actual wall bot entity (LuaEntity) or nil if not spawned.
+            -- The actual bot entity (LuaEntity) or nil if not spawned.
             wall_bot = nil,
 
-            -- Route of damaged walls to visit (array of LuaEntity walls).
+            -- Route of damaged entities to visit (array of LuaEntity).
             repair_targets = nil,
 
             -- Index into repair_targets for the current target.
@@ -63,7 +187,7 @@ local function init_player(player)
             -- The list of recorded damaged markers (dots).
             damaged_markers = nil,
 
-            -- Line render objects from damaged walls to the player.
+            -- Line render objects from damaged entities to the player.
             damaged_lines = nil
         }
 
@@ -103,10 +227,10 @@ local function get_player_data(index)
 end
 
 ---------------------------------------------------
--- DAMAGED WALL MARKERS (DOTS + LINES)
+-- DAMAGED ENTITY MARKERS (DOTS + LINES)
 ---------------------------------------------------
 
--- Destroy and forget all previously drawn green dots and lines for damaged walls.
+-- Destroy and forget all previously drawn green dots and lines for damaged entities.
 local function clear_damaged_markers(pdata)
     if pdata.damaged_markers then
         for _, obj in pairs(pdata.damaged_markers) do
@@ -127,25 +251,22 @@ local function clear_damaged_markers(pdata)
     end
 end
 
--- Draw a green dot on each damaged wall and a line from the wall to the player.
+-- Draw a green dot on each damaged entity and a line from the entity to the player.
 -- This does NOT clear old visuals; call clear_damaged_markers first
 -- if you want only the current set to be visible.
-local function draw_damaged_visuals(player, pdata, damaged_walls)
-    if not damaged_walls or #damaged_walls == 0 then
+local function draw_damaged_visuals(player, pdata, damaged_entities)
+    if not damaged_entities or #damaged_entities == 0 then
         return
     end
 
     pdata.damaged_markers = pdata.damaged_markers or {}
     pdata.damaged_lines = pdata.damaged_lines or {}
 
-    local player_pos = player.position
-
-    -- Use an entity for the line target so it tracks as the player moves.
     local player_target = player.character or player
 
-    for _, wall in pairs(damaged_walls) do
-        if wall and wall.valid then
-            -- Small filled green circle at the wall's position (dot).
+    for _, ent in pairs(damaged_entities) do
+        if ent and ent.valid then
+            -- Small filled green circle at the entity's position (dot).
             local dot = rendering.draw_circle {
                 color = {
                     r = 0,
@@ -155,13 +276,13 @@ local function draw_damaged_visuals(player, pdata, damaged_walls)
                 }, -- solid green
                 radius = 0.15,
                 filled = true,
-                target = wall,
-                surface = wall.surface,
+                target = ent,
+                surface = ent.surface,
                 only_in_alt_mode = false
             }
             pdata.damaged_markers[#pdata.damaged_markers + 1] = dot
 
-            -- Line from the wall to the player.
+            -- Line from the entity to the player.
             local line = rendering.draw_line {
                 color = {
                     r = 1,
@@ -170,9 +291,9 @@ local function draw_damaged_visuals(player, pdata, damaged_walls)
                     a = 0.1
                 }, -- semi-transparent red
                 width = 1,
-                from = wall, -- start at wall entity
+                from = ent, -- start at entity
                 to = player_target, -- end at player entity (follows movement)
-                surface = wall.surface,
+                surface = ent.surface,
                 only_in_alt_mode = false
             }
             pdata.damaged_lines[#pdata.damaged_lines + 1] = line
@@ -255,87 +376,27 @@ script.on_load(function()
 end)
 
 ---------------------------------------------------
--- WALL / HEALTH HELPERS
+-- DAMAGED ENTITY SEARCH
 ---------------------------------------------------
 
--- Safely obtain the maximum health for an entity.
--- Uses pcall around the prototype access in case max_health doesn't exist.
-local function get_entity_max_health(entity)
-    if not (entity and entity.valid) then
-        return nil
-    end
+-- Find all damaged entities of this force on the given surface
+-- within a radius around "center".
+-- This is now generic: ANY entity with health can be a candidate.
+local function find_damaged_entities(surface, force, center, radius)
+    local area = {{center.x - radius, center.y - radius}, {center.x + radius, center.y + radius}}
 
-    local proto = entity.prototype
-    if not proto then
-        return nil
-    end
-
-    -- Access via pcall so missing property doesn't crash.
-    local ok, max = pcall(function()
-        return proto.max_health
-    end)
-
-    if ok and type(max) == "number" and max > 0 then
-        return max
-    end
-
-    -- If we can't read max_health reliably, return nil.
-    return nil
-end
-
--- Generic damage check for any entity type.
--- entity        : LuaEntity
--- max_table     : table mapping entity.name -> max_health
--- log_prefix    : string prefix for log messages, e.g. "[WallRepair]"
-local function is_entity_damaged(entity, max_table, log_prefix)
-    if not (entity and entity.valid and entity.health) then
-        return false
-    end
-
-    local name = entity.name
-    local defined_max = max_table[name]
-
-    if defined_max then
-        return entity.health < defined_max
-    end
-
-    ------------------------------------------------------------
-    -- Entity type not found: print an error ONCE per entity name
-    ------------------------------------------------------------
-    local key = (log_prefix or "") .. "|" .. name
-    if not UNKNOWN_ENTITY_WARNED[key] then
-        UNKNOWN_ENTITY_WARNED[key] = true
-        game.print(string.format("%s[ERROR] No max health defined for entity type: %s", log_prefix or "", name))
-    end
-
-    -- Unknown entity types are treated as NOT damaged.
-    return false
-end
-
--- Determine whether a given wall entity is damaged.
-local function is_wall_damaged(wall)
-    return is_entity_damaged(wall, ENTITY_MAX_HEALTH, "[WallRepair]")
-end
-
----------------------------------------------------
--- WALL / HEALTH HELPERS
----------------------------------------------------
-
--- Find all damaged walls of this force on the given surface
--- (no longer limited to a radius around a point).
-local function find_damaged_walls(surface, force, center, radius)
-    -- We now search all wall entities of this force on the surface.
-    -- 'center' and 'radius' are kept in the signature for compatibility.
+    -- We search all entities of this force in the area.
+    -- is_entity_damaged() will filter out those without health or not damaged.
     local candidates = surface.find_entities_filtered {
-        type = "wall",
-        force = force
+        force = force,
+        area = area
     }
 
     local damaged = {}
 
-    for _, wall in pairs(candidates) do
-        if is_wall_damaged(wall) then
-            damaged[#damaged + 1] = wall
+    for _, ent in pairs(candidates) do
+        if is_entity_damaged(ent) then
+            damaged[#damaged + 1] = ent
         end
     end
 
@@ -346,12 +407,12 @@ end
 -- ROUTE BUILDING (NEAREST NEIGHBOUR)
 ---------------------------------------------------
 
--- Build an ordered route over a set of wall entities, such that each next wall
+-- Build an ordered route over a set of entities, such that each next entity
 -- is the nearest to the previous one. This is a greedy nearest-neighbour TSP approximation.
-local function build_nearest_route(walls, start_pos)
+local function build_nearest_route(entities, start_pos)
     local ordered = {}
     local used = {}
-    local remaining = #walls
+    local remaining = #entities
 
     -- Start the route from the given starting position (usually the bot position).
     local current_x = start_pos.x
@@ -360,12 +421,12 @@ local function build_nearest_route(walls, start_pos)
     while remaining > 0 do
         local best_i, best_d2 = nil, nil
 
-        -- Find the nearest unused, valid wall to the current point.
-        for i, wall in ipairs(walls) do
-            if not used[i] and wall.valid then
-                local wp = wall.position
-                local dx = wp.x - current_x
-                local dy = wp.y - current_y
+        -- Find the nearest unused, valid entity to the current point.
+        for i, ent in ipairs(entities) do
+            if not used[i] and ent.valid then
+                local ep = ent.position
+                local dx = ep.x - current_x
+                local dy = ep.y - current_y
                 local d2 = dx * dx + dy * dy
 
                 if not best_d2 or d2 < best_d2 then
@@ -375,28 +436,28 @@ local function build_nearest_route(walls, start_pos)
             end
         end
 
-        -- If we couldn't find any more valid walls, stop.
+        -- If we couldn't find any more valid entities, stop.
         if not best_i then
             break
         end
 
-        -- Add the chosen wall to the ordered route.
-        local w = walls[best_i]
+        -- Add the chosen entity to the ordered route.
+        local e = entities[best_i]
         used[best_i] = true
-        ordered[#ordered + 1] = w
+        ordered[#ordered + 1] = e
         remaining = remaining - 1
 
-        -- Advance the "current point" to this wall.
-        local wp = w.position
-        current_x = wp.x
-        current_y = wp.y
+        -- Advance the "current point" to this entity.
+        local ep = e.position
+        current_x = ep.x
+        current_y = ep.y
     end
 
     return ordered
 end
 
 -- Rebuild the player's current repair route.
--- Damaged walls are FOUND around the PLAYER, but the route itself is still
+-- Damaged entities are FOUND around the PLAYER, but the route itself is still
 -- built starting from the BOT position (so the bot travels efficiently).
 local function rebuild_repair_route(player, pdata, bot)
     if not (bot and bot.valid) then
@@ -421,20 +482,20 @@ local function rebuild_repair_route(player, pdata, bot)
     -- Search center is the PLAYER position, not the bot.
     local search_center = player.position
 
-    -- Search for damaged walls around the player.
-    local damaged = find_damaged_walls(surface, force, search_center, WALL_SEARCH_RADIUS)
+    -- Search for damaged entities around the player.
+    local damaged = find_damaged_entities(surface, force, search_center, WALL_SEARCH_RADIUS)
 
     -- Always reset markers based on the latest damaged list.
     clear_damaged_markers(pdata)
 
     if not damaged or #damaged == 0 then
-        -- No damaged walls found: clear route and leave no dots/lines.
+        -- No damaged entities found: clear route and leave no dots/lines.
         pdata.repair_targets = nil
         pdata.current_target_index = 1
         return
     end
 
-    -- Draw a green dot and line for every damaged wall we found near the player.
+    -- Draw a green dot and line for every damaged entity we found near the player.
     draw_damaged_visuals(player, pdata, damaged)
 
     -- Route is still built to be efficient from the BOT's current position.
@@ -446,7 +507,7 @@ end
 -- BOT SPAWN / MOVEMENT / REPAIR
 ---------------------------------------------------
 
--- Spawn the wall bot near the given player and reset its state.
+-- Spawn the repair bot near the given player and reset its state.
 local function spawn_wall_bot_for_player(player, pdata)
     if not (player and player.valid and player.character) then
         return
@@ -472,9 +533,9 @@ local function spawn_wall_bot_for_player(player, pdata)
         pdata.repair_targets = nil
         pdata.current_target_index = 1
 
-        player.print("[WallRepair] Wall bot spawned.")
+        player.print("[WallRepair] Repair bot spawned.")
     else
-        player.print("[WallRepair] Failed to spawn wall bot.")
+        player.print("[WallRepair] Failed to spawn repair bot.")
     end
 end
 
@@ -497,39 +558,34 @@ local function move_bot_to(bot, target_pos)
     }
 end
 
--- Repair all walls within a radius of a given center point.
-local function repair_walls_near(surface, force, center, radius)
+-- Repair all damaged entities within a radius of a given center point.
+local function repair_entities_near(surface, force, center, radius)
     local area = {{center.x - radius, center.y - radius}, {center.x + radius, center.y + radius}}
 
-    local walls = surface.find_entities_filtered {
-        type = "wall",
+    local entities = surface.find_entities_filtered {
         force = force,
         area = area
     }
 
-    for _, wall in pairs(walls) do
-        if wall.valid and wall.health then
-            local max = get_entity_max_health(wall)
+    for _, ent in pairs(entities) do
+        if ent.valid and ent.health then
+            local max = get_entity_max_health(ent)
             if max then
                 -- Set exactly to max health when we know it.
-                wall.health = max
-            else
-                -- Fallback: Factorio will clamp this if there is a max,
-                -- and if not, it's still safe.
-                wall.health = WALL_MAX_HEALTH
+                ent.health = max
             end
         end
     end
 end
 
--- Main per-tick update for a single player's wall bot.
+-- Main per-tick update for a single player's repair bot.
 local function update_wall_bot_for_player(player, pdata)
     -- If the feature is disabled for this player, do nothing.
     if not pdata.wall_bot_enabled then
         return
     end
 
-    -- Ensure the wall bot entity exists.
+    -- Ensure the bot entity exists.
     local bot = pdata.wall_bot
     if not (bot and bot.valid) then
         spawn_wall_bot_for_player(player, pdata)
@@ -543,15 +599,15 @@ local function update_wall_bot_for_player(player, pdata)
     draw_bot_highlight(bot, pdata)
 
     ---------------------------------------------------
-    -- Always rebuild the damaged-wall route so that:
-    -- - walls repaired by the bot are removed
-    -- - walls repaired by the PLAYER (or anything else)
+    -- Always rebuild the damaged-entity route so that:
+    -- - entities repaired by the bot are removed
+    -- - entities repaired by the PLAYER (or anything else)
     --   are also removed from the list and their
     --   markers/lines disappear on the next update.
     ---------------------------------------------------
     rebuild_repair_route(player, pdata, bot)
 
-    -- Make sure we have a current list of damaged walls ordered by nearest-neighbour.
+    -- Make sure we have a current list of damaged entities ordered by nearest-neighbour.
     local targets = pdata.repair_targets
 
     -- If no targets, idle (and clear markers).
@@ -566,10 +622,10 @@ local function update_wall_bot_for_player(player, pdata)
         idx = 1
     end
 
-    local target_wall = targets[idx]
+    local target_entity = targets[idx]
 
-    -- Skip invalid or fully repaired walls, advancing through the route.
-    while target_wall and (not target_wall.valid or not is_wall_damaged(target_wall)) do
+    -- Skip invalid or fully repaired entities, advancing through the route.
+    while target_entity and (not target_entity.valid or not is_entity_damaged(target_entity)) do
         idx = idx + 1
         if idx > #targets then
             -- We've exhausted the current route; rebuild to pick up any new damage.
@@ -583,10 +639,10 @@ local function update_wall_bot_for_player(player, pdata)
             end
         end
 
-        target_wall = targets[idx]
+        target_entity = targets[idx]
     end
 
-    if not target_wall or not target_wall.valid then
+    if not target_entity or not target_entity.valid then
         return
     end
 
@@ -594,24 +650,24 @@ local function update_wall_bot_for_player(player, pdata)
     pdata.current_target_index = idx
 
     -- Movement and repair logic.
-    local tp = target_wall.position
+    local tp = target_entity.position
     local bp = bot.position
     local dx = tp.x - bp.x
     local dy = tp.y - bp.y
     local dist_sq = dx * dx + dy * dy
 
     if dist_sq <= (WALL_REPAIR_DISTANCE * WALL_REPAIR_DISTANCE) then
-        -- Close enough: repair walls around the target.
-        repair_walls_near(bot.surface, bot.force, tp, WALL_REPAIR_RADIUS)
+        -- Close enough: repair entities around the target.
+        repair_entities_near(bot.surface, bot.force, tp, WALL_REPAIR_RADIUS)
 
-        -- Immediately rebuild the damaged-wall list since health changed.
+        -- Immediately rebuild the damaged-entity list since health changed.
         rebuild_repair_route(player, pdata, bot)
         targets = pdata.repair_targets
 
-        -- Next tick, proceed to the next wall in the route.
+        -- Next tick, proceed to the next entity in the route.
         pdata.current_target_index = idx + 1
     else
-        -- Not close enough yet: keep moving towards the target wall.
+        -- Not close enough yet: keep moving towards the target entity.
         move_bot_to(bot, tp)
     end
 end
@@ -621,7 +677,7 @@ end
 ---------------------------------------------------
 
 -- IMPORTANT: this name must match the custom-input name in data.lua
--- Toggles the wall bot for the player who pressed the key.
+-- Toggles the repair bot for the player who pressed the key.
 script.on_event("augment-toggle-wall-bot", function(event)
     local player = game.get_player(event.player_index)
     if not player then
@@ -641,7 +697,7 @@ script.on_event("augment-toggle-wall-bot", function(event)
         if not (pdata.wall_bot and pdata.wall_bot.valid) then
             spawn_wall_bot_for_player(player, pdata)
         end
-        player.print("[WallRepair] Wall bot enabled.")
+        player.print("[WallRepair] Repair bot enabled.")
     else
         -- Disable: destroy bot and clear state.
         if pdata.wall_bot and pdata.wall_bot.valid then
@@ -652,7 +708,7 @@ script.on_event("augment-toggle-wall-bot", function(event)
         pdata.repair_targets = nil
         pdata.current_target_index = 1
 
-        -- Clear all damaged-wall visuals (dots + lines) when disabling.
+        -- Clear all damaged-entity visuals (dots + lines) when disabling.
         clear_damaged_markers(pdata)
 
         -- Remove highlight if present.
@@ -664,7 +720,7 @@ script.on_event("augment-toggle-wall-bot", function(event)
             pdata.highlight_object = nil
         end
 
-        player.print("[WallRepair] Wall bot disabled.")
+        player.print("[WallRepair] Repair bot disabled.")
     end
 end)
 
@@ -689,11 +745,6 @@ script.on_event(defines.events.on_tick, function(event)
         player.print("[WallRepair] Player found but no pdata exists.")
         return
     end
-
-    -- Debug print with some player + pdata info
-    -- player.print("[WallRepair] Tick " .. event.tick .. " | Player: " .. player.name .. " | Bot Enabled: " ..
-    --                  tostring(pdata.wall_bot_enabled) .. " | Repair Targets: " ..
-    --                  tostring(pdata.repair_targets and #pdata.repair_targets or 0))
 
     if pdata.wall_bot_enabled then
         update_wall_bot_for_player(player, pdata)
