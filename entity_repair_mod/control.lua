@@ -231,6 +231,7 @@ local function init_player(player)
 
             -- visuals (rendered on display)
             vis_highlight_object = nil,
+            vis_lines = nil,
             vis_damaged_markers = nil,
             vis_damaged_lines = nil,
             vis_bot_path = nil,
@@ -255,6 +256,7 @@ local function init_player(player)
 
         -- visuals (rendered on display)
         pdata.vis_highlight_object = pdata.vis_highlight_object or nil
+        pdata.vis_lines = pdata.vis_lines or pdata.vis_lines
         pdata.vis_damaged_markers = pdata.vis_damaged_markers or nil
         pdata.vis_damaged_lines = pdata.vis_damaged_lines or nil
         pdata.vis_bot_path = pdata.vis_bot_path or nil
@@ -366,6 +368,7 @@ local function rebuild_repair_route(player, pdata, bot)
     if not damaged or #damaged == 0 then
         pdata.damaged_entities = nil
         pdata.damaged_entities_next_repair_index = 1
+        visuals.draw_bot_player_visuals(player, bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
         return
     end
 
@@ -561,6 +564,9 @@ local function update_repair_bot_for_player(player, pdata)
             return
         end
     end
+
+    -- clear any drawn lines
+    visuals.clear_lines(pdata)
 
     -- visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
 

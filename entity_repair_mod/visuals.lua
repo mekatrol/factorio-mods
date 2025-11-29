@@ -1,5 +1,48 @@
 local visuals = {}
 
+function visuals.clear_lines(pdata)
+    if pdata.vis_lines then
+        for _, obj in pairs(pdata.vis_lines) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+        pdata.vis_lines = nil
+    end
+end
+
+function visuals.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_offset)
+    if not (player and player.valid and bot and bot.valid) then
+        return
+    end
+
+    local y_offset = bot_highlight_y_offset or 0
+
+    local bot_pos = bot.position
+    local to_pos = {
+        x = bot_pos.x,
+        y = bot_pos.y + y_offset
+    }
+
+    pdata.vis_lines = pdata.vis_lines or {}
+
+    local line = rendering.draw_line {
+        color = {
+            r = 0.3,
+            g = 0.3,
+            b = 0.3,
+            a = 0.1
+        },
+        width = 1,
+        from = player.position,
+        to = to_pos,
+        surface = bot.surface,
+        only_in_alt_mode = false
+    }
+
+    pdata.vis_lines[#pdata.vis_lines + 1] = line
+end
+
 ---------------------------------------------------
 -- DAMAGED ENTITY MARKERS (DOTS + LINES)
 ---------------------------------------------------
@@ -28,19 +71,25 @@ function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highligh
         return
     end
 
+    local y_offset = bot_highlight_y_offset or 0
+
+    local bot_pos = bot.position
+    local to_pos = {
+        x = bot_pos.x,
+        y = bot_pos.y + y_offset
+    }
+
     pdata.vis_damaged_markers = pdata.vis_damaged_markers or {}
     pdata.vis_damaged_lines = pdata.vis_damaged_lines or {}
-
-    local y_offset = bot_highlight_y_offset or 0
 
     for _, ent in pairs(damaged_entities) do
         if ent and ent.valid then
             local dot = rendering.draw_circle {
                 color = {
                     r = 0,
-                    g = 1,
+                    g = 0.3,
                     b = 0,
-                    a = 1
+                    a = 0.1
                 },
                 radius = 0.15,
                 filled = true,
@@ -58,9 +107,8 @@ function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highligh
                     a = 0.1
                 },
                 width = 1,
-                from = ent,
-                to = bot,
-                to_offset = {0, y_offset},
+                from = ent.position,
+                to = bot_pos,
                 surface = ent.surface,
                 only_in_alt_mode = false
             }
