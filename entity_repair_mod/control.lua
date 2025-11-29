@@ -5,6 +5,10 @@
 -- 60 ticks = 1 second, so 30 = every 0.5 seconds.
 local WALL_BOT_UPDATE_INTERVAL = 30
 
+-- How often (in ticks) to scan player entities for max health of unknown types.
+-- 60 ticks = 1 second, 3600 = 1 minute.
+local MAX_HEALTH_SCAN_INTERVAL = 3600
+
 -- Radius (in tiles) around the player to search for damaged entities.
 -- (Name kept for compatibility, but this applies to ANY entity with health.)
 local WALL_SEARCH_RADIUS = 64
@@ -48,11 +52,74 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["long-handed-inserter"] = 160,
     ["lab"] = 150,
     ["fast-underground-belt"] = 160,
-    ["wooden-chest"] = 100
+    ["wooden-chest"] = 100,
+    ["pumpjack"] = 200,
+    ["pipe-to-ground"] = 150,
+    ["pipe"] = 100,
+    ["storage-tank"] = 500,
+    ["offshore-pump"] = 150,
+    ["boiler"] = 200,
+    ["steam-engine"] = 400
 }
 
 -- Tracks which entity names we have already warned about (so we don't spam chat).
 local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
+
+-- Persistent discovered max health values (per entity name)
+local function get_discovered_table()
+    storage.wall_repair_mod = storage.wall_repair_mod or {}
+    local s = storage.wall_repair_mod
+    s.discovered_max_health = s.discovered_max_health or {}
+    return s.discovered_max_health
+end
+
+-- Scan all entities of the given force on all surfaces.
+-- For any entity whose name is NOT in ENTITY_MAX_HEALTH, track the highest
+-- health seen and write out a suggested constant when it increases.
+local function scan_player_entities_for_max_health(force)
+    if not force then
+        return
+    end
+
+    local discovered = get_discovered_table()
+
+    for _, surface in pairs(game.surfaces) do
+        -- All entities belonging to this force on this surface
+        local entities = surface.find_entities_filtered {
+            force = force
+        }
+
+        for _, e in pairs(entities) do
+            if e.valid and e.health then
+                local name = e.name
+
+                -- Skip entities we already have a constant for
+                if not ENTITY_MAX_HEALTH[name] then
+                    local h = e.health
+                    local prev = discovered[name]
+
+                    -- Only care if this is a new maximum
+                    if not prev or h > prev then
+                        discovered[name] = h
+                        local suggested = math.floor(h + 0.5)
+
+                        local line = string.format("[\"%s\"] = %d,\n", name, suggested)
+
+                        -- Print in-game so you can see it immediately
+                        game.print("[WallRepair][SCAN] " .. line)
+
+                        -- Write to disk if helpers.write_file is available (Factorio 2.0+)
+                        if helpers and helpers.write_file then
+                            helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
+                        else
+                            game.print("[WallRepair][WARN] helpers.write_file not available; cannot write to disk.")
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
 
 -- Scan all entities of this name for this force and return the highest
 -- .health value observed. Also prints a suggested constant to add.
@@ -82,12 +149,12 @@ local function infer_max_health_from_world(name, force)
                                      "Suggested: ENTITY_MAX_HEALTH[\"%s\"] = %d", max_health_seen, name, force.name,
             name, suggested))
 
-        local line = string.format("ENTITY_MAX_HEALTH[\"%s\"] = %d\n", name, suggested)
+        local line = string.format("[\"%s\"] = %d,\n", name, suggested)
 
         game.print("[WallRepair][INFO] " .. line)
 
         if helpers and helpers.write_file then
-            helpers.write_file("repair_mod_maxhealth.txt", line, true)
+            helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
         else
             -- fallback to avoid crashing
             game.print("[WallRepair][WARN] helpers.write_file not available; cannot write to disk.")
@@ -729,7 +796,7 @@ end)
 ---------------------------------------------------
 
 script.on_event(defines.events.on_tick, function(event)
-    -- Only run the logic every WALL_BOT_UPDATE_INTERVAL ticks.
+    -- Only run the main logic every WALL_BOT_UPDATE_INTERVAL ticks.
     if event.tick % WALL_BOT_UPDATE_INTERVAL ~= 0 then
         return
     end
@@ -746,7 +813,13 @@ script.on_event(defines.events.on_tick, function(event)
         return
     end
 
+    -- Periodic scan of all player-force entities for unknown max health
+    if event.tick % MAX_HEALTH_SCAN_INTERVAL == 0 then
+        scan_player_entities_for_max_health(player.force)
+    end
+
     if pdata.wall_bot_enabled then
         update_wall_bot_for_player(player, pdata)
     end
 end)
+
