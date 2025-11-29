@@ -2,24 +2,27 @@
 -- CONFIGURATION
 ---------------------------------------------------
 -- How often (in ticks) to update the repair bot logic.
--- 60 ticks = 1 second, so 30 = every 0.5 seconds.
-local WALL_BOT_UPDATE_INTERVAL = 30
+-- 60 ticks = 1 second, 1 = every tick (smooth movement).
+local REPAIR_BOT_UPDATE_INTERVAL = 1
+
+-- Bot movement speed in tiles per second.
+-- Vanilla construction robot is ~4 tiles/second.
+local BOT_SPEED_TILES_PER_SECOND = 4.0
 
 -- How often (in ticks) to scan player entities for max health of unknown types.
 -- 60 ticks = 1 second, 3600 = 1 minute.
 local MAX_HEALTH_SCAN_INTERVAL = 3600
 
 -- Radius (in tiles) around the player to search for damaged entities.
--- (Name kept for compatibility, but this applies to ANY entity with health.)
-local WALL_SEARCH_RADIUS = 64
+local ENTITY_SEARCH_RADIUS = 64
 
 -- Distance (in tiles) at which the bot considers itself "close enough"
 -- to a target entity to perform repairs.
-local WALL_REPAIR_DISTANCE = 20.0
+local ENTITY_REPAIR_DISTANCE = 20.0
 
 -- Radius (in tiles) around the repair target to actually repair entities.
 -- All entities in this radius will be repaired to max health.
-local WALL_REPAIR_RADIUS = 20.0
+local ENTITY_REPAIR_RADIUS = 20.0
 
 -- Vertical offset (in tiles) to move the bot highlight up so it surrounds
 -- the flying construction-robot sprite instead of the ground position.
@@ -28,7 +31,11 @@ local WALL_REPAIR_RADIUS = 20.0
 local BOT_HIGHLIGHT_Y_OFFSET = -1.2
 
 -- Distance (in tiles) the bot tries to maintain from the player
-local BOT_FOLLOW_DISTANCE = 3.0
+local BOT_FOLLOW_DISTANCE = 1.0
+
+-- Distance the bot moves per update (in tiles).
+-- With REPAIR_BOT_UPDATE_INTERVAL = 1, this is tiles per tick.
+local BOT_STEP_DISTANCE = 0.5
 
 ---------------------------------------------------
 -- REPAIR TOOL CONFIGURATION
@@ -89,8 +96,8 @@ local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
 
 -- Persistent discovered max health values (per entity name)
 local function get_discovered_table()
-    storage.wall_repair_mod = storage.wall_repair_mod or {}
-    local s = storage.wall_repair_mod
+    storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
+    local s = storage.mekatrol_repair_mod
     s.discovered_max_health = s.discovered_max_health or {}
     return s.discovered_max_health
 end
@@ -128,13 +135,13 @@ local function scan_player_entities_for_max_health(force)
                         local line = string.format("[\"%s\"] = %d,\n", name, suggested)
 
                         -- Print in-game so you can see it immediately
-                        game.print("[WallRepair][SCAN] " .. line)
+                        game.print("[MekatrolRepair][SCAN] " .. line)
 
                         -- Write to disk if helpers.write_file is available (Factorio 2.0+)
                         if helpers and helpers.write_file then
                             helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
                         else
-                            game.print("[WallRepair][WARN] helpers.write_file not available; cannot write to disk.")
+                            game.print("[MekatrolRepair][WARN] helpers.write_file not available; cannot write to disk.")
                         end
                     end
                 end
@@ -167,25 +174,25 @@ local function infer_max_health_from_world(name, force)
 
     if max_health_seen > 0 then
         local suggested = math.floor(max_health_seen + 0.5)
-        game.print(string.format("[WallRepair][INFO] Observed max health %.1f for '%s' (force=%s). " ..
+        game.print(string.format("[MekatrolRepair][INFO] Observed max health %.1f for '%s' (force=%s). " ..
                                      "Suggested: ENTITY_MAX_HEALTH[\"%s\"] = %d", max_health_seen, name, force.name,
             name, suggested))
 
         local line = string.format("[\"%s\"] = %d,\n", name, suggested)
 
-        game.print("[WallRepair][INFO] " .. line)
+        game.print("[MekatrolRepair][INFO] " .. line)
 
         if helpers and helpers.write_file then
             helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
         else
             -- fallback to avoid crashing
-            game.print("[WallRepair][WARN] helpers.write_file not available; cannot write to disk.")
+            game.print("[MekatrolRepair][WARN] helpers.write_file not available; cannot write to disk.")
         end
 
         return suggested
     else
         game.print(string.format(
-            "[WallRepair][INFO] Could not infer max health for '%s' (no live entities with health).", name))
+            "[MekatrolRepair][INFO] Could not infer max health for '%s' (no live entities with health).", name))
         return nil
     end
 end
@@ -260,8 +267,8 @@ end
 -- not for every player in the game.
 local function init_player(player)
     -- Root storage table for this mod.
-    storage.wall_repair_mod = storage.wall_repair_mod or {}
-    local s = storage.wall_repair_mod
+    storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
+    local s = storage.mekatrol_repair_mod
 
     -- Per-player subtable.
     s.players = s.players or {}
@@ -271,10 +278,10 @@ local function init_player(player)
         -- First-time initialisation for this player.
         pdata = {
             -- Whether this player's repair bot is enabled.
-            wall_bot_enabled = false,
+            repair_bot_enabled = false,
 
             -- The actual bot entity (LuaEntity) or nil if not spawned.
-            wall_bot = nil,
+            repair_bot = nil,
 
             -- Route of damaged entities to visit (array of LuaEntity).
             repair_targets = nil,
@@ -298,8 +305,8 @@ local function init_player(player)
         s.players[player.index] = pdata
     else
         -- Backwards compatibility / ensure all fields exist.
-        if pdata.wall_bot_enabled == nil then
-            pdata.wall_bot_enabled = false
+        if pdata.repair_bot_enabled == nil then
+            pdata.repair_bot_enabled = false
         end
 
         pdata.repair_targets = pdata.repair_targets or nil
@@ -313,8 +320,8 @@ end
 -- Obtain the persistent player data table for a given player index.
 -- If it doesn't exist yet, this will initialise it.
 local function get_player_data(index)
-    storage.wall_repair_mod = storage.wall_repair_mod or {}
-    local s = storage.wall_repair_mod
+    storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
+    local s = storage.mekatrol_repair_mod
 
     s.players = s.players or {}
     local pdata = s.players[index]
@@ -464,12 +471,12 @@ end
 
 -- Called once when the mod is first initialised for a save.
 script.on_init(function()
-    storage.wall_repair_mod = storage.wall_repair_mod or {}
+    storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
 end)
 
 -- Called when mod configuration (version, dependencies, etc.) changes.
 script.on_configuration_changed(function(_)
-    storage.wall_repair_mod = storage.wall_repair_mod or {}
+    storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
 end)
 
 -- Called when a new player is created (e.g. new game or new MP player).
@@ -593,7 +600,7 @@ local function rebuild_repair_route(player, pdata, bot)
     local search_center = player.position
 
     -- Search for damaged entities around the player.
-    local damaged = find_damaged_entities(surface, force, search_center, WALL_SEARCH_RADIUS)
+    local damaged = find_damaged_entities(surface, force, search_center, ENTITY_SEARCH_RADIUS)
 
     -- Always reset markers based on the latest damaged list.
     clear_damaged_markers(pdata)
@@ -618,7 +625,7 @@ end
 ---------------------------------------------------
 
 -- Spawn the repair bot near the given player and reset its state.
-local function spawn_wall_bot_for_player(player, pdata)
+local function spawn_repair_bot_for_player(player, pdata)
     if not (player and player.valid and player.character) then
         return
     end
@@ -626,7 +633,6 @@ local function spawn_wall_bot_for_player(player, pdata)
     local surface = player.surface
     local pos = player.position
 
-    -- Create the bot one tile to the right of the player.
     local bot = surface.create_entity {
         name = "mekatrol-repair-bot",
         position = {pos.x + 1, pos.y},
@@ -634,29 +640,73 @@ local function spawn_wall_bot_for_player(player, pdata)
     }
 
     if bot then
-        -- Make sure it can't be killed accidentally.
         bot.destructible = false
-
-        pdata.wall_bot = bot
+        pdata.repair_bot = bot
 
         -- Reset current route.
         pdata.repair_targets = nil
         pdata.current_target_index = 1
 
-        player.print("[WallRepair] Repair bot spawned.")
+        player.print("[MekatrolRepair] Repair bot spawned.")
     else
-        player.print("[WallRepair] Failed to spawn repair bot.")
+        player.print("[MekatrolRepair] Failed to spawn repair bot.")
     end
 end
 
-local function move_bot_to(bot, target_pos)
-    if not (bot and bot.valid and target_pos) then
+local function move_bot_to(bot, target)
+    if not (bot and bot.valid and target) then
+        game.print("[MekatrolRepair][move_bot_to] invalid bot or target (nil)")
         return
     end
 
-    -- Easiest: just snap the bot directly to the target.
-    -- If you want it to “glide”, you can move it in small steps per tick instead.
-    bot.teleport(target_pos)
+    local tp
+
+    if type(target) == "table" and target.position ~= nil then
+        -- entity
+        tp = target.position
+
+    elseif type(target) == "table" and target.x ~= nil and target.y ~= nil then
+        -- {x=..., y=...}
+        tp = target
+
+    elseif type(target) == "table" and target[1] ~= nil and target[2] ~= nil then
+        -- {x, y} numeric indices; auto-convert
+        tp = {
+            x = target[1],
+            y = target[2]
+        }
+    else
+        local desc = serpent and serpent.line(target) or "<no serpent>"
+        return
+    end
+
+    local bp = bot.position
+
+    local dx = tp.x - bp.x
+    local dy = tp.y - bp.y
+    local dist_sq = dx * dx + dy * dy
+
+    if dist_sq == 0 then
+        return
+    end
+
+    local dist = math.sqrt(dist_sq)
+
+    if dist <= BOT_STEP_DISTANCE then
+        bot.teleport {
+            x = tp.x,
+            y = tp.y
+        }
+        return
+    end
+
+    local nx = dx / dist
+    local ny = dy / dist
+
+    bot.teleport {
+        x = bp.x + nx * BOT_STEP_DISTANCE,
+        y = bp.y + ny * BOT_STEP_DISTANCE
+    }
 end
 
 local function follow_player(bot, player)
@@ -678,7 +728,10 @@ local function follow_player(bot, player)
         local offset_x = 0.5
         local offset_y = -0.5
 
-        local target_pos = {pp.x + offset_x, pp.y + offset_y}
+        local target_pos = {
+            x = pp.x + offset_x,
+            y = pp.y + offset_y
+        }
 
         -- Reuse your existing movement (currently teleport)
         move_bot_to(bot, target_pos)
@@ -701,7 +754,7 @@ local function repair_entities_near(player, surface, force, center, radius)
         local pdata = get_player_data(player.index)
         if pdata and not pdata.out_of_tools_warned then
             pdata.out_of_tools_warned = true
-            player.print("[WallRepair] No repair tools in your inventory. Bot cannot repair.")
+            player.print("[MekatrolRepair] No repair tools in your inventory. Bot cannot repair.")
         end
         return
     end
@@ -746,17 +799,17 @@ local function repair_entities_near(player, surface, force, center, radius)
 end
 
 -- Main per-tick update for a single player's repair bot.
-local function update_wall_bot_for_player(player, pdata)
+local function update_repair_bot_for_player(player, pdata)
     -- If the feature is disabled for this player, do nothing.
-    if not pdata.wall_bot_enabled then
+    if not pdata.repair_bot_enabled then
         return
     end
 
     -- Ensure the bot entity exists.
-    local bot = pdata.wall_bot
+    local bot = pdata.repair_bot
     if not (bot and bot.valid) then
-        spawn_wall_bot_for_player(player, pdata)
-        bot = pdata.wall_bot
+        spawn_repair_bot_for_player(player, pdata)
+        bot = pdata.repair_bot
         if not (bot and bot.valid) then
             return
         end
@@ -824,10 +877,10 @@ local function update_wall_bot_for_player(player, pdata)
     local dy = tp.y - bp.y
     local dist_sq = dx * dx + dy * dy
 
-    if dist_sq <= (WALL_REPAIR_DISTANCE * WALL_REPAIR_DISTANCE) then
+    if dist_sq <= (ENTITY_REPAIR_DISTANCE * ENTITY_REPAIR_DISTANCE) then
         -- Close enough: repair entities around the target,
         -- consuming repair tools from the player's inventory.
-        repair_entities_near(player, bot.surface, bot.force, tp, WALL_REPAIR_RADIUS)
+        repair_entities_near(player, bot.surface, bot.force, tp, ENTITY_REPAIR_RADIUS)
 
         -- Immediately rebuild the damaged-entity list since health changed.
         rebuild_repair_route(player, pdata, bot)
@@ -836,8 +889,11 @@ local function update_wall_bot_for_player(player, pdata)
         -- Next tick, proceed to the next entity in the route.
         pdata.current_target_index = idx + 1
     else
-        -- Not close enough yet: keep moving towards the target entity.
-        move_bot_to(bot, tp)
+        --- Not close enough yet: move towards the target entity.
+        move_bot_to(bot, {
+            x = tp.x,
+            y = tp.y
+        })
     end
 end
 
@@ -859,21 +915,21 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
     end
 
     -- Toggle on/off.
-    pdata.wall_bot_enabled = not pdata.wall_bot_enabled
+    pdata.repair_bot_enabled = not pdata.repair_bot_enabled
 
-    if pdata.wall_bot_enabled then
+    if pdata.repair_bot_enabled then
         -- Enable: spawn bot if needed.
-        if not (pdata.wall_bot and pdata.wall_bot.valid) then
-            spawn_wall_bot_for_player(player, pdata)
+        if not (pdata.repair_bot and pdata.repair_bot.valid) then
+            spawn_repair_bot_for_player(player, pdata)
         end
-        player.print("[WallRepair] Repair bot enabled.")
+        player.print("[MekatrolRepair] Repair bot enabled.")
     else
         -- Disable: destroy bot and clear state.
-        if pdata.wall_bot and pdata.wall_bot.valid then
-            pdata.wall_bot.destroy()
+        if pdata.repair_bot and pdata.repair_bot.valid then
+            pdata.repair_bot.destroy()
         end
 
-        pdata.wall_bot = nil
+        pdata.repair_bot = nil
         pdata.repair_targets = nil
         pdata.current_target_index = 1
 
@@ -889,7 +945,7 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
             pdata.highlight_object = nil
         end
 
-        player.print("[WallRepair] Repair bot disabled.")
+        player.print("[MekatrolRepair] Repair bot disabled.")
     end
 end)
 
@@ -898,8 +954,8 @@ end)
 ---------------------------------------------------
 
 script.on_event(defines.events.on_tick, function(event)
-    -- Only run the main logic every WALL_BOT_UPDATE_INTERVAL ticks.
-    if event.tick % WALL_BOT_UPDATE_INTERVAL ~= 0 then
+    -- Only run the main logic every REPAIR_BOT_UPDATE_INTERVAL ticks.
+    if event.tick % REPAIR_BOT_UPDATE_INTERVAL ~= 0 then
         return
     end
 
@@ -911,7 +967,7 @@ script.on_event(defines.events.on_tick, function(event)
 
     local pdata = get_player_data(player.index)
     if not pdata then
-        player.print("[WallRepair] Player found but no pdata exists.")
+        player.print("[MekatrolRepair] Player found but no pdata exists.")
         return
     end
 
@@ -920,8 +976,7 @@ script.on_event(defines.events.on_tick, function(event)
         scan_player_entities_for_max_health(player.force)
     end
 
-    if pdata.wall_bot_enabled then
-        update_wall_bot_for_player(player, pdata)
+    if pdata.repair_bot_enabled then
+        update_repair_bot_for_player(player, pdata)
     end
 end)
-
