@@ -1,13 +1,13 @@
 data:extend({ -- Hotkey to toggle the wall bot
 {
     type = "custom-input",
-    name = "augment-toggle-wall-bot", -- THIS is the event name
+    name = "mekatrol-toggle-repair-bot", -- THIS is the event name
     key_sequence = "CONTROL + SHIFT + W", -- change in-game if you like
     consuming = "none"
 }, -- Flying wall-repair drone unit
 {
     type = "unit",
-    name = "augment-wall-drone",
+    name = "mekatrol-repair-bot",
 
     icon = "__core__/graphics/player-force-icon.png", -- exists on your system
     icon_size = 32,

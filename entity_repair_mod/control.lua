@@ -518,7 +518,7 @@ local function spawn_wall_bot_for_player(player, pdata)
 
     -- Create the bot one tile to the right of the player.
     local bot = surface.create_entity {
-        name = "augment-wall-drone",
+        name = "mekatrol-repair-bot",
         position = {pos.x + 1, pos.y},
         force = player.force
     }
@@ -678,7 +678,7 @@ end
 
 -- IMPORTANT: this name must match the custom-input name in data.lua
 -- Toggles the repair bot for the player who pressed the key.
-script.on_event("augment-toggle-wall-bot", function(event)
+script.on_event("mekatrol-toggle-repair-bot", function(event)
     local player = game.get_player(event.player_index)
     if not player then
         return

@@ -1,7 +1,7 @@
 {
-  "name": "wall_repair_mod",
+  "name": "entity_repair_mod",
   "version": "1.0.0",
-  "title": "Wall Repair Mod",
+  "title": "Entity Repair Mod",
   "author": "mekatrol",
   "factorio_version": "2.0",
   "dependencies": []
