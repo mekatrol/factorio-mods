@@ -568,7 +568,8 @@ local function update_repair_bot_for_player(player, pdata)
     -- clear any drawn lines
     visuals.clear_lines(pdata)
 
-    -- visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
+    -- draw rect around bot
+    visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
 
     rebuild_repair_route(player, pdata, bot)
 

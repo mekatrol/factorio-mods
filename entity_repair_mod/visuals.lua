@@ -37,6 +37,7 @@ function visuals.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_off
         from = player.position,
         to = to_pos,
         surface = bot.surface,
+        draw_on_ground = true,
         only_in_alt_mode = false
     }
 
@@ -95,6 +96,7 @@ function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highligh
                 filled = true,
                 target = ent,
                 surface = ent.surface,
+                draw_on_ground = true,
                 only_in_alt_mode = false
             }
             pdata.vis_damaged_markers[#pdata.vis_damaged_markers + 1] = dot
@@ -110,6 +112,7 @@ function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highligh
                 from = ent.position,
                 to = bot_pos,
                 surface = ent.surface,
+                draw_on_ground = true,
                 only_in_alt_mode = false
             }
             pdata.vis_damaged_lines[#pdata.vis_damaged_lines + 1] = line
@@ -148,15 +151,16 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     pdata.vis_highlight_object = rendering.draw_rectangle {
         color = {
             r = 0,
-            g = 1,
-            b = 1,
-            a = 0.2
+            g = 0.2,
+            b = 0.2,
+            a = 0.1
         },
         filled = false,
         width = 2,
         left_top = left_top,
         right_bottom = right_bottom,
         surface = bot.surface,
+        draw_on_ground = true,
         only_in_alt_mode = false
     }
 end
