@@ -22,6 +22,18 @@ local WALL_REPAIR_DISTANCE = 20.0
 local WALL_REPAIR_RADIUS = 20.0
 
 ---------------------------------------------------
+-- REPAIR TOOL CONFIGURATION
+---------------------------------------------------
+
+-- Name of the item used for repairs.
+-- Change this if you use a custom repair item.
+local REPAIR_TOOL_NAME = "repair-pack"
+
+-- How many repair tools are consumed per entity fully repaired.
+-- You can tune this number.
+local REPAIR_TOOLS_PER_ENTITY = 1
+
+---------------------------------------------------
 -- HEALTH HELPERS / MAX HEALTH OVERRIDES
 ---------------------------------------------------
 -- Optional static overrides for max health of specific entity names.
@@ -31,6 +43,7 @@ local WALL_REPAIR_RADIUS = 20.0
 --
 -- By default this is empty and the mod uses prototype.max_health.
 local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
+    ["mekatrol-repair-bot"] = 100,
     ["stone-wall"] = 350,
     ["gun-turret"] = 400,
     ["fast-transport-belt"] = 160,
@@ -217,6 +230,18 @@ local function is_entity_damaged(entity)
     return entity.health < max
 end
 
+-- Get the player's main inventory (or nil if not available).
+local function get_player_main_inventory(player)
+    if not (player and player.valid) then
+        return nil
+    end
+    local inv = player.get_main_inventory()
+    if inv and inv.valid then
+        return inv
+    end
+    return nil
+end
+
 ---------------------------------------------------
 -- PLAYER STATE / INITIALISATION
 ---------------------------------------------------
@@ -255,7 +280,10 @@ local function init_player(player)
             damaged_markers = nil,
 
             -- Line render objects from damaged entities to the player.
-            damaged_lines = nil
+            damaged_lines = nil,
+
+            -- Whether we've already warned this player about being out of repair tools.
+            out_of_tools_warned = false
         }
 
         s.players[player.index] = pdata
@@ -625,8 +653,27 @@ local function move_bot_to(bot, target_pos)
     }
 end
 
--- Repair all damaged entities within a radius of a given center point.
-local function repair_entities_near(surface, force, center, radius)
+-- Repair all damaged entities within a radius of a given center point,
+-- consuming repair tools from the PLAYER'S inventory.
+local function repair_entities_near(player, surface, force, center, radius)
+    if not (player and player.valid) then
+        return
+    end
+
+    local inv = get_player_main_inventory(player)
+    if not inv then
+        return
+    end
+
+    if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
+        local pdata = get_player_data(player.index)
+        if pdata and not pdata.out_of_tools_warned then
+            pdata.out_of_tools_warned = true
+            player.print("[WallRepair] No repair tools in your inventory. Bot cannot repair.")
+        end
+        return
+    end
+
     local area = {{center.x - radius, center.y - radius}, {center.x + radius, center.y + radius}}
 
     local entities = surface.find_entities_filtered {
@@ -635,11 +682,32 @@ local function repair_entities_near(surface, force, center, radius)
     }
 
     for _, ent in pairs(entities) do
+        -- Stop if we have run out of tools.
+        if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
+            return
+        end
+
         if ent.valid and ent.health then
             local max = get_entity_max_health(ent)
-            if max then
-                -- Set exactly to max health when we know it.
-                ent.health = max
+            if max and ent.health < max then
+                -- Consume the repair tools needed for this entity.
+                local removed = inv.remove {
+                    name = REPAIR_TOOL_NAME,
+                    count = REPAIR_TOOLS_PER_ENTITY
+                }
+
+                -- Only repair if we actually consumed tools.
+                if removed > 0 then
+                    ent.health = max
+                    local pdata = get_player_data(player.index)
+                    if pdata then
+                        pdata.out_of_tools_warned = false
+                    end
+                else
+                    -- Could not remove tools (race condition or other mod),
+                    -- abort repairs.
+                    return
+                end
             end
         end
     end
@@ -724,8 +792,9 @@ local function update_wall_bot_for_player(player, pdata)
     local dist_sq = dx * dx + dy * dy
 
     if dist_sq <= (WALL_REPAIR_DISTANCE * WALL_REPAIR_DISTANCE) then
-        -- Close enough: repair entities around the target.
-        repair_entities_near(bot.surface, bot.force, tp, WALL_REPAIR_RADIUS)
+        -- Close enough: repair entities around the target,
+        -- consuming repair tools from the player's inventory.
+        repair_entities_near(player, bot.surface, bot.force, tp, WALL_REPAIR_RADIUS)
 
         -- Immediately rebuild the damaged-entity list since health changed.
         rebuild_repair_route(player, pdata, bot)
