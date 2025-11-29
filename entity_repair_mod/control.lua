@@ -49,6 +49,8 @@ local REPAIR_TOOL_NAME = "repair-pack"
 -- You can tune this number.
 local REPAIR_TOOLS_PER_ENTITY = 1
 
+local REPAIR_TOOL_HEALTH_INCREMENT_PCT = 0.1 -- Only add 10% of entity max health for each repair pack consumption
+
 ---------------------------------------------------
 -- HEALTH HELPERS / MAX HEALTH OVERRIDES
 ---------------------------------------------------
@@ -1350,6 +1352,7 @@ local function repair_entities_near(player, surface, force, center, radius)
         return
     end
 
+    -- If there are no tools at all, warn once and stop.
     if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
         local pdata = get_player_data(player.index)
         if pdata and not pdata.out_of_tools_warned then
@@ -1359,6 +1362,7 @@ local function repair_entities_near(player, surface, force, center, radius)
         return
     end
 
+    local pdata = get_player_data(player.index)
     local area = {{center.x - radius, center.y - radius}, {center.x + radius, center.y + radius}}
 
     local entities = surface.find_entities_filtered {
@@ -1369,6 +1373,10 @@ local function repair_entities_near(player, surface, force, center, radius)
     for _, ent in pairs(entities) do
         -- Stop if we have run out of tools.
         if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
+            if pdata then
+                pdata.out_of_tools_warned = true
+                player.print("[MekatrolRepairBot] Out of repair tools; stopping repairs.")
+            end
             return
         end
 
@@ -1383,8 +1391,11 @@ local function repair_entities_near(player, surface, force, center, radius)
 
                 -- Only repair if we actually consumed tools.
                 if removed > 0 then
-                    ent.health = max
-                    local pdata = get_player_data(player.index)
+                    -- Only add percentage of max health per repair pack, up to max.
+                    local health_increment = max * REPAIR_TOOL_HEALTH_INCREMENT_PCT
+                    ent.health = math.min(max, ent.health + health_increment)
+
+                    -- We successfully used tools, clear any previous warning.
                     if pdata then
                         pdata.out_of_tools_warned = false
                     end
