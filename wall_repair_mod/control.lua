@@ -16,8 +16,15 @@ local WALL_REPAIR_DISTANCE = 20.0
 -- All walls in this radius will be repaired to max health.
 local WALL_REPAIR_RADIUS = 20.0
 
--- The wall maximum health value
-local WALL_MAX_HEALTH = 350
+---------------------------------------------------
+-- MAX HEALTH TABLE
+---------------------------------------------------
+local ENTITY_MAX_HEALTH = {
+    ["stone-wall"] = 350 -- vanilla wall
+}
+
+-- Tracks which unknown entities we have already warned about (by key).
+local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
 
 ---------------------------------------------------
 -- PLAYER STATE / INITIALISATION
@@ -276,23 +283,38 @@ local function get_entity_max_health(entity)
     return nil
 end
 
--- Determine whether a given wall entity is damaged.
-local function is_wall_damaged(wall)
-    if not (wall and wall.valid and wall.health) then
+-- Generic damage check for any entity type.
+-- entity        : LuaEntity
+-- max_table     : table mapping entity.name -> max_health
+-- log_prefix    : string prefix for log messages, e.g. "[WallRepair]"
+local function is_entity_damaged(entity, max_table, log_prefix)
+    if not (entity and entity.valid and entity.health) then
         return false
     end
 
-    local max = get_entity_max_health(wall)
-    if max then
-        -- If we know the maximum health, compare against it.
-        return wall.health < max
+    local name = entity.name
+    local defined_max = max_table[name]
+
+    if defined_max then
+        return entity.health < defined_max
     end
 
-    -- Fallback if prototype has no max_health:
-    -- treat as damaged if below our "full repair" fallback value.
-    -- We use WALL_MAX_HEALTH because repair_walls_near sets wall.health = 350
-    -- when no proper max can be read.
-    return wall.health < WALL_MAX_HEALTH
+    ------------------------------------------------------------
+    -- Entity type not found: print an error ONCE per entity name
+    ------------------------------------------------------------
+    local key = (log_prefix or "") .. "|" .. name
+    if not UNKNOWN_ENTITY_WARNED[key] then
+        UNKNOWN_ENTITY_WARNED[key] = true
+        game.print(string.format("%s[ERROR] No max health defined for entity type: %s", log_prefix or "", name))
+    end
+
+    -- Unknown entity types are treated as NOT damaged.
+    return false
+end
+
+-- Determine whether a given wall entity is damaged.
+local function is_wall_damaged(wall)
+    return is_entity_damaged(wall, ENTITY_MAX_HEALTH, "[WallRepair]")
 end
 
 ---------------------------------------------------
