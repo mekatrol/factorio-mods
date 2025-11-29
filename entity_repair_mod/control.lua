@@ -94,6 +94,284 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
 -- Tracks which entity names we have already warned about (so we don't spam chat).
 local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
 
+-- Round a position to tile coordinates
+local function round_to_tile_pos(pos)
+    return {
+        x = math.floor(pos.x + 0.5),
+        y = math.floor(pos.y + 0.5)
+    }
+end
+
+local function tile_key(x, y)
+    return x .. "," .. y
+end
+
+-- Build a wall occupancy map and bounding box for A*
+-- Returns: wall_map, minx, maxx, miny, maxy
+local function build_wall_map(surface, start_pos, target_pos, max_radius)
+    local sp = round_to_tile_pos(start_pos)
+    local tp = round_to_tile_pos(target_pos)
+
+    max_radius = max_radius or 128
+
+    local minx = math.min(sp.x, tp.x) - max_radius
+    local maxx = math.max(sp.x, tp.x) + max_radius
+    local miny = math.min(sp.y, tp.y) - max_radius
+    local maxy = math.max(sp.y, tp.y) + max_radius
+
+    local area = {{minx - 1, miny - 1}, {maxx + 1, maxy + 1}}
+
+    local walls = surface.find_entities_filtered {
+        area = area,
+        type = "wall" -- all entities of type 'wall'
+    }
+
+    local wall_map = {}
+
+    for _, w in pairs(walls) do
+        if w.valid then
+            local wp = round_to_tile_pos(w.position)
+            wall_map[wp.x] = wall_map[wp.x] or {}
+            wall_map[wp.x][wp.y] = true
+        end
+    end
+
+    return wall_map, minx, maxx, miny, maxy
+end
+
+local function is_tile_blocked(wall_map, minx, maxx, miny, maxy, x, y)
+    if x < minx or x > maxx or y < miny or y > maxy then
+        return true
+    end
+    local col = wall_map[x]
+    return col and col[y] or false
+end
+
+-- Simple A* on tiles, avoiding walls.
+-- Returns an array of world positions { {x=..., y=...}, ... }.
+-- If target is unreachable, returns a path to the closest reachable tile to target.
+local function find_path_astar(surface, start_pos, target_pos, max_radius)
+    local sp = round_to_tile_pos(start_pos)
+    local tp = round_to_tile_pos(target_pos)
+
+    -- Trivial case
+    if sp.x == tp.x and sp.y == tp.y then
+        return {{
+            x = target_pos.x,
+            y = target_pos.y
+        }}
+    end
+
+    local wall_map, minx, maxx, miny, maxy = build_wall_map(surface, start_pos, target_pos, max_radius or 128)
+
+    -- If start is on a wall, give up early (bot is "inside" a wall).
+    if is_tile_blocked(wall_map, minx, maxx, miny, maxy, sp.x, sp.y) then
+        return nil
+    end
+    -- IMPORTANT: do NOT early-return if target tile is blocked.
+    -- We still search and will pick the closest reachable tile instead.
+
+    local open = {}
+    local open_lookup = {}
+    local closed = {}
+    local came_from = {}
+
+    local function heuristic(x, y)
+        local dx = math.abs(x - tp.x)
+        local dy = math.abs(y - tp.y)
+        -- Chebyshev distance (works well with 8-directional movement)
+        return math.max(dx, dy)
+    end
+
+    local function push_open(node)
+        open[#open + 1] = node
+        open_lookup[node.key] = node
+    end
+
+    local function pop_best()
+        local best_index = nil
+        local best_f = nil
+
+        for i, n in ipairs(open) do
+            if not best_f or n.f < best_f then
+                best_f = n.f
+                best_index = i
+            end
+        end
+
+        if not best_index then
+            return nil
+        end
+
+        local n = open[best_index]
+        table.remove(open, best_index)
+        open_lookup[n.key] = nil
+        return n
+    end
+
+    -- Reconstruct path from start to 'end_node'.
+    -- If final_pos is non-nil, the last waypoint is replaced with that exact world position.
+    local function reconstruct_path(came_from_tbl, end_node, final_pos)
+        local rev = {}
+        local node = end_node
+
+        while node do
+            if node.parent_key == nil then
+                break
+            end
+
+            rev[#rev + 1] = {
+                x = node.x + 0.5,
+                y = node.y + 0.5
+            }
+            node = came_from_tbl[node.parent_key]
+        end
+
+        local path = {}
+        for i = #rev, 1, -1 do
+            path[#path + 1] = rev[i]
+        end
+
+        if final_pos and #path > 0 then
+            -- For exact-goal success, snap last point to target_pos.
+            path[#path] = {
+                x = final_pos.x,
+                y = final_pos.y
+            }
+        end
+
+        return path
+    end
+
+    local start_key = tile_key(sp.x, sp.y)
+    local start_h = heuristic(sp.x, sp.y)
+    local start_node = {
+        x = sp.x,
+        y = sp.y,
+        g = 0,
+        h = start_h,
+        f = start_h,
+        key = start_key,
+        parent_key = nil
+    }
+
+    push_open(start_node)
+    came_from[start_key] = start_node
+
+    -- Track best (closest-to-target) node seen so far.
+    local best_node = start_node
+    local best_h = start_h
+
+    local NEIGHBORS = {{1, 0}, -- east
+    {-1, 0}, -- west
+    {0, 1}, -- south
+    {0, -1}, -- north
+    {1, 1}, -- southeast
+    {1, -1}, -- northeast
+    {-1, 1}, -- southwest
+    {-1, -1} -- northwest
+    }
+
+    while true do
+        local current = pop_best()
+        if not current then
+            -- No more nodes: goal unreachable.
+            -- Return best path we can (if it's not just the start).
+            if best_node and best_node ~= start_node then
+                return reconstruct_path(came_from, best_node, nil)
+            else
+                return nil
+            end
+        end
+
+        -- Check if we've hit the exact goal tile (only possible if it isn't blocked).
+        if current.x == tp.x and current.y == tp.y then
+            return reconstruct_path(came_from, current, target_pos)
+        end
+
+        closed[current.key] = true
+
+        for _, d in ipairs(NEIGHBORS) do
+            local nx = current.x + d[1]
+            local ny = current.y + d[2]
+            local nkey = tile_key(nx, ny)
+
+            -- Corner-cutting check for diagonals
+            if not (d[1] ~= 0 and d[2] ~= 0 and
+                (is_tile_blocked(wall_map, minx, maxx, miny, maxy, current.x + d[1], current.y) or
+                    is_tile_blocked(wall_map, minx, maxx, miny, maxy, current.x, current.y + d[2]))) then
+
+                if not closed[nkey] and not is_tile_blocked(wall_map, minx, maxx, miny, maxy, nx, ny) then
+                    local move_cost = (d[1] ~= 0 and d[2] ~= 0) and 1.41421356237 or 1
+                    local tentative_g = current.g + move_cost
+                    local existing = open_lookup[nkey]
+
+                    if not existing or tentative_g < existing.g then
+                        local h = heuristic(nx, ny)
+                        local node = existing or {
+                            x = nx,
+                            y = ny,
+                            key = nkey
+                        }
+                        node.g = tentative_g
+                        node.h = h
+                        node.f = tentative_g + h
+                        node.parent_key = current.key
+
+                        came_from[nkey] = node
+
+                        -- Update "best reach so far" if closer to target.
+                        if h < best_h then
+                            best_h = h
+                            best_node = node
+                        end
+
+                        if not existing then
+                            push_open(node)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Single straight-line step, used by the path follower.
+local function step_bot_towards(bot, tp)
+    if not (bot and bot.valid and tp) then
+        return
+    end
+
+    local bp = bot.position
+    local dx = tp.x - bp.x
+    local dy = tp.y - bp.y
+    local dist_sq = dx * dx + dy * dy
+
+    if dist_sq == 0 then
+        return
+    end
+
+    local dist = math.sqrt(dist_sq)
+    local step = BOT_STEP_DISTANCE
+
+    -- If we're within one step, teleport exactly to the waypoint.
+    if dist <= step then
+        bot.teleport {
+            x = tp.x,
+            y = tp.y
+        }
+        return
+    end
+
+    -- Otherwise, move a single step in that direction.
+    local scale = step / dist
+
+    bot.teleport {
+        x = bp.x + dx * scale,
+        y = bp.y + dy * scale
+    }
+end
+
 -- Persistent discovered max health values (per entity name)
 local function get_discovered_table()
     storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
@@ -300,7 +578,14 @@ local function init_player(player)
             damaged_lines = nil,
 
             -- Whether we've already warned this player about being out of repair tools.
-            out_of_tools_warned = false
+            out_of_tools_warned = false,
+
+            -- Pathfinding state
+            bot_path = nil, -- array of {x, y} waypoints
+            bot_path_index = 1, -- current waypoint index
+            bot_path_target = nil, -- {x, y} of target this path was built for
+            bot_path_visuals = nil,
+            current_wp_visual = nil
         }
 
         s.players[player.index] = pdata
@@ -315,6 +600,11 @@ local function init_player(player)
         pdata.highlight_object = pdata.highlight_object or nil
         pdata.damaged_markers = pdata.damaged_markers or nil
         pdata.damaged_lines = pdata.damaged_lines or nil
+        pdata.bot_path = pdata.bot_path or nil
+        pdata.bot_path_index = pdata.bot_path_index or 1
+        pdata.bot_path_target = pdata.bot_path_target or nil
+        pdata.bot_path_visuals = pdata.bot_path_visuals or nil
+        pdata.current_wp_visual = pdata.current_wp_visual or nil
     end
 end
 
@@ -341,6 +631,38 @@ end
 ---------------------------------------------------
 -- DAMAGED ENTITY MARKERS (DOTS + LINES)
 ---------------------------------------------------
+
+local function clear_bot_path_visuals(pdata)
+    if not pdata.bot_path_visuals then
+        return
+    end
+
+    for _, obj in pairs(pdata.bot_path_visuals) do
+        if obj and obj.valid then
+            obj:destroy()
+        end
+    end
+
+    pdata.bot_path_visuals = nil
+end
+
+local function reset_bot_path(pdata)
+    if not pdata then
+        return
+    end
+
+    pdata.bot_path = nil
+    pdata.bot_path_index = 1
+    pdata.bot_path_target = nil
+
+    clear_bot_path_visuals(pdata)
+
+    -- Clear current waypoint highlight
+    if pdata.current_wp_visual and pdata.current_wp_visual.valid then
+        pdata.current_wp_visual:destroy()
+    end
+    pdata.current_wp_visual = nil
+end
 
 -- Destroy and forget all previously drawn green dots and lines for damaged entities.
 local function clear_damaged_markers(pdata)
@@ -647,10 +969,142 @@ local function spawn_repair_bot_for_player(player, pdata)
         -- Reset current route.
         pdata.repair_targets = nil
         pdata.current_target_index = 1
+        reset_bot_path(pdata)
 
         player.print("[MekatrolRepairBot] Repair bot spawned.")
     else
         player.print("[MekatrolRepairBot] Failed to spawn repair bot.")
+    end
+end
+
+-- Returns true if the given position is "inside" a wall tile.
+local function is_position_blocked_by_wall(surface, pos)
+    if not (surface and pos) then
+        return false
+    end
+
+    -- Walls are 1x1 entities; a radius of ~0.4 tiles around the center is enough
+    local area = {{pos.x - 0.4, pos.y - 0.4}, {pos.x + 0.4, pos.y + 0.4}}
+
+    local walls = surface.find_entities_filtered {
+        area = area,
+        type = "wall" -- catches stone-wall and modded walls with type = "wall"
+        -- if you only want vanilla walls: name = "stone-wall"
+    }
+
+    return walls and #walls > 0
+end
+
+-- Ensure we have a path to 'target_pos' stored in pdata; rebuild if target changed.
+local function ensure_bot_path(bot, target_pos, pdata)
+    if not (bot and bot.valid and target_pos and pdata) then
+        return
+    end
+
+    local tp = {
+        x = target_pos.x,
+        y = target_pos.y
+    }
+
+    if pdata.bot_path_target then
+        local dx = pdata.bot_path_target.x - tp.x
+        local dy = pdata.bot_path_target.y - tp.y
+        local d2 = dx * dx + dy * dy
+
+        -- If target has not moved much, keep existing path.
+        if d2 < 0.25 and pdata.bot_path and #pdata.bot_path > 0 then
+            return
+        end
+    end
+
+    local surface = bot.surface
+
+    -- Rebuild path
+    local path = find_path_astar(surface, bot.position, tp, 32)
+
+    -- Clear any old visuals
+    clear_bot_path_visuals(pdata)
+
+    -- Draw new visuals
+    pdata.bot_path_visuals = {}
+
+    local target_circle = rendering.draw_circle {
+        color = {
+            r = 1,
+            g = 0,
+            b = 1,
+            a = 1
+        }, -- magenta
+        radius = 0.5,
+        filled = true,
+        target = tp, -- tp is {x, y}
+        surface = surface,
+        only_in_alt_mode = false
+    }
+    table.insert(pdata.bot_path_visuals, target_circle)
+
+    local line = rendering.draw_line {
+        color = {
+            r = 1,
+            g = 1,
+            b = 1,
+            a = 0.5
+        },
+        width = 1,
+        from = bot.position, -- {x, y}
+        to = tp, -- {x, y}
+        surface = surface,
+        only_in_alt_mode = false
+    }
+    table.insert(pdata.bot_path_visuals, line)
+
+    if path and #path > 0 then
+        pdata.bot_path = path
+        pdata.bot_path_index = 1
+        pdata.bot_path_target = tp
+
+        local prev = nil
+        for i, wp in ipairs(path) do
+            -- Waypoint circle
+            local circle = rendering.draw_circle {
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 0,
+                    a = 1
+                }, -- yellow
+                radius = 0.2,
+                filled = true,
+                target = wp, -- wp is {x, y}
+                surface = surface,
+                only_in_alt_mode = false
+            }
+            table.insert(pdata.bot_path_visuals, circle)
+
+            -- Line from previous waypoint
+            if prev then
+                local line = rendering.draw_line {
+                    color = {
+                        r = 1,
+                        g = 1,
+                        b = 0,
+                        a = 0.5
+                    },
+                    width = 1,
+                    from = prev, -- {x, y}
+                    to = wp, -- {x, y}
+                    surface = surface,
+                    only_in_alt_mode = false
+                }
+                table.insert(pdata.bot_path_visuals, line)
+            end
+
+            prev = wp
+        end
+    else
+        pdata.bot_path = nil
+        pdata.bot_path_index = 1
+        pdata.bot_path_target = nil
     end
 end
 
@@ -738,6 +1192,152 @@ local function follow_player(bot, player)
     end
 end
 
+-- Path-aware move: follows A* path, which never enters wall tiles.
+local function move_bot_to_a_star(bot, target, pdata)
+    if not (bot and bot.valid and target and pdata) then
+        return
+    end
+
+    local tp
+
+    if type(target) == "table" and target.position ~= nil then
+        tp = target.position
+    elseif type(target) == "table" and target.x ~= nil and target.y ~= nil then
+        tp = target
+    elseif type(target) == "table" and target[1] ~= nil and target[2] ~= nil then
+        tp = {
+            x = target[1],
+            y = target[2]
+        }
+    else
+        return
+    end
+
+    ensure_bot_path(bot, tp, pdata)
+
+    local path = pdata.bot_path
+    if not path or #path == 0 then
+        -- No path found (e.g. target unreachable within radius): just stop.
+        return
+    end
+
+    local idx = pdata.bot_path_index or 1
+    if idx < 1 then
+        idx = 1
+    elseif idx > #path then
+        idx = #path
+    end
+
+    local bp = bot.position
+    local waypoint = path[idx]
+
+    -- If we are very close to this waypoint, advance to next.
+    local dx = waypoint.x - bp.x
+    local dy = waypoint.y - bp.y
+    local d2 = dx * dx + dy * dy
+
+    if d2 < 0.04 then
+        idx = idx + 1
+        if idx > #path then
+            -- At final waypoint, nothing more to do.
+            reset_bot_path(pdata)
+            return
+        end
+        waypoint = path[idx]
+        bp = bot.position
+    end
+
+    ----------------------------------------------------------------
+    -- NEW: skip any waypoints that are NOT in the direction
+    -- of the final target (i.e. they increase distance to target).
+    ----------------------------------------------------------------
+    local final_target = pdata.bot_path_target or tp
+
+    local function dist_sq(ax, ay, bx, by)
+        local ddx = bx - ax
+        local ddy = by - ay
+        return ddx * ddx + ddy * ddy
+    end
+
+    -- Current distance from bot to final target
+    local bot_to_target_sq = dist_sq(bp.x, bp.y, final_target.x, final_target.y)
+
+    -- Advance idx while waypoint is further from target than bot is
+    while idx <= #path do
+        waypoint = path[idx]
+        local wp_to_target_sq = dist_sq(waypoint.x, waypoint.y, final_target.x, final_target.y)
+
+        -- If waypoint is not worse (<=) than current position wrt target, use it
+        if wp_to_target_sq <= bot_to_target_sq + 0.0001 then
+            break
+        end
+
+        -- Otherwise skip this waypoint and try the next
+        idx = idx + 1
+    end
+
+    -- If we ran out of waypoints, clear path and stop
+    if idx > #path then
+        reset_bot_path(pdata)
+        return
+    end
+
+    waypoint = path[idx]
+    pdata.bot_path_index = idx
+
+    ---------------------------------------------------
+    -- Highlight current waypoint in bright color
+    ---------------------------------------------------
+    if pdata.current_wp_visual and pdata.current_wp_visual.valid then
+        pdata.current_wp_visual.target = waypoint
+    else
+        pdata.current_wp_visual = rendering.draw_circle {
+            color = {
+                r = 1,
+                g = 1,
+                b = 0,
+                a = 1
+            }, -- bright yellow
+            radius = 0.6,
+            filled = false,
+            target = waypoint,
+            surface = bot.surface,
+            only_in_alt_mode = false
+        }
+    end
+
+    -- Take one step towards current waypoint.
+    step_bot_towards(bot, waypoint)
+end
+
+local function follow_player_a_star(bot, player, pdata)
+    if not (bot and bot.valid and player and player.valid) then
+        return
+    end
+
+    local bp = bot.position
+    local pp = player.position
+
+    -- desired follow position (2 tiles up-left of player)
+    local target_pos = {
+        x = pp.x - 2.0,
+        y = pp.y - 2.0
+    }
+
+    local dx = target_pos.x - bp.x
+    local dy = target_pos.y - bp.y
+    local dist_sq = dx * dx + dy * dy
+
+    -- how close the bot should try to be to the follow position
+    local desired_sq = BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE
+    -- or just a small tolerance, e.g.:
+    -- local desired_sq = 0.25  -- within 0.5 tiles
+
+    if dist_sq > desired_sq then
+        move_bot_to_a_star(bot, target_pos, pdata)
+    end
+end
+
 -- Repair all damaged entities within a radius of a given center point,
 -- consuming repair tools from the PLAYER'S inventory.
 local function repair_entities_near(player, surface, force, center, radius)
@@ -802,6 +1402,7 @@ end
 local function update_repair_bot_for_player(player, pdata)
     -- If the feature is disabled for this player, do nothing.
     if not pdata.repair_bot_enabled then
+        clear_bot_path_visuals(pdata)
         return
     end
 
@@ -837,8 +1438,17 @@ local function update_repair_bot_for_player(player, pdata)
             pdata.last_mode = "follow"
         end
         clear_damaged_markers(pdata)
-        follow_player(bot, player)
+
+        -- We're switching to follow mode → old repair path is irrelevant.
+        reset_bot_path(pdata)
+
+        follow_player(bot, player, pdata)
         return
+    else
+        if pdata.last_mode ~= "repair" then
+            player.print("[MekatrolRepairBot] mode: REPAIRING DAMAGE")
+            pdata.last_mode = "repair"
+        end
     end
 
     -- Clamp current index into valid range.
@@ -898,11 +1508,11 @@ local function update_repair_bot_for_player(player, pdata)
         -- Next tick, proceed to the next entity in the route.
         pdata.current_target_index = idx + 1
     else
-        --- Not close enough yet: move towards the target entity.
+        -- Not close enough yet: move towards the target entity via A* path.
         move_bot_to(bot, {
             x = tp.x,
             y = tp.y
-        })
+        }, pdata)
     end
 end
 
@@ -948,6 +1558,9 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
 
         -- Clear all damaged-entity visuals (dots + lines) when disabling.
         clear_damaged_markers(pdata)
+
+        -- Remove bot path & its visuals
+        reset_bot_path(pdata)
 
         -- Remove highlight if present.
         if pdata.highlight_object then
