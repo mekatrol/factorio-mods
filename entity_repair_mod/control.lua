@@ -417,7 +417,7 @@ end
 -- VISUALS (BOT HIGHLIGHT)
 ---------------------------------------------------
 
--- Draw or update a green rectangle around the bot so the player can see it easily.
+-- Draw or update the rectangle around the bot so the player can see it easily.
 local function draw_bot_highlight(bot, pdata)
     if not (bot and bot.valid) then
         return
@@ -636,7 +636,7 @@ local function spawn_repair_bot_for_player(player, pdata)
 
     local bot = surface.create_entity {
         name = "mekatrol-repair-bot",
-        position = {pos.x + 1, pos.y},
+        position = {pos.x - 1, pos.y - 1},
         force = player.force
     }
 
@@ -725,8 +725,8 @@ local function follow_player(bot, player)
     -- Only move if the bot is “too far” from the player.
     if dist_sq > desired_sq then
         -- Optional: small offset so it doesn't sit exactly on the player
-        local offset_x = -1.0
-        local offset_y = -1.0
+        local offset_x = -2.0
+        local offset_y = -2.0
 
         local target_pos = {
             x = pp.x + offset_x,
@@ -816,7 +816,7 @@ local function update_repair_bot_for_player(player, pdata)
     end
 
     -- Always update the visual highlight around the bot.
-    draw_bot_highlight(bot, pdata)
+    -- draw_bot_highlight(bot, pdata)
 
     ---------------------------------------------------
     -- Always rebuild the damaged-entity route so that:
