@@ -4,22 +4,22 @@ local visuals = {}
 -- DAMAGED ENTITY MARKERS (DOTS + LINES)
 ---------------------------------------------------
 function visuals.clear_damaged_markers(pdata)
-    if pdata.damaged_markers then
-        for _, obj in pairs(pdata.damaged_markers) do
+    if pdata.vis_damaged_markers then
+        for _, obj in pairs(pdata.vis_damaged_markers) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
-        pdata.damaged_markers = nil
+        pdata.vis_damaged_markers = nil
     end
 
-    if pdata.damaged_lines then
-        for _, obj in pairs(pdata.damaged_lines) do
+    if pdata.vis_damaged_lines then
+        for _, obj in pairs(pdata.vis_damaged_lines) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
-        pdata.damaged_lines = nil
+        pdata.vis_damaged_lines = nil
     end
 end
 
@@ -28,8 +28,8 @@ function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highligh
         return
     end
 
-    pdata.damaged_markers = pdata.damaged_markers or {}
-    pdata.damaged_lines = pdata.damaged_lines or {}
+    pdata.vis_damaged_markers = pdata.vis_damaged_markers or {}
+    pdata.vis_damaged_lines = pdata.vis_damaged_lines or {}
 
     local y_offset = bot_highlight_y_offset or 0
 
@@ -48,7 +48,7 @@ function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highligh
                 surface = ent.surface,
                 only_in_alt_mode = false
             }
-            pdata.damaged_markers[#pdata.damaged_markers + 1] = dot
+            pdata.vis_damaged_markers[#pdata.vis_damaged_markers + 1] = dot
 
             local line = rendering.draw_line {
                 color = {
@@ -64,7 +64,7 @@ function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highligh
                 surface = ent.surface,
                 only_in_alt_mode = false
             }
-            pdata.damaged_lines[#pdata.damaged_lines + 1] = line
+            pdata.vis_damaged_lines[#pdata.vis_damaged_lines + 1] = line
         end
     end
 end
@@ -86,18 +86,18 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     local left_top = {cx - size, cy - size * 1.5}
     local right_bottom = {cx + size, cy + size}
 
-    if pdata.highlight_object then
-        local obj = pdata.highlight_object
+    if pdata.vis_highlight_object then
+        local obj = pdata.vis_highlight_object
         if obj and obj.valid then
             obj.left_top = left_top
             obj.right_bottom = right_bottom
             return
         else
-            pdata.highlight_object = nil
+            pdata.vis_highlight_object = nil
         end
     end
 
-    pdata.highlight_object = rendering.draw_rectangle {
+    pdata.vis_highlight_object = rendering.draw_rectangle {
         color = {
             r = 0,
             g = 1,

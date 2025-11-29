@@ -245,17 +245,17 @@ end
 -- PATH VISUALS + STATE RESET
 ---------------------------------------------------
 function pathfinding.clear_bot_path_visuals(pdata)
-    if not pdata.bot_path_visuals then
+    if not pdata.vis_bot_path then
         return
     end
 
-    for _, obj in pairs(pdata.bot_path_visuals) do
+    for _, obj in pairs(pdata.vis_bot_path) do
         if obj and obj.valid then
             obj:destroy()
         end
     end
 
-    pdata.bot_path_visuals = nil
+    pdata.vis_bot_path = nil
 end
 
 function pathfinding.reset_bot_path(pdata)
@@ -269,10 +269,10 @@ function pathfinding.reset_bot_path(pdata)
 
     pathfinding.clear_bot_path_visuals(pdata)
 
-    if pdata.current_wp_visual and pdata.current_wp_visual.valid then
-        pdata.current_wp_visual:destroy()
+    if pdata.vis_current_waypoint and pdata.vis_current_waypoint.valid then
+        pdata.vis_current_waypoint:destroy()
     end
-    pdata.current_wp_visual = nil
+    pdata.vis_current_waypoint = nil
 end
 
 local function ensure_bot_path(bot, target_pos, pdata)
@@ -299,7 +299,7 @@ local function ensure_bot_path(bot, target_pos, pdata)
     local path = find_path_astar(surface, bot.position, tp, 32)
 
     pathfinding.clear_bot_path_visuals(pdata)
-    pdata.bot_path_visuals = {}
+    pdata.vis_bot_path = {}
 
     local target_circle = rendering.draw_circle {
         color = {
@@ -314,7 +314,7 @@ local function ensure_bot_path(bot, target_pos, pdata)
         surface = surface,
         only_in_alt_mode = false
     }
-    table.insert(pdata.bot_path_visuals, target_circle)
+    table.insert(pdata.vis_bot_path, target_circle)
 
     local line = rendering.draw_line {
         color = {
@@ -329,7 +329,7 @@ local function ensure_bot_path(bot, target_pos, pdata)
         surface = surface,
         only_in_alt_mode = false
     }
-    table.insert(pdata.bot_path_visuals, line)
+    table.insert(pdata.vis_bot_path, line)
 
     if path and #path > 0 then
         pdata.bot_path = path
@@ -351,7 +351,7 @@ local function ensure_bot_path(bot, target_pos, pdata)
                 surface = surface,
                 only_in_alt_mode = false
             }
-            table.insert(pdata.bot_path_visuals, circle)
+            table.insert(pdata.vis_bot_path, circle)
 
             if prev then
                 local l = rendering.draw_line {
@@ -367,7 +367,7 @@ local function ensure_bot_path(bot, target_pos, pdata)
                     surface = surface,
                     only_in_alt_mode = false
                 }
-                table.insert(pdata.bot_path_visuals, l)
+                table.insert(pdata.vis_bot_path, l)
             end
 
             prev = wp
@@ -494,10 +494,10 @@ function pathfinding.move_bot_to_a_star(bot, target, pdata, step_distance)
     waypoint = path[idx]
     pdata.bot_path_index = idx
 
-    if pdata.current_wp_visual and pdata.current_wp_visual.valid then
-        pdata.current_wp_visual.target = waypoint
+    if pdata.vis_current_waypoint and pdata.vis_current_waypoint.valid then
+        pdata.vis_current_waypoint.target = waypoint
     else
-        pdata.current_wp_visual = rendering.draw_circle {
+        pdata.vis_current_waypoint = rendering.draw_circle {
             color = {
                 r = 1,
                 g = 1,

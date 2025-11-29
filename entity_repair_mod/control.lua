@@ -211,41 +211,54 @@ local function init_player(player)
 
     if not pdata then
         pdata = {
+            -- set to true when the bot is enabled using hotkey
             repair_bot_enabled = false,
             repair_bot = nil,
 
-            repair_targets = nil,
-            current_target_index = 1,
+            -- the list of damaged entities
+            damaged_entities = nil,
 
-            highlight_object = nil,
-            damaged_markers = nil,
-            damaged_lines = nil,
+            -- the index of the next damaged enitity to repair
+            damaged_entities_next_repair_index = 1,
 
-            out_of_tools_warned = false,
+            -- set to true once the user has been warned there are no repair packs available 
+            out_of_repair_tools_warned = false,
 
+            -- pathing
             bot_path = nil,
             bot_path_index = 1,
             bot_path_target = nil,
-            bot_path_visuals = nil,
-            current_wp_visual = nil
+
+            -- visuals (rendered on display)
+            vis_highlight_object = nil,
+            vis_damaged_markers = nil,
+            vis_damaged_lines = nil,
+            vis_bot_path = nil,
+            vis_current_waypoint = nil
         }
 
         s.players[player.index] = pdata
     else
+        -- init enabled state
         if pdata.repair_bot_enabled == nil then
             pdata.repair_bot_enabled = false
         end
 
-        pdata.repair_targets = pdata.repair_targets or nil
-        pdata.current_target_index = pdata.current_target_index or 1
-        pdata.highlight_object = pdata.highlight_object or nil
-        pdata.damaged_markers = pdata.damaged_markers or nil
-        pdata.damaged_lines = pdata.damaged_lines or nil
+        -- tracking damaged entities
+        pdata.damaged_entities = pdata.damaged_entities or nil
+        pdata.damaged_entities_next_repair_index = pdata.damaged_entities_next_repair_index or 1
+
+        -- pathing
         pdata.bot_path = pdata.bot_path or nil
         pdata.bot_path_index = pdata.bot_path_index or 1
         pdata.bot_path_target = pdata.bot_path_target or nil
-        pdata.bot_path_visuals = pdata.bot_path_visuals or nil
-        pdata.current_wp_visual = pdata.current_wp_visual or nil
+
+        -- visuals (rendered on display)
+        pdata.vis_highlight_object = pdata.vis_highlight_object or nil
+        pdata.vis_damaged_markers = pdata.vis_damaged_markers or nil
+        pdata.vis_damaged_lines = pdata.vis_damaged_lines or nil
+        pdata.vis_bot_path = pdata.vis_bot_path or nil
+        pdata.vis_current_waypoint = pdata.vis_current_waypoint or nil
     end
 end
 
@@ -335,17 +348,12 @@ local function build_nearest_route(entities, start_pos)
 end
 
 local function rebuild_repair_route(player, pdata, bot)
-    if not (bot and bot.valid) then
-        pdata.repair_targets = nil
-        pdata.current_target_index = 1
-        visuals.clear_damaged_markers(pdata)
-        return
-    end
+    visuals.clear_damaged_markers(pdata)
 
-    if not (player and player.valid) then
-        pdata.repair_targets = nil
-        pdata.current_target_index = 1
-        visuals.clear_damaged_markers(pdata)
+    -- If bot or player is invalid, clear route and stop
+    if not (bot and bot.valid and player and player.valid) then
+        pdata.damaged_entities = nil
+        pdata.damaged_entities_next_repair_index = 1
         return
     end
 
@@ -355,18 +363,16 @@ local function rebuild_repair_route(player, pdata, bot)
 
     local damaged = find_damaged_entities(surface, force, search_center, ENTITY_SEARCH_RADIUS)
 
-    visuals.clear_damaged_markers(pdata)
-
     if not damaged or #damaged == 0 then
-        pdata.repair_targets = nil
-        pdata.current_target_index = 1
+        pdata.damaged_entities = nil
+        pdata.damaged_entities_next_repair_index = 1
         return
     end
 
     visuals.draw_damaged_visuals(bot, pdata, damaged, BOT_HIGHLIGHT_Y_OFFSET)
 
-    pdata.repair_targets = build_nearest_route(damaged, bot.position)
-    pdata.current_target_index = 1
+    pdata.damaged_entities = build_nearest_route(damaged, bot.position)
+    pdata.damaged_entities_next_repair_index = 1
 end
 
 ---------------------------------------------------
@@ -390,8 +396,8 @@ local function spawn_repair_bot_for_player(player, pdata)
         bot.destructible = false
         pdata.repair_bot = bot
 
-        pdata.repair_targets = nil
-        pdata.current_target_index = 1
+        pdata.damaged_entities = nil
+        pdata.damaged_entities_next_repair_index = 1
         pathfinding.reset_bot_path(pdata)
 
         player.print("[MekatrolRepairBot] Repair bot spawned.")
@@ -491,8 +497,8 @@ local function repair_entities_near(player, surface, force, center, radius)
 
     if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
         local pdata = get_player_data(player.index)
-        if pdata and not pdata.out_of_tools_warned then
-            pdata.out_of_tools_warned = true
+        if pdata and not pdata.out_of_repair_tools_warned then
+            pdata.out_of_repair_tools_warned = true
             player.print("[MekatrolRepairBot] No repair tools in your inventory. Bot cannot repair.")
         end
         return
@@ -509,7 +515,7 @@ local function repair_entities_near(player, surface, force, center, radius)
     for _, ent in pairs(entities) do
         if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
             if pdata then
-                pdata.out_of_tools_warned = true
+                pdata.out_of_repair_tools_warned = true
                 player.print("[MekatrolRepairBot] Out of repair tools; stopping repairs.")
             end
             return
@@ -528,7 +534,7 @@ local function repair_entities_near(player, surface, force, center, radius)
                     ent.health = math.min(max, ent.health + health_increment)
 
                     if pdata then
-                        pdata.out_of_tools_warned = false
+                        pdata.out_of_repair_tools_warned = false
                     end
                 else
                     return
@@ -560,7 +566,7 @@ local function update_repair_bot_for_player(player, pdata)
 
     rebuild_repair_route(player, pdata, bot)
 
-    local targets = pdata.repair_targets
+    local targets = pdata.damaged_entities
 
     if not targets or #targets == 0 then
         if pdata.last_mode ~= "follow" then
@@ -580,7 +586,7 @@ local function update_repair_bot_for_player(player, pdata)
         end
     end
 
-    local idx = pdata.current_target_index or 1
+    local idx = pdata.damaged_entities_next_repair_index or 1
     if idx < 1 or idx > #targets then
         idx = 1
     end
@@ -591,8 +597,8 @@ local function update_repair_bot_for_player(player, pdata)
         idx = idx + 1
         if idx > #targets then
             rebuild_repair_route(player, pdata, bot)
-            targets = pdata.repair_targets
-            idx = pdata.current_target_index or 1
+            targets = pdata.damaged_entities
+            idx = pdata.damaged_entities_next_repair_index or 1
 
             if not targets or #targets == 0 then
                 visuals.clear_damaged_markers(pdata)
@@ -607,7 +613,7 @@ local function update_repair_bot_for_player(player, pdata)
         return
     end
 
-    pdata.current_target_index = idx
+    pdata.damaged_entities_next_repair_index = idx
 
     local tp = target_entity.position
     local bp = bot.position
@@ -624,9 +630,9 @@ local function update_repair_bot_for_player(player, pdata)
         repair_entities_near(player, bot.surface, bot.force, tp, ENTITY_REPAIR_RADIUS)
 
         rebuild_repair_route(player, pdata, bot)
-        targets = pdata.repair_targets
+        targets = pdata.damaged_entities
 
-        pdata.current_target_index = idx + 1
+        pdata.damaged_entities_next_repair_index = idx + 1
     else
         -- still using simple move; if you want A*, replace this with:
         -- pathfinding.move_bot_to_a_star(bot, tp, pdata, BOT_STEP_DISTANCE)
@@ -688,18 +694,18 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
         end
 
         pdata.repair_bot = nil
-        pdata.repair_targets = nil
-        pdata.current_target_index = 1
+        pdata.damaged_entities = nil
+        pdata.damaged_entities_next_repair_index = 1
 
         visuals.clear_damaged_markers(pdata)
         pathfinding.reset_bot_path(pdata)
 
-        if pdata.highlight_object then
-            local obj = pdata.highlight_object
+        if pdata.vis_highlight_object then
+            local obj = pdata.vis_highlight_object
             if obj and obj.valid then
                 obj:destroy()
             end
-            pdata.highlight_object = nil
+            pdata.vis_highlight_object = nil
         end
 
         pdata.last_mode = "off"
