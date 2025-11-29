@@ -687,18 +687,16 @@ local function clear_damaged_markers(pdata)
     end
 end
 
--- Draw a green dot on each damaged entity and a line from the entity to the player.
+-- Draw a green dot on each damaged entity and a line from the entity to the bot.
 -- This does NOT clear old visuals; call clear_damaged_markers first
 -- if you want only the current set to be visible.
-local function draw_damaged_visuals(player, pdata, damaged_entities)
+local function draw_damaged_visuals(bot, pdata, damaged_entities)
     if not damaged_entities or #damaged_entities == 0 then
         return
     end
 
     pdata.damaged_markers = pdata.damaged_markers or {}
     pdata.damaged_lines = pdata.damaged_lines or {}
-
-    local player_target = player.character or player
 
     for _, ent in pairs(damaged_entities) do
         if ent and ent.valid then
@@ -718,7 +716,7 @@ local function draw_damaged_visuals(player, pdata, damaged_entities)
             }
             pdata.damaged_markers[#pdata.damaged_markers + 1] = dot
 
-            -- Line from the entity to the player.
+            -- Line from the entity to the bot.
             local line = rendering.draw_line {
                 color = {
                     r = 1,
@@ -728,7 +726,8 @@ local function draw_damaged_visuals(player, pdata, damaged_entities)
                 }, -- semi-transparent red
                 width = 1,
                 from = ent, -- start at entity
-                to = player_target, -- end at player entity (follows movement)
+                to = bot, -- end at bot entity (follows movement)
+                to_offset = {0, BOT_HIGHLIGHT_Y_OFFSET}, -- shift end of line in Y as bot floats above its position
                 surface = ent.surface,
                 only_in_alt_mode = false
             }
@@ -937,8 +936,8 @@ local function rebuild_repair_route(player, pdata, bot)
         return
     end
 
-    -- Draw a green dot and line for every damaged entity we found near the player.
-    draw_damaged_visuals(player, pdata, damaged)
+    -- Draw a green dot and line for every damaged entity found.
+    draw_damaged_visuals(bot, pdata, damaged)
 
     -- Route is still built to be efficient from the BOT's current position.
     pdata.repair_targets = build_nearest_route(damaged, bot.position)
