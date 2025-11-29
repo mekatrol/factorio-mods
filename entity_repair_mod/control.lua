@@ -27,6 +27,9 @@ local WALL_REPAIR_RADIUS = 20.0
 -- so -0.2 is a good starting point.
 local BOT_HIGHLIGHT_Y_OFFSET = -1.2
 
+-- Distance (in tiles) the bot tries to maintain from the player
+local BOT_FOLLOW_DISTANCE = 3.0
+
 ---------------------------------------------------
 -- REPAIR TOOL CONFIGURATION
 ---------------------------------------------------
@@ -656,6 +659,32 @@ local function move_bot_to(bot, target_pos)
     bot.teleport(target_pos)
 end
 
+local function follow_player(bot, player)
+    if not (bot and bot.valid and player and player.valid) then
+        return
+    end
+
+    local bp = bot.position
+    local pp = player.position
+
+    local dx = pp.x - bp.x
+    local dy = pp.y - bp.y
+    local dist_sq = dx * dx + dy * dy
+    local desired_sq = BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE
+
+    -- Only move if the bot is “too far” from the player.
+    if dist_sq > desired_sq then
+        -- Optional: small offset so it doesn't sit exactly on the player
+        local offset_x = 0.5
+        local offset_y = -0.5
+
+        local target_pos = {pp.x + offset_x, pp.y + offset_y}
+
+        -- Reuse your existing movement (currently teleport)
+        move_bot_to(bot, target_pos)
+    end
+end
+
 -- Repair all damaged entities within a radius of a given center point,
 -- consuming repair tools from the PLAYER'S inventory.
 local function repair_entities_near(player, surface, force, center, radius)
@@ -751,6 +780,7 @@ local function update_wall_bot_for_player(player, pdata)
     -- If no targets, idle (and clear markers).
     if not targets or #targets == 0 then
         clear_damaged_markers(pdata)
+        follow_player(bot, player)
         return
     end
 
