@@ -1,70 +1,69 @@
-data:extend({ -- Hotkey to toggle the wall bot
-{
+local util = require("util")
+
+----------------------------------------------------------------------
+-- HOTKEY: toggle repair bot
+----------------------------------------------------------------------
+
+data:extend({{
     type = "custom-input",
-    name = "mekatrol-toggle-repair-bot", -- THIS is the event name
-    key_sequence = "CONTROL + SHIFT + W", -- change in-game if you like
+    name = "mekatrol-toggle-repair-bot",
+    key_sequence = "CONTROL + SHIFT + W",
     consuming = "none"
-}, -- Flying wall-repair drone unit
-{
-    type = "unit",
-    name = "mekatrol-repair-bot",
-
-    icon = "__core__/graphics/player-force-icon.png", -- exists on your system
-    icon_size = 32,
-
-    flags = {"placeable-neutral", "placeable-player", "not-on-map"},
-
-    max_health = 100,
-    order = "z[augment-drone]",
-
-    distraction_cooldown = 300,
-    vision_distance = 32,
-
-    movement_speed = 0.15,
-    distance_per_frame = 0.1,
-
-    collision_box = {{0, 0}, {0, 0}},
-    selection_box = {{-0.2, -0.2}, {0.2, 0.2}},
-    drawing_box = {{-0.3, -0.3}, {0.3, 0.3}},
-
-    attack_parameters = {
-        type = "projectile",
-        ammo_category = "melee",
-        cooldown = 1000,
-        range = 0.5,
-
-        ammo_type = {
-            category = "melee",
-            action = {
-                type = "direct",
-                action_delivery = {
-                    type = "instant"
-                }
-            }
-        },
-
-        -- minimal required attack animation
-        animation = {
-            layers = {{
-                filename = "__core__/graphics/empty.png",
-                width = 1,
-                height = 1,
-                frame_count = 1,
-                direction_count = 1,
-                shift = {0, 0}
-            }}
-        }
-    },
-
-    -- run/idle animation
-    run_animation = {
-        layers = {{
-            filename = "__core__/graphics/goto-icon.png",
-            width = 1,
-            height = 1,
-            frame_count = 1,
-            direction_count = 1,
-            shift = {0, 0}
-        }}
-    }
 }})
+
+----------------------------------------------------------------------
+-- ENTITY PROTOTYPE: mekatr ol-repair-bot AS A CONSTRUCTION ROBOT
+--
+-- We clone the base game's construction robot and modify it:
+-- - New name ("mekatrol-repair-bot") so we can spawn it by script.
+-- - Hidden from normal gameplay (no blueprints, no deconstruction).
+-- - Always uses the "working" animation so it looks like it's repairing.
+----------------------------------------------------------------------
+
+do
+    -- Grab the vanilla construction robot prototype.
+    local base = data.raw["construction-robot"]["construction-robot"]
+    if not base then
+        error("Base construction-robot prototype not found")
+    end
+
+    -- Deep copy the vanilla robot so we start from a valid definition.
+    local repair_bot = table.deepcopy(base)
+
+    ------------------------------------------------------------------
+    -- Basic identity / visibility
+    ------------------------------------------------------------------
+    repair_bot.name = "mekatrol-repair-bot"
+    repair_bot.localised_name = {"entity-name.mekatrol-repair-bot"} -- optional, add locale if you like
+
+    -- Hide it from normal player interaction:
+    -- - not-on-map: no minimap dot
+    -- - not-blueprintable: cannot be included in blueprints
+    -- - not-deconstructable: can’t be marked for deconstruction
+    repair_bot.flags = {"placeable-player", "not-on-map", "not-blueprintable", "not-deconstructable"}
+
+    -- Make sure it doesn’t do real logistic/construction work on its own.
+    repair_bot.max_payload_size = 0
+
+    -- You can tweak speed if you want; this is the vanilla value:
+    -- (Your script is teleporting it, so this mostly affects how it looks
+    -- if the game ever tries to move it naturally.)
+    repair_bot.speed = base.speed
+
+    ------------------------------------------------------------------
+    -- GRAPHICS: always look like a working construction robot
+    --
+    -- We override the idle / in_motion sprites to reuse the vanilla
+    -- "working" and "shadow_working" animations so the bot is always
+    -- shown as repairing.
+    ------------------------------------------------------------------
+    repair_bot.idle = base.working
+    repair_bot.in_motion = base.working
+    repair_bot.shadow_idle = base.shadow_working
+    repair_bot.shadow_in_motion = base.shadow_working
+
+    ------------------------------------------------------------------
+    -- Register the new prototype
+    ------------------------------------------------------------------
+    data:extend({repair_bot})
+end

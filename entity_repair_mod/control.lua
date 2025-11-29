@@ -21,6 +21,12 @@ local WALL_REPAIR_DISTANCE = 20.0
 -- All entities in this radius will be repaired to max health.
 local WALL_REPAIR_RADIUS = 20.0
 
+-- Vertical offset (in tiles) to move the bot highlight up so it surrounds
+-- the flying construction-robot sprite instead of the ground position.
+-- Construction robots use a shift of about util.by_pixel(-0.25, -5) (~ -0.156 tiles),
+-- so -0.2 is a good starting point.
+local BOT_HIGHLIGHT_Y_OFFSET = -1.2
+
 ---------------------------------------------------
 -- REPAIR TOOL CONFIGURATION
 ---------------------------------------------------
@@ -408,10 +414,16 @@ local function draw_bot_highlight(bot, pdata)
 
     -- Half-size of the highlight box around the bot.
     local size = 0.6
+
+    -- Base position is the entity position (on the ground).
     local pos = bot.position
 
-    local left_top = {pos.x - size, pos.y - size}
-    local right_bottom = {pos.x + size, pos.y + size}
+    -- Apply a vertical offset so the rectangle is centered on the flying sprite.
+    local cx = pos.x
+    local cy = pos.y + BOT_HIGHLIGHT_Y_OFFSET
+
+    local left_top = {cx - size, cy - size * 1.5}
+    local right_bottom = {cx + size, cy + size}
 
     -- If we already have a rectangle, update it in-place.
     if pdata.highlight_object then
@@ -431,9 +443,9 @@ local function draw_bot_highlight(bot, pdata)
         color = {
             r = 0,
             g = 1,
-            b = 0,
-            a = 0.7
-        }, -- semi-transparent green
+            b = 1,
+            a = 0.2
+        }, -- semi-transparent blue
         filled = false,
         width = 2,
         left_top = left_top,
@@ -634,23 +646,14 @@ local function spawn_wall_bot_for_player(player, pdata)
     end
 end
 
--- Issue a go-to command to the bot to move toward a target position.
 local function move_bot_to(bot, target_pos)
     if not (bot and bot.valid and target_pos) then
         return
     end
 
-    local cmd = bot.commandable
-    if not (cmd and cmd.valid) then
-        return
-    end
-
-    cmd.set_command {
-        type = defines.command.go_to_location,
-        destination = target_pos,
-        radius = 0.5,
-        distraction = defines.distraction.none
-    }
+    -- Easiest: just snap the bot directly to the target.
+    -- If you want it to “glide”, you can move it in small steps per tick instead.
+    bot.teleport(target_pos)
 end
 
 -- Repair all damaged entities within a radius of a given center point,
