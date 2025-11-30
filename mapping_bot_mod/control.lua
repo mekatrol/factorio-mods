@@ -13,6 +13,11 @@ local MAPPING_SCAN_INTERVAL_TICKS = 60
 local MOD_NAME = "mapping_bot_mod"
 
 ---------------------------------------------------
+-- CUSTOM EVENT
+---------------------------------------------------
+local EVENT_on_entity_mapped = script.generate_event_name()
+
+---------------------------------------------------
 -- MODULES
 ---------------------------------------------------
 local visuals = require("visuals")
@@ -123,10 +128,13 @@ local function upsert_mapped_entity(player, pdata, entity, tick)
         return
     end
 
-    local shared = ensure_root().shared_mapped_entities
+    local root = ensure_root()
+    local shared = root.shared_mapped_entities
     local info = shared[key]
+    local is_new = false
 
     if not info then
+        is_new = true
         -- Create new mapping entry
         info = {
             name = entity.name,
@@ -153,6 +161,13 @@ local function upsert_mapped_entity(player, pdata, entity, tick)
         info.position.y = entity.position.y
         info.last_seen_tick = tick
     end
+
+    -- notify subscribers
+    local e = {
+        key = key,
+        info = info
+    }
+    script.raise_event(EVENT_on_entity_mapped, e)
 end
 
 ---------------------------------------------------
@@ -262,6 +277,18 @@ local function clear_all_mapped_entities(pdata)
     local root = ensure_root()
     root.shared_mapped_entities = {}
 end
+
+---------------------------------------------------
+-- REMOTE INTERFACE (for other mods)
+---------------------------------------------------
+remote.add_interface("mapping_bot_mod", {
+    get_event = function()
+        return EVENT_on_entity_mapped
+    end,
+    get_mapped_entities = function()
+        return ensure_root().shared_mapped_entities
+    end
+})
 
 ---------------------------------------------------
 -- EVENTS
