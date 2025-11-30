@@ -26,7 +26,7 @@ end
 
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
-function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_offset)
+function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highlight_y_offset, repair_tool_name)
     if not (bot and bot.valid and max_health and max_health > 0) then
         -- Cleanup if bot missing
         if pdata.bot_health_bg and pdata.bot_health_bg.valid then
@@ -112,13 +112,21 @@ function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_o
     -------------------------------------------------------
     -- Text (e.g. "75/100") just below the bar
     -------------------------------------------------------
+
+    local inv = player.get_main_inventory()
+    if not inv then
+        return
+    end
+
+    local packs_available = inv.get_item_count(repair_tool_name)
+
     local text_y_off = 0.8
     local text_pos = {
         x = pos.x,
         y = pos.y + text_y_off + bot_highlight_y_offset
     }
 
-    local text_value = string.format("%.0f/%.0f", health, max_health)
+    local text_value = string.format("%.0d→%.0d", pdata.repair_health_pool, packs_available)
 
     if pdata.bot_health_text and pdata.bot_health_text.valid then
         pdata.bot_health_text.target = text_pos

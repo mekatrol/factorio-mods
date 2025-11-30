@@ -22,8 +22,20 @@ local visuals = require("visuals")
 -- REPAIR TOOL CONFIGURATION
 ---------------------------------------------------
 local REPAIR_TOOL_NAME = "repair-pack"
-local REPAIR_TOOLS_PER_ENTITY = 1
+
+-- How many tools are consumed at a time when we need *new* durability.
+-- With the durability pool logic below this is effectively “packs per top-up”,
+-- not “packs per entity”.
+local REPAIR_TOOLS_PER_INVENTORY_FETCH = 1
+
+-- Fraction of an entity’s max health to *attempt* to repair per step.
+-- This is still used to determine the size of each healing step,
+-- but actual tool consumption is now pooled and shared across entities.
 local REPAIR_TOOL_HEALTH_INCREMENT_PCT = 1
+
+-- Total health that a single repair pack can repair across all entities.
+-- This is the “durability” per pack. Tune to taste.
+local REPAIR_TOOL_HEALTH_PER_PACK = 100
 
 ---------------------------------------------------
 -- HEALTH HELPERS / MAX HEALTH OVERRIDES
@@ -237,7 +249,11 @@ local function init_player(player)
             vis_damaged_markers = nil,
             vis_damaged_lines = nil,
             vis_bot_path = nil,
-            vis_current_waypoint = nil
+            vis_current_waypoint = nil,
+
+            -- accumulated durability from already-consumed repair tools
+            -- measured in "health points" that can be spent across entities
+            repair_health_pool = 0
         }
 
         s.players[player.index] = pdata
@@ -263,6 +279,9 @@ local function init_player(player)
         pdata.vis_damaged_lines = pdata.vis_damaged_lines or nil
         pdata.vis_bot_path = pdata.vis_bot_path or nil
         pdata.vis_current_waypoint = pdata.vis_current_waypoint or nil
+
+        -- durability pool may not exist in older saves
+        pdata.repair_health_pool = pdata.repair_health_pool or 0
     end
 end
 
@@ -282,6 +301,109 @@ local function get_player_data(index)
     end
 
     return pdata
+end
+
+---------------------------------------------------
+-- REPAIR TOOL / DURABILITY HELPERS
+---------------------------------------------------
+-- We track a per-player "repair_health_pool" that represents health points
+-- available from already-consumed repair packs. This lets one pack heal
+-- multiple entities instead of being consumed per entity.
+
+local function get_player_repair_data(player)
+    if not (player and player.valid) then
+        return nil
+    end
+    local pdata = get_player_data(player.index)
+    if not pdata then
+        return nil
+    end
+    pdata.repair_health_pool = pdata.repair_health_pool or 0
+    return pdata
+end
+
+-- Returns true if the player has either:
+--   * at least one repair pack in inventory, or
+--   * any remaining pooled repair health.
+local function player_has_repair_capacity(player, pdata)
+    if not (player and player.valid) then
+        return false
+    end
+
+    pdata = pdata or get_player_repair_data(player)
+    if not pdata then
+        return false
+    end
+
+    local inv = get_player_main_inventory(player)
+    if not inv then
+        return false
+    end
+
+    local packs = inv.get_item_count(REPAIR_TOOL_NAME)
+    local pool = pdata.repair_health_pool or 0
+    return packs > 0 or pool > 0
+end
+
+-- Convert repair packs into "health points" and spend from that pool.
+-- requested_health is how much health we would like to repair right now.
+-- Returns the actual health value we are allowed to apply (<= requested_health).
+local function consume_repair_health(player, pdata, requested_health)
+    if not (player and player.valid and pdata) then
+        return 0
+    end
+
+    if requested_health <= 0 then
+        return 0
+    end
+
+    local inv = get_player_main_inventory(player)
+    if not inv then
+        return 0
+    end
+
+    pdata.repair_health_pool = pdata.repair_health_pool or 0
+    local pool = pdata.repair_health_pool
+
+    -- How much additional pool is needed to satisfy this repair.
+    local remaining_needed = math.max(0, requested_health - pool)
+
+    -- Top up the pool using repair packs as long as we need more durability.
+    while remaining_needed > 0 do
+        local packs_available = inv.get_item_count(REPAIR_TOOL_NAME)
+        if packs_available <= 0 then
+            break
+        end
+
+        local removed = inv.remove {
+            name = REPAIR_TOOL_NAME,
+            count = REPAIR_TOOLS_PER_INVENTORY_FETCH
+        }
+
+        if removed <= 0 then
+            break
+        end
+
+        -- Each removed pack adds a fixed amount of repair capacity.
+        pool = pool + (REPAIR_TOOL_HEALTH_PER_PACK * removed)
+        remaining_needed = math.max(0, requested_health - pool)
+        pdata.out_of_repair_tools_warned = false
+    end
+
+    -- Spend from the pool.
+    local spent = math.min(requested_health, pool)
+    if spent <= 0 then
+        pdata.repair_health_pool = pool
+        return 0
+    end
+
+    pool = pool - spent
+    pdata.repair_health_pool = pool
+
+    msg = string.format("[MekatrolRepairBot] Spending %d with %d left in the pool", spent, pool)
+    player.print(msg)
+
+    return spent
 end
 
 ---------------------------------------------------
@@ -493,18 +615,18 @@ end
 -- REPAIR LOGIC
 ---------------------------------------------------
 local function repair_bot_self_heal(player, bot, pdata)
-    if not (player and player.valid) then
+    if not (player and player.valid and bot and bot.valid) then
         return
     end
 
-    local inv = get_player_main_inventory(player)
-    if not inv then
+    pdata = pdata or get_player_repair_data(player)
+    if not pdata then
         return
     end
 
-    if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
-        local pdata = get_player_data(player.index)
-        if pdata and not pdata.out_of_repair_tools_warned then
+    -- If there is neither inventory nor pooled durability, bail and warn once.
+    if not player_has_repair_capacity(player, pdata) then
+        if not pdata.out_of_repair_tools_warned then
             pdata.out_of_repair_tools_warned = true
             player.print("[MekatrolRepairBot] No repair tools in your inventory. Bot cannot repair.")
         end
@@ -513,29 +635,35 @@ local function repair_bot_self_heal(player, bot, pdata)
 
     -- only self heal if damaged
     local max = get_entity_max_health(bot)
+    if not max or bot.health >= max then
+        return
+    end
 
-    if max and bot.health < max then
-        local removed = inv.remove {
-            name = REPAIR_TOOL_NAME,
-            count = REPAIR_TOOLS_PER_ENTITY
-        }
+    local missing = max - bot.health
+    if missing <= 0 then
+        return
+    end
 
-        if removed > 0 then
-            local health_increment = max * REPAIR_TOOL_HEALTH_INCREMENT_PCT
-            local before_health = bot.health
-            bot.health = math.min(max, bot.health + health_increment)
+    -- requested step: fraction of max health, clamped to missing.
+    local base_increment = max * REPAIR_TOOL_HEALTH_INCREMENT_PCT
+    if base_increment <= 0 then
+        return
+    end
 
-            if pdata then
-                pdata.out_of_repair_tools_warned = false
-            end
+    local requested = math.min(missing, base_increment)
+    local spent = consume_repair_health(player, pdata, requested)
 
-            -- DEBUG: put inventory back
-            -- inv.insert {
-            --     name = REPAIR_TOOL_NAME,
-            --     count = removed
-            -- }
-        else
-            return
+    if spent > 0 then
+        local before_health = bot.health
+        bot.health = math.min(max, bot.health + spent)
+        pdata.out_of_repair_tools_warned = false
+        -- DEBUG: you can log before/after if needed
+        -- player.print(string.format("[MekatrolRepairBot] Bot self-healed %.1f (%.1f -> %.1f)", spent, before_health, bot.health))
+    else
+        -- No durability available anymore – warn once.
+        if not pdata.out_of_repair_tools_warned and not player_has_repair_capacity(player, pdata) then
+            pdata.out_of_repair_tools_warned = true
+            player.print("[MekatrolRepairBot] Out of repair tools; bot cannot self-repair.")
         end
     end
 end
@@ -545,21 +673,20 @@ local function repair_entities_near(player, surface, force, center, radius)
         return
     end
 
-    local inv = get_player_main_inventory(player)
-    if not inv then
+    local pdata = get_player_repair_data(player)
+    if not pdata then
         return
     end
 
-    if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
-        local pdata = get_player_data(player.index)
-        if pdata and not pdata.out_of_repair_tools_warned then
+    -- If we have neither inventory packs nor pooled durability, warn once.
+    if not player_has_repair_capacity(player, pdata) then
+        if not pdata.out_of_repair_tools_warned then
             pdata.out_of_repair_tools_warned = true
             player.print("[MekatrolRepairBot] No repair tools in your inventory. Bot cannot repair.")
         end
         return
     end
 
-    local pdata = get_player_data(player.index)
     local area = {{center.x - radius, center.y - radius}, {center.x + radius, center.y + radius}}
 
     local entities = surface.find_entities_filtered {
@@ -568,34 +695,42 @@ local function repair_entities_near(player, surface, force, center, radius)
     }
 
     for _, ent in pairs(entities) do
-        if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
-            if pdata then
-                pdata.out_of_repair_tools_warned = true
-                player.print("[MekatrolRepairBot] Out of repair tools; stopping repairs.")
-            end
-            return
+        if not (ent and ent.valid and ent.health) then
+            goto continue_entity
         end
 
-        if ent.valid and ent.health then
-            local max = get_entity_max_health(ent)
-            if max and ent.health < max then
-                local removed = inv.remove {
-                    name = REPAIR_TOOL_NAME,
-                    count = REPAIR_TOOLS_PER_ENTITY
-                }
+        local max = get_entity_max_health(ent)
+        if not max or ent.health >= max then
+            goto continue_entity
+        end
 
-                if removed > 0 then
-                    local health_increment = max * REPAIR_TOOL_HEALTH_INCREMENT_PCT
-                    ent.health = math.min(max, ent.health + health_increment)
+        -- How much we *could* repair this entity in a single step.
+        local missing = max - ent.health
+        local base_increment = max * REPAIR_TOOL_HEALTH_INCREMENT_PCT
+        if base_increment <= 0 then
+            goto continue_entity
+        end
 
-                    if pdata then
-                        pdata.out_of_repair_tools_warned = false
-                    end
-                else
-                    return
+        local requested = math.min(missing, base_increment)
+
+        -- Spend from the pooled durability, topping up from inventory as needed.
+        local spent = consume_repair_health(player, pdata, requested)
+
+        if spent > 0 then
+            ent.health = math.min(max, ent.health + spent)
+            pdata.out_of_repair_tools_warned = false
+        else
+            -- No more durability available; check if we truly ran out and warn once.
+            if not player_has_repair_capacity(player, pdata) then
+                if not pdata.out_of_repair_tools_warned then
+                    pdata.out_of_repair_tools_warned = true
+                    player.print("[MekatrolRepairBot] Out of repair tools; stopping repairs.")
                 end
+                return
             end
         end
+
+        ::continue_entity::
     end
 end
 
@@ -621,7 +756,7 @@ local function update_repair_bot_for_player(player, pdata)
     visuals.clear_lines(pdata)
 
     local max = get_entity_max_health(bot) or REPAIR_BOT_HEALTH
-    visuals.update_bot_health_bar(bot, pdata, max, BOT_HIGHLIGHT_Y_OFFSET)
+    visuals.update_bot_health_bar(player, bot, pdata, max, BOT_HIGHLIGHT_Y_OFFSET, REPAIR_TOOL_NAME)
 
     -- draw rect around bot
     visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
