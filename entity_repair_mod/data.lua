@@ -42,16 +42,14 @@ do
     -- - not-deconstructable: can’t be marked for deconstruction
     repair_bot.flags = {"placeable-player", "not-on-map", "not-blueprintable", "not-deconstructable"}
 
-    -- Make sure it doesn’t do real logistic/construction work on its own.
-    repair_bot.max_payload_size = 0
-
-    -- You can tweak speed if you want; this is the vanilla value:
-    -- (Your script is teleporting it, so this mostly affects how it looks
-    -- if the game ever tries to move it naturally.)
     repair_bot.speed = base.speed
 
-    -- override max health
-    repair_bot.max_health = 500
+    -- Make sure it doesn’t do real logistic/construction work on its own.
+    repair_bot.max_payload_size = 0
+    repair_bot.construction_radius = 0
+    repair_bot.logistic_radius = 0
+    repair_bot.energy_per_move = "0J"
+    repair_bot.energy_per_tick = "0J"
 
     ------------------------------------------------------------------
     -- GRAPHICS: always look like a working construction robot

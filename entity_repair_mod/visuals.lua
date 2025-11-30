@@ -1,5 +1,19 @@
 local visuals = {}
 
+-- Must match "name" in info.json
+local MOD_NAME = "entity_repair_mod"
+
+----------------------------------------------------------------
+-- Wipe ALL rendering objects created by this mod
+----------------------------------------------------------------
+function visuals.force_clear_mod_objects(pdata)
+    if not pdata then
+        return
+    end
+
+    pcall(rendering.clear, MOD_NAME)
+end
+
 function visuals.clear_bot_health_bar(pdata)
     if pdata.bot_health_bg and pdata.bot_health_bg.valid then
         pdata.bot_health_bg:destroy()
@@ -21,8 +35,6 @@ function visuals.clear_bot_highlight(pdata)
     end
     pdata.vis_highlight_object = nil
 end
-
--- Existing clear_lines/clear_damaged_markers are good; keep them.
 
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
@@ -47,28 +59,46 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
     local health = bot.health or max_health
     local ratio = math.max(0, math.min(1, health / max_health))
 
+    -------------------------------------------------------
+    -- Shared "UI baseline" for all bot overlays
+    -------------------------------------------------------
     local pos = bot.position
+    local ui_y = pos.y + (bot_highlight_y_offset or 0) + 0.3
 
-    -- Position/size for the bar (just below the bot)
     local bar_width = 0.8
     local bar_height = 0.10
-    local bar_y_off = 0.6 -- vertical offset below bot
 
-    local y_offset = bot_highlight_y_offset or 0
+    local highlight_size = 0.6
+    local bar_y_start = (ui_y + highlight_size) + 0.05
 
-    local x1 = pos.x - bar_width / 2
-    local x2 = pos.x + bar_width / 2
-    local y1 = pos.y + bar_y_off + bot_highlight_y_offset
-    local y2 = y1 + bar_height
+    -- Offsets relative to bot (for ScriptRenderTarget)
+    local lt_offset = {
+        x = -bar_width / 2,
+        y = bar_y_start - pos.y
+    }
 
-    local fg_x2 = x1 + bar_width * ratio
+    local rb_offset_full = {
+        x = bar_width / 2,
+        y = (bar_y_start + bar_height) - pos.y
+    }
+
+    local rb_offset_fg = {
+        x = -bar_width / 2 + bar_width * ratio,
+        y = (bar_y_start + bar_height) - pos.y
+    }
 
     -------------------------------------------------------
-    -- Background rectangle
+    -- Background rectangle (full bar area, dark)
     -------------------------------------------------------
     if pdata.bot_health_bg and pdata.bot_health_bg.valid then
-        pdata.bot_health_bg.left_top = {x1, y1}
-        pdata.bot_health_bg.right_bottom = {x2, y2}
+        pdata.bot_health_bg.left_top = {
+            entity = bot,
+            offset = lt_offset
+        }
+        pdata.bot_health_bg.right_bottom = {
+            entity = bot,
+            offset = rb_offset_full
+        }
     else
         pdata.bot_health_bg = rendering.draw_rectangle {
             color = {
@@ -78,8 +108,14 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
                 a = 0.7
             }, -- dark background
             filled = true,
-            left_top = {x1, y1},
-            right_bottom = {x2, y2},
+            left_top = {
+                entity = bot,
+                offset = lt_offset
+            },
+            right_bottom = {
+                entity = bot,
+                offset = rb_offset_full
+            },
             surface = bot.surface,
             draw_on_ground = true,
             only_in_alt_mode = false
@@ -87,32 +123,38 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
     end
 
     -------------------------------------------------------
-    -- Foreground (current health) rectangle
+    -- Foreground (current health) rectangle (green)
+    -- Destroy + recreate every tick so it always renders on top
     -------------------------------------------------------
     if pdata.bot_health_fg and pdata.bot_health_fg.valid then
-        pdata.bot_health_fg.left_top = {x1, y1}
-        pdata.bot_health_fg.right_bottom = {fg_x2, y2}
-    else
-        pdata.bot_health_fg = rendering.draw_rectangle {
-            color = {
-                r = 0,
-                g = 1,
-                b = 0,
-                a = 0.9
-            }, -- green bar
-            filled = true,
-            left_top = {x1, y1},
-            right_bottom = {fg_x2, y2},
-            surface = bot.surface,
-            draw_on_ground = true,
-            only_in_alt_mode = false
-        }
+        pdata.bot_health_fg:destroy()
+        pdata.bot_health_fg = nil
     end
+
+    pdata.bot_health_fg = rendering.draw_rectangle {
+        color = {
+            r = 0,
+            g = 1,
+            b = 0,
+            a = 0.9
+        }, -- green bar
+        filled = true,
+        left_top = {
+            entity = bot,
+            offset = lt_offset
+        },
+        right_bottom = {
+            entity = bot,
+            offset = rb_offset_fg
+        },
+        surface = bot.surface,
+        draw_on_ground = true,
+        only_in_alt_mode = false
+    }
 
     -------------------------------------------------------
     -- Text (e.g. "75→100") just below the bar
     -------------------------------------------------------
-
     local inv = player.get_main_inventory()
     if not inv then
         return
@@ -120,13 +162,13 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
 
     local packs_available = inv.get_item_count(repair_tool_name)
 
-    local text_y_off = 0.8
+    local text_y = bar_y_start + bar_height + 0.15
     local text_pos = {
         x = pos.x,
-        y = pos.y + text_y_off + bot_highlight_y_offset
+        y = text_y
     }
 
-    local text_value = string.format("%d→%d", pdata.repair_health_pool, packs_available)
+    local text_value = string.format("%d→%d", pdata.repair_health_pool or 0, packs_available)
 
     if pdata.bot_health_text and pdata.bot_health_text.valid then
         pdata.bot_health_text.target = text_pos
@@ -281,11 +323,12 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     local size = 0.6
     local pos = bot.position
 
-    local cy = pos.y + (bot_highlight_y_offset or 0)
+    -- Shared baseline:
+    local ui_y = pos.y + (bot_highlight_y_offset or 0)
     local cx = pos.x
 
-    local left_top = {cx - size, cy - size * 1.5}
-    local right_bottom = {cx + size, cy + size}
+    local left_top = {cx - size, ui_y - size * 1.5}
+    local right_bottom = {cx + size, ui_y + size}
 
     if pdata.vis_highlight_object then
         local obj = pdata.vis_highlight_object
