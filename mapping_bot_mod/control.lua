@@ -14,16 +14,15 @@
 ---------------------------------------------------
 -- CONFIG
 ---------------------------------------------------
--- How often the mapping logic runs.
--- 10 * 60 = once per in-game 10 seconds at 60 UPS.
--- For debugging, set this to 60 (once per second).
-local TICK_INTERVAL = 10 * 60
 
 -- How far around a known entity we search for more entities.
 local SEARCH_RADIUS = 32
 
 -- Safety cap: how many entities to expand per tick per player.
 local MAX_EXPANSIONS_PER_TICK = 50
+
+-- Tiles per tick the bot will move. 0.1 => 6 tiles/sec at 60 UPS.
+local BOT_SPEED_PER_TICK = 0.1
 
 ---------------------------------------------------
 -- MODULES
@@ -82,32 +81,32 @@ local STATIC_TYPES = {
 ---------------------------------------------------
 
 local NON_STATIC_TYPES = {
-    ["character"]          = true,
-    ["car"]                = true,
-    ["spider-vehicle"]     = true,
-    ["locomotive"]         = true,
-    ["cargo-wagon"]        = true,
-    ["fluid-wagon"]        = true,
-    ["artillery-wagon"]    = true,
+    ["character"] = true,
+    ["car"] = true,
+    ["spider-vehicle"] = true,
+    ["locomotive"] = true,
+    ["cargo-wagon"] = true,
+    ["fluid-wagon"] = true,
+    ["artillery-wagon"] = true,
 
-    ["unit"]               = true,  -- biters, etc.
-    ["unit-spawner"]       = true,
-    ["turret"]             = false,
-    ["ammo-turret"]        = false,
-    ["electric-turret"]    = false,
-    ["artillery-turret"]   = false,
+    ["unit"] = true, -- biters, etc.
+    ["unit-spawner"] = true,
+    ["turret"] = false,
+    ["ammo-turret"] = false,
+    ["electric-turret"] = false,
+    ["artillery-turret"] = false,
 
-    ["combat-robot"]       = true,
+    ["combat-robot"] = true,
     ["construction-robot"] = true,
-    ["logistic-robot"]     = true,
+    ["logistic-robot"] = true,
 
-    ["projectile"]         = true,
-    ["beam"]               = true,
-    ["flying-text"]        = true,
-    ["smoke"]              = true,
-    ["fire"]               = true,
-    ["stream"]             = true,
-    ["decorative"]         = true,
+    ["projectile"] = true,
+    ["beam"] = true,
+    ["flying-text"] = true,
+    ["smoke"] = true,
+    ["fire"] = true,
+    ["stream"] = true,
+    ["decorative"] = true
 }
 
 local function is_static_mappable_entity_blackllist(e)
@@ -123,7 +122,6 @@ local function is_static_mappable_entity_blackllist(e)
     -- Everything else (including item-entity, resources, buildings) is allowed.
     return true
 end
-
 
 local function is_static_mappable_entity_whitelist(e)
     if not (e and e.valid) then
@@ -192,6 +190,12 @@ local function get_player_data(player_index)
             bot_path = nil, -- reserved for pathfinding module
             bot_path_index = 1,
             bot_path_target = nil,
+
+            ------------------------------------------------------------------
+            -- Movement state (for smooth movement)
+            ------------------------------------------------------------------
+            movement_target_position = nil, -- {x, y} of current destination
+            movement_target_name = nil, -- entity name (for expand lookup)
 
             ------------------------------------------------------------------
             -- Visuals
@@ -572,6 +576,70 @@ end
 -- PER-TICK MAPPING UPDATE
 ---------------------------------------------------
 
+local function update_bot_movement(player, pdata, event)
+    local bot = pdata.mapping_bot
+    local target_pos = pdata.movement_target_position
+
+    if not (bot and bot.valid and target_pos) then
+        return
+    end
+
+    local pos = bot.position
+    local dx = target_pos.x - pos.x
+    local dy = target_pos.y - pos.y
+    local dist_sq = dx * dx + dy * dy
+
+    if dist_sq == 0 then
+        -- Already at target.
+        dx, dy = 0, 0
+    end
+
+    local step = BOT_SPEED_PER_TICK
+
+    if dist_sq <= step * step then
+        -- Arrive this tick: snap to target and perform expansion there.
+        bot.teleport(target_pos)
+
+        -- Find the entity at/near this position for expansion.
+        local surface = bot.surface
+        local entity = nil
+
+        if pdata.movement_target_name then
+            entity = surface.find_entity(pdata.movement_target_name, target_pos)
+        end
+
+        if not entity then
+            local nearby = surface.find_entities_filtered {
+                position = target_pos,
+                radius = 0.5
+            }
+            entity = nearby[1]
+        end
+
+        if entity and entity.valid then
+            expand_from_entity(player, pdata, entity, event.tick)
+        end
+
+        -- Clear movement target so a new one can be picked on the next
+        -- mapping update.
+        pdata.movement_target_position = nil
+        pdata.movement_target_name = nil
+        return
+    end
+
+    -- Move a small step towards the target.
+    local dist = math.sqrt(dist_sq)
+    local nx = dx / dist
+    local ny = dy / dist
+
+    local new_pos = {
+        x = pos.x + nx * step,
+        y = pos.y + ny * step
+    }
+
+    bot.teleport(new_pos)
+end
+
 local function update_mapping_bot(player, pdata, event)
     local tick = event.tick
 
@@ -586,15 +654,23 @@ local function update_mapping_bot(player, pdata, event)
     -- Dynamic rescan around the bot so moving entities stay up-to-date.
     rescan_dynamic_area(player, pdata, bot, tick)
 
-    -- BFS step: pick next frontier entity and expand from it.
-    local target_entity = pick_next_target_entity(player, pdata)
-    if not target_entity then
-        -- Nothing left to explore this tick.
+    -- If we already have a movement target, let per-tick movement handle it.
+    if pdata.movement_target_position then
         return
     end
 
-    move_bot_to_entity(bot, target_entity)
-    expand_from_entity(player, pdata, target_entity, tick)
+    -- Pick the next entity from the frontier as a new movement target.
+    local target_entity = pick_next_target_entity(player, pdata)
+    if not target_entity then
+        -- Nothing left to explore this mapping step.
+        return
+    end
+
+    pdata.movement_target_position = {
+        x = target_entity.position.x,
+        y = target_entity.position.y
+    }
+    pdata.movement_target_name = target_entity.name
 end
 
 ---------------------------------------------------
@@ -717,18 +793,21 @@ script.on_event(defines.events.on_tick, function(event)
         local pdata = get_player_data(player.index)
 
         if pdata.mapping_bot_enabled then
-            local bot = pdata.mapping_bot
-            if bot and bot.valid then
-                -- ALWAYS draw/update circle every tick
-                if visuals.update_search_radius_circle then
-                    visuals.update_search_radius_circle(player, pdata, bot, SEARCH_RADIUS)
-                end
+            -- Ensure bot exists
+            local bot = ensure_bot_for_player(player, pdata)
+
+            -- Draw/update the blue search-radius circle every tick (if you have this)
+            if bot and bot.valid and visuals.update_search_radius_circle then
+                visuals.update_search_radius_circle(player, pdata, bot, SEARCH_RADIUS)
             end
 
-            -- Only run heavy mapping logic occasionally
-            if event.tick % TICK_INTERVAL == 0 then
-                update_mapping_bot(player, pdata, event)
-            end
+            -- Smooth movement every tick
+            update_bot_movement(player, pdata, event)
+
+            -- Target selection + mapping logic every tick, but it will
+            -- only pick a new target when there is none.
+            update_mapping_bot(player, pdata, event)
         end
     end
 end)
+
