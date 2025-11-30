@@ -5,6 +5,10 @@ local REPAIR_BOT_HEALTH = 100
 
 local SEARCH_RADIUS = 32
 
+-- How often the bot scans for entities (in ticks)
+-- 60 ticks = 1 second on default settings.
+local MAPPING_SCAN_INTERVAL_TICKS = 60
+
 -- Must match "name" in info.json
 local MOD_NAME = "mapping_bot_mod"
 
@@ -32,6 +36,8 @@ local NON_STATIC_TYPES = {
 
     ["corpse"] = true,
     ["character-corpse"] = true,
+
+    ["fish"] = true,
 
     ["combat-robot"] = true,
     ["construction-robot"] = true,
@@ -85,7 +91,10 @@ local function get_player_data(idx)
             mapping_bot = nil,
             mapped_entities = {},
             mapped_entity_visuals = {},
-            vis_search_radius_circle = nil
+            vis_search_radius_circle = nil,
+
+            -- when this player/bot may next run a scan
+            next_mapping_scan_tick = 0
         }
         root.players[idx] = pdata
     end
@@ -190,17 +199,27 @@ local function update_bot(player, pdata, tick)
         return
     end
 
-    -- FOLLOW PLAYER
+    -- FOLLOW PLAYER (still every tick; cheap)
     local pos = player.position
     local offset = {pos.x + 3, pos.y - 2}
     bot.teleport(offset)
 
-    -- BLUE SEARCH CIRCLE (every tick)
+    -- BLUE SEARCH CIRCLE (still every tick; cheap)
     if visuals.update_search_radius_circle then
         visuals.update_search_radius_circle(player, pdata, bot, SEARCH_RADIUS)
     end
 
+    ----------------------------------------------------------------
     -- MAP ENTITIES IN RADIUS
+    -- This is the expensive bit. Throttle it.
+    ----------------------------------------------------------------
+    if tick < (pdata.next_mapping_scan_tick or 0) then
+        return
+    end
+
+    -- schedule next scan
+    pdata.next_mapping_scan_tick = tick + MAPPING_SCAN_INTERVAL_TICKS
+
     local found = bot.surface.find_entities_filtered {
         position = bot.position,
         radius = SEARCH_RADIUS
