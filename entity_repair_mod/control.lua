@@ -30,6 +30,7 @@ local REPAIR_TOOL_HEALTH_INCREMENT_PCT = 0.1
 ---------------------------------------------------
 local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["mekatrol-repair-bot"] = REPAIR_BOT_HEALTH,
+    ["mekatrol-mapping-bot"] = 100,
     ["stone-wall"] = 350,
     ["gun-turret"] = 400,
     ["fast-transport-belt"] = 160,

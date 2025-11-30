@@ -163,82 +163,6 @@ function visuals.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_off
 end
 
 ---------------------------------------------------
--- DAMAGED ENTITY MARKERS (DOTS + LINES)
----------------------------------------------------
-function visuals.clear_damaged_markers(pdata)
-    if pdata.vis_damaged_markers then
-        for _, obj in pairs(pdata.vis_damaged_markers) do
-            if obj and obj.valid then
-                obj:destroy()
-            end
-        end
-        pdata.vis_damaged_markers = nil
-    end
-
-    if pdata.vis_damaged_lines then
-        for _, obj in pairs(pdata.vis_damaged_lines) do
-            if obj and obj.valid then
-                obj:destroy()
-            end
-        end
-        pdata.vis_damaged_lines = nil
-    end
-end
-
-function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highlight_y_offset)
-    if not damaged_entities or #damaged_entities == 0 then
-        return
-    end
-
-    local y_offset = bot_highlight_y_offset or 0
-
-    local bot_pos = bot.position
-    local to_pos = {
-        x = bot_pos.x,
-        y = bot_pos.y + y_offset
-    }
-
-    pdata.vis_damaged_markers = pdata.vis_damaged_markers or {}
-    pdata.vis_damaged_lines = pdata.vis_damaged_lines or {}
-
-    for _, ent in pairs(damaged_entities) do
-        if ent and ent.valid then
-            local dot = rendering.draw_circle {
-                color = {
-                    r = 0,
-                    g = 0.3,
-                    b = 0,
-                    a = 0.1
-                },
-                radius = 0.15,
-                filled = true,
-                target = ent,
-                surface = ent.surface,
-                draw_on_ground = true,
-                only_in_alt_mode = false
-            }
-            pdata.vis_damaged_markers[#pdata.vis_damaged_markers + 1] = dot
-
-            local line = rendering.draw_line {
-                color = {
-                    r = 1,
-                    g = 0,
-                    b = 0,
-                    a = 0.1
-                },
-                width = 1,
-                from = ent.position,
-                to = bot_pos,
-                surface = ent.surface,
-                draw_on_ground = true,
-                only_in_alt_mode = false
-            }
-            pdata.vis_damaged_lines[#pdata.vis_damaged_lines + 1] = line
-        end
-    end
-end
-
----------------------------------------------------
 -- BOT HIGHLIGHT
 ---------------------------------------------------
 function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
@@ -283,4 +207,106 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     }
 end
 
+---------------------------------------------------
+-- Helper to safely destroy a rendering object
+---------------------------------------------------
+local function destroy_render_handle(handle)
+    if not handle then
+        return
+    end
+
+    local t = type(handle)
+
+    -- If it's a numeric id (normal case)
+    if t == "number" then
+        local ok, obj = pcall(rendering.get_object_by_id, handle)
+        if ok and obj and obj.valid then
+            obj.destroy()
+        end
+        return
+    end
+
+    -- If it's a rendering object/userdata from previous code
+    if (t == "userdata" or t == "table") and handle.destroy then
+        if handle.valid ~= false then
+            handle:destroy()
+        end
+    end
+end
+
+---------------------------------------------------
+-- Green box around mapped entities
+---------------------------------------------------
+function visuals.add_mapped_entity_box(player, pdata, entity)
+    if not (entity and entity.valid) then
+        return nil
+    end
+
+    local box = entity.selection_box or entity.bounding_box
+    if not box then
+        return nil
+    end
+
+    local id = rendering.draw_rectangle {
+        color = {
+            r = 0.3,
+            g = 0.3,
+            b = 0.3,
+            a = 0.35
+        },
+        width = 1,
+        filled = false,
+        left_top = box.left_top,
+        right_bottom = box.right_bottom,
+        surface = entity.surface,
+        players = {player},
+        draw_on_ground = false
+    }
+
+    return id
+end
+
+---------------------------------------------------
+-- Bright-blue search radius circle around the bot
+---------------------------------------------------
+function visuals.update_search_radius_circle(player, pdata, bot, radius)
+    -- Destroy old circle if it exists (handles both id and object)
+    if pdata.vis_search_radius_circle then
+        destroy_render_handle(pdata.vis_search_radius_circle)
+        pdata.vis_search_radius_circle = nil
+    end
+
+    if not (bot and bot.valid) then
+        return
+    end
+
+    -- Draw a new bright-blue circle, anchored to the bot
+    local id = rendering.draw_circle {
+        color = {
+            r = 0,
+            g = 0.6,
+            b = 1,
+            a = 0.8
+        }, -- bright blue
+        radius = radius,
+        width = 4,
+        filled = false,
+
+        -- Anchor to entity so it follows the bot automatically
+        target = bot,
+        surface = bot.surface,
+        players = {player},
+        draw_on_ground = true
+    }
+
+    -- Store the numeric id
+    pdata.vis_search_radius_circle = id
+end
+
+function visuals.clear_search_radius_circle(pdata)
+    if pdata.vis_search_radius_circle then
+        destroy_render_handle(pdata.vis_search_radius_circle)
+        pdata.vis_search_radius_circle = nil
+    end
+end
 return visuals
