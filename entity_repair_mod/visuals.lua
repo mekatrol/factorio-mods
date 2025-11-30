@@ -110,7 +110,7 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
     end
 
     -------------------------------------------------------
-    -- Text (e.g. "75/100") just below the bar
+    -- Text (e.g. "75→100") just below the bar
     -------------------------------------------------------
 
     local inv = player.get_main_inventory()
@@ -126,7 +126,7 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
         y = pos.y + text_y_off + bot_highlight_y_offset
     }
 
-    local text_value = string.format("%.0d→%.0d", pdata.repair_health_pool, packs_available)
+    local text_value = string.format("%d→%d", pdata.repair_health_pool, packs_available)
 
     if pdata.bot_health_text and pdata.bot_health_text.valid then
         pdata.bot_health_text.target = text_pos
