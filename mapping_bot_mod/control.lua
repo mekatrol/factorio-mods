@@ -1,11 +1,8 @@
-----------------------------------------------------------------------
--- control.lua
---
--- Follow-the-player mapping bot WITH NON-STATIC BLACKLIST FILTER
-----------------------------------------------------------------------
 ---------------------------------------------------
--- CONFIG
+-- CONFIGURATION
 ---------------------------------------------------
+local REPAIR_BOT_HEALTH = 100
+
 local SEARCH_RADIUS = 32
 
 -- Must match "name" in info.json
@@ -153,15 +150,35 @@ end
 -- BOT MANAGEMENT
 ---------------------------------------------------
 local function ensure_bot_for_player(player, pdata)
+    if not (player and player.valid and player.character) then
+        return
+    end
+
     if pdata.mapping_bot and pdata.mapping_bot.valid then
         return pdata.mapping_bot
     end
 
-    local bot = player.surface.create_entity {
+    local surface = player.surface
+    local pos = player.position
+
+    local bot = surface.create_entity {
         name = "mekatrol-mapping-bot",
-        position = player.position,
+        position = {pos.x + 2, pos.y - 1},
         force = player.force
     }
+
+    if bot then
+        bot.destructible = true
+        bot.health = REPAIR_BOT_HEALTH
+        pdata.mapping_bot = bot
+
+        pdata.damaged_entities = nil
+        pdata.damaged_entities_next_repair_index = 1
+
+        player.print("[MekatrolMappingBot] bot spawned.")
+    else
+        player.print("[MekatrolMappingBot] failed to spawn bot.")
+    end
 
     pdata.mapping_bot = bot
     return bot
@@ -174,7 +191,9 @@ local function update_bot(player, pdata, tick)
     end
 
     -- FOLLOW PLAYER
-    bot.teleport(player.position)
+    local pos = player.position
+    local offset = {pos.x + 3, pos.y - 2}
+    bot.teleport(offset)
 
     -- BLUE SEARCH CIRCLE (every tick)
     if visuals.update_search_radius_circle then
@@ -245,7 +264,6 @@ script.on_event("mekatrol-mapping-bot-toggle", function(event)
 
     if pdata.mapping_bot_enabled then
         ensure_bot_for_player(player, pdata)
-        player.print("[MappingBot] Bot enabled.")
     else
         if pdata.mapping_bot and pdata.mapping_bot.valid then
             pdata.mapping_bot.destroy()

@@ -506,9 +506,13 @@ end
 ---------------------------------------------------
 -- BOT SPAWN / SIMPLE MOVEMENT / FOLLOW
 ---------------------------------------------------
-local function spawn_repair_bot_for_player(player, pdata)
+local function ensure_bot_for_player(player, pdata)
     if not (player and player.valid and player.character) then
         return
+    end
+
+    if pdata.repair_bot and pdata.repair_bot.valid then
+        return pdata.repair_bot
     end
 
     local surface = player.surface
@@ -529,9 +533,9 @@ local function spawn_repair_bot_for_player(player, pdata)
         pdata.damaged_entities_next_repair_index = 1
         pathfinding.reset_bot_path(pdata)
 
-        player.print("[MekatrolRepairBot] Repair bot spawned.")
+        player.print("[MekatrolRepairBot] bot spawned.")
     else
-        player.print("[MekatrolRepairBot] Failed to spawn repair bot.")
+        player.print("[MekatrolRepairBot] failed to spawn bot.")
     end
 end
 
@@ -745,7 +749,7 @@ local function update_repair_bot_for_player(player, pdata)
 
     local bot = pdata.repair_bot
     if not (bot and bot.valid) then
-        spawn_repair_bot_for_player(player, pdata)
+        ensure_bot_for_player(player, pdata)
         bot = pdata.repair_bot
         if not (bot and bot.valid) then
             return
@@ -881,9 +885,7 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
     pdata.repair_bot_enabled = not pdata.repair_bot_enabled
 
     if pdata.repair_bot_enabled then
-        if not (pdata.repair_bot and pdata.repair_bot.valid) then
-            spawn_repair_bot_for_player(player, pdata)
-        end
+        ensure_bot_for_player(player, pdata)
 
         pdata.last_mode = "follow"
         player.print("[MekatrolRepairBot] Repair bot enabled.")
