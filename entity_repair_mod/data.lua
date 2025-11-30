@@ -50,6 +50,9 @@ do
     -- if the game ever tries to move it naturally.)
     repair_bot.speed = base.speed
 
+    -- override max health
+    repair_bot.max_health = 500
+
     ------------------------------------------------------------------
     -- GRAPHICS: always look like a working construction robot
     --

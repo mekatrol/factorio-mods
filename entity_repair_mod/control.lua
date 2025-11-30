@@ -1,6 +1,7 @@
 ---------------------------------------------------
 -- CONFIGURATION
 ---------------------------------------------------
+local REPAIR_BOT_HEALTH = 100
 local REPAIR_BOT_UPDATE_INTERVAL = 5
 local BOT_SPEED_TILES_PER_SECOND = 4.0
 local MAX_HEALTH_SCAN_INTERVAL = 3600
@@ -28,7 +29,7 @@ local REPAIR_TOOL_HEALTH_INCREMENT_PCT = 0.1
 -- HEALTH HELPERS / MAX HEALTH OVERRIDES
 ---------------------------------------------------
 local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
-    ["mekatrol-repair-bot"] = 100,
+    ["mekatrol-repair-bot"] = REPAIR_BOT_HEALTH,
     ["stone-wall"] = 350,
     ["gun-turret"] = 400,
     ["fast-transport-belt"] = 160,
@@ -285,7 +286,9 @@ end
 ---------------------------------------------------
 -- DAMAGED ENTITY SEARCH
 ---------------------------------------------------
-local function find_damaged_entities(surface, force, center, radius)
+local function find_damaged_entities(bot, center, radius)
+    local surface = bot.surface
+    local force = bot.force
     local area = {{center.x - radius, center.y - radius}, {center.x + radius, center.y + radius}}
 
     local candidates = surface.find_entities_filtered {
@@ -296,7 +299,7 @@ local function find_damaged_entities(surface, force, center, radius)
     local damaged = {}
 
     for _, ent in pairs(candidates) do
-        if is_entity_damaged(ent) then
+        if ent ~= bot and is_entity_damaged(ent) then
             damaged[#damaged + 1] = ent
         end
     end
@@ -307,11 +310,12 @@ end
 ---------------------------------------------------
 -- ROUTE BUILDING (NEAREST NEIGHBOUR)
 ---------------------------------------------------
-local function build_nearest_route(entities, start_pos)
+local function build_nearest_route(entities, bot)
     local ordered = {}
     local used = {}
     local remaining = #entities
 
+    local start_pos = bot.position
     local current_x = start_pos.x
     local current_y = start_pos.y
 
@@ -349,7 +353,7 @@ local function build_nearest_route(entities, start_pos)
     return ordered
 end
 
-local function rebuild_repair_route(player, pdata, bot)
+local function rebuild_repair_route(player, bot, pdata)
     visuals.clear_damaged_markers(pdata)
 
     -- If bot or player is invalid, clear route and stop
@@ -359,11 +363,9 @@ local function rebuild_repair_route(player, pdata, bot)
         return
     end
 
-    local surface = bot.surface
-    local force = bot.force
     local search_center = player.position
 
-    local damaged = find_damaged_entities(surface, force, search_center, ENTITY_SEARCH_RADIUS)
+    local damaged = find_damaged_entities(bot, search_center, ENTITY_SEARCH_RADIUS)
 
     if not damaged or #damaged == 0 then
         pdata.damaged_entities = nil
@@ -374,7 +376,7 @@ local function rebuild_repair_route(player, pdata, bot)
 
     visuals.draw_damaged_visuals(bot, pdata, damaged, BOT_HIGHLIGHT_Y_OFFSET)
 
-    pdata.damaged_entities = build_nearest_route(damaged, bot.position)
+    pdata.damaged_entities = build_nearest_route(damaged, bot)
     pdata.damaged_entities_next_repair_index = 1
 end
 
@@ -396,7 +398,8 @@ local function spawn_repair_bot_for_player(player, pdata)
     }
 
     if bot then
-        bot.destructible = false
+        bot.destructible = true
+        bot.health = REPAIR_BOT_HEALTH
         pdata.repair_bot = bot
 
         pdata.damaged_entities = nil
@@ -488,6 +491,54 @@ end
 ---------------------------------------------------
 -- REPAIR LOGIC
 ---------------------------------------------------
+local function repair_bot_self_heal(player, bot, pdata)
+    if not (player and player.valid) then
+        return
+    end
+
+    local inv = get_player_main_inventory(player)
+    if not inv then
+        return
+    end
+
+    if inv.get_item_count(REPAIR_TOOL_NAME) <= 0 then
+        local pdata = get_player_data(player.index)
+        if pdata and not pdata.out_of_repair_tools_warned then
+            pdata.out_of_repair_tools_warned = true
+            player.print("[MekatrolRepairBot] No repair tools in your inventory. Bot cannot repair.")
+        end
+        return
+    end
+
+    -- only self heal if damaged
+    local max = get_entity_max_health(bot)
+
+    if max and bot.health < max then
+        local removed = inv.remove {
+            name = REPAIR_TOOL_NAME,
+            count = REPAIR_TOOLS_PER_ENTITY
+        }
+
+        if removed > 0 then
+            local health_increment = max * REPAIR_TOOL_HEALTH_INCREMENT_PCT
+            local before_health = bot.health
+            bot.health = math.min(max, bot.health + health_increment)
+
+            if pdata then
+                pdata.out_of_repair_tools_warned = false
+            end
+
+            -- DEBUG: put inventory back
+            -- inv.insert {
+            --     name = REPAIR_TOOL_NAME,
+            --     count = removed
+            -- }
+        else
+            return
+        end
+    end
+end
+
 local function repair_entities_near(player, surface, force, center, radius)
     if not (player and player.valid) then
         return
@@ -568,10 +619,16 @@ local function update_repair_bot_for_player(player, pdata)
     -- clear any drawn lines
     visuals.clear_lines(pdata)
 
+    local max = get_entity_max_health(bot) or REPAIR_BOT_HEALTH
+    visuals.update_bot_health_bar(bot, pdata, max, BOT_HIGHLIGHT_Y_OFFSET)
+
     -- draw rect around bot
     visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
 
-    rebuild_repair_route(player, pdata, bot)
+    rebuild_repair_route(player, bot, pdata)
+
+    -- the bot should repair itself first
+    repair_bot_self_heal(player, bot, pdata)
 
     local targets = pdata.damaged_entities
 
@@ -603,7 +660,7 @@ local function update_repair_bot_for_player(player, pdata)
     while target_entity and (not target_entity.valid or not is_entity_damaged(target_entity)) do
         idx = idx + 1
         if idx > #targets then
-            rebuild_repair_route(player, pdata, bot)
+            rebuild_repair_route(player, bot, pdata)
             targets = pdata.damaged_entities
             idx = pdata.damaged_entities_next_repair_index or 1
 
@@ -636,7 +693,7 @@ local function update_repair_bot_for_player(player, pdata)
 
         repair_entities_near(player, bot.surface, bot.force, tp, ENTITY_REPAIR_RADIUS)
 
-        rebuild_repair_route(player, pdata, bot)
+        rebuild_repair_route(player, bot, pdata)
         targets = pdata.damaged_entities
 
         pdata.damaged_entities_next_repair_index = idx + 1

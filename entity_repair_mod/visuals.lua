@@ -1,5 +1,123 @@
 local visuals = {}
 
+-- Call this every tick (or at your bot update interval)
+-- max_health: either a constant or passed in from your get_entity_max_health(bot)
+function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_offset)
+    if not (bot and bot.valid and max_health and max_health > 0) then
+        -- Cleanup if bot missing
+        if pdata.bot_health_bg and pdata.bot_health_bg.valid then
+            pdata.bot_health_bg:destroy()
+        end
+        if pdata.bot_health_fg and pdata.bot_health_fg.valid then
+            pdata.bot_health_fg:destroy()
+        end
+        if pdata.bot_health_text and pdata.bot_health_text.valid then
+            pdata.bot_health_text:destroy()
+        end
+        pdata.bot_health_bg = nil
+        pdata.bot_health_fg = nil
+        pdata.bot_health_text = nil
+        return
+    end
+
+    local health = bot.health or max_health
+    local ratio = math.max(0, math.min(1, health / max_health))
+
+    local pos = bot.position
+
+    -- Position/size for the bar (just below the bot)
+    local bar_width = 0.8
+    local bar_height = 0.10
+    local bar_y_off = 0.6 -- vertical offset below bot
+
+    local y_offset = bot_highlight_y_offset or 0
+
+    local x1 = pos.x - bar_width / 2
+    local x2 = pos.x + bar_width / 2
+    local y1 = pos.y + bar_y_off + bot_highlight_y_offset
+    local y2 = y1 + bar_height
+
+    local fg_x2 = x1 + bar_width * ratio
+
+    -------------------------------------------------------
+    -- Background rectangle
+    -------------------------------------------------------
+    if pdata.bot_health_bg and pdata.bot_health_bg.valid then
+        pdata.bot_health_bg.left_top = {x1, y1}
+        pdata.bot_health_bg.right_bottom = {x2, y2}
+    else
+        pdata.bot_health_bg = rendering.draw_rectangle {
+            color = {
+                r = 0,
+                g = 0,
+                b = 0,
+                a = 0.7
+            }, -- dark background
+            filled = true,
+            left_top = {x1, y1},
+            right_bottom = {x2, y2},
+            surface = bot.surface,
+            draw_on_ground = true,
+            only_in_alt_mode = false
+        }
+    end
+
+    -------------------------------------------------------
+    -- Foreground (current health) rectangle
+    -------------------------------------------------------
+    if pdata.bot_health_fg and pdata.bot_health_fg.valid then
+        pdata.bot_health_fg.left_top = {x1, y1}
+        pdata.bot_health_fg.right_bottom = {fg_x2, y2}
+    else
+        pdata.bot_health_fg = rendering.draw_rectangle {
+            color = {
+                r = 0,
+                g = 1,
+                b = 0,
+                a = 0.9
+            }, -- green bar
+            filled = true,
+            left_top = {x1, y1},
+            right_bottom = {fg_x2, y2},
+            surface = bot.surface,
+            draw_on_ground = true,
+            only_in_alt_mode = false
+        }
+    end
+
+    -------------------------------------------------------
+    -- Text (e.g. "75/100") just below the bar
+    -------------------------------------------------------
+    local text_y_off = 0.8
+    local text_pos = {
+        x = pos.x,
+        y = pos.y + text_y_off + bot_highlight_y_offset
+    }
+
+    local text_value = string.format("%.0f/%.0f", health, max_health)
+
+    if pdata.bot_health_text and pdata.bot_health_text.valid then
+        pdata.bot_health_text.target = text_pos
+        pdata.bot_health_text.text = text_value
+    else
+        pdata.bot_health_text = rendering.draw_text {
+            text = text_value,
+            surface = bot.surface,
+            target = text_pos,
+            color = {
+                r = 1,
+                g = 1,
+                b = 1,
+                a = 1
+            },
+            scale = 0.75,
+            draw_on_ground = true,
+            alignment = "center",
+            only_in_alt_mode = false
+        }
+    end
+end
+
 function visuals.clear_lines(pdata)
     if pdata.vis_lines then
         for _, obj in pairs(pdata.vis_lines) do
