@@ -852,6 +852,7 @@ end
 ---------------------------------------------------
 local mapping_bot_event
 local mapping_bot_event_registered = false
+local mapping_bot_event_registered = false
 
 local seen_mapped_entities = {}
 
@@ -865,7 +866,15 @@ local function on_mapping_bot_entity_mapped(e)
     -- Do whatever the repair bot should do with this entity
     local msg = string.format("[MekatrolRepairBot] NEW mapped entity: key=%s, name=%s, surface=%d (first_seen=%d)",
         tostring(e.key), info.name or "<nil>", info.surface_index or -1, info.last_seen_tick or -1)
-    game.print(msg)
+    -- game.print(msg)
+end
+
+local function on_mapping_bot_entities_cleared(e)
+    local msg = string.format("[MekatrolRepairBot] Mapping cleared (reason=%s, player_index=%s, tick=%d)",
+        tostring(e.reason), tostring(e.player_index), e.tick or -1)
+    -- game.print(msg)
+
+    seen_mapped_entities = {}
 end
 
 local function register_mapping_bot_event()
@@ -873,19 +882,20 @@ local function register_mapping_bot_event()
         return
     end
 
-    -- Optional debug
-    game.print("[MekatrolRepairBot] register_mapping_bot_event called")
+    if remote.interfaces["mapping_bot_mod"] then
+        local iface = remote.interfaces["mapping_bot_mod"]
 
-    -- Check interface exists and has the method
-    if remote.interfaces["mapping_bot_mod"] and remote.interfaces["mapping_bot_mod"].get_event then
+        if iface.get_event then
+            mapping_bot_event = remote.call("mapping_bot_mod", "get_event")
+            script.on_event(mapping_bot_event, on_mapping_bot_entity_mapped)
+        end
 
-        mapping_bot_event = remote.call("mapping_bot_mod", "get_event")
-        game.print(string.format("[MekatrolRepairBot] mapping_bot_event id = %s", tostring(mapping_bot_event)))
+        if iface.get_clear_event then
+            mapping_bot_clear_event = remote.call("mapping_bot_mod", "get_clear_event")
+            script.on_event(mapping_bot_clear_event, on_mapping_bot_entities_cleared)
+        end
 
-        script.on_event(mapping_bot_event, on_mapping_bot_entity_mapped)
         mapping_bot_event_registered = true
-    else
-        game.print("[MekatrolRepairBot] mapping_bot_mod interface not available (yet?)")
     end
 end
 

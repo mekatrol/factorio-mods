@@ -13,9 +13,10 @@ local MAPPING_SCAN_INTERVAL_TICKS = 60
 local MOD_NAME = "mapping_bot_mod"
 
 ---------------------------------------------------
--- CUSTOM EVENT
+-- CUSTOM EVENTS
 ---------------------------------------------------
 local EVENT_on_entity_mapped = script.generate_event_name()
+local EVENT_on_mapped_entities_cleared = script.generate_event_name()
 
 ---------------------------------------------------
 -- MODULES
@@ -250,17 +251,15 @@ end
 ---------------------------------------------------
 -- CLEAR ALL MAP DATA (ENTITIES + VISUALS)
 ---------------------------------------------------
-local function clear_all_mapped_entities(pdata)
+local function clear_all_mapped_entities(pdata, opts)
     if not pdata then
         return
     end
 
+    opts = opts or {}
+
     ----------------------------------------------------------------
     -- 1. Wipe ALL rendering objects created by this mod
-    --    This removes:
-    --      - All mapped entity boxes
-    --      - Any search-radius circles
-    --      - Any other rendering from this mod
     ----------------------------------------------------------------
     pcall(rendering.clear, MOD_NAME)
 
@@ -276,15 +275,32 @@ local function clear_all_mapped_entities(pdata)
     ----------------------------------------------------------------
     local root = ensure_root()
     root.shared_mapped_entities = {}
+
+    ----------------------------------------------------------------
+    -- 4. Fire "map cleared" event
+    ----------------------------------------------------------------
+    script.raise_event(EVENT_on_mapped_entities_cleared, {
+        reason = opts.reason or "unknown",
+        player_index = opts.player_index, -- may be nil
+        tick = game.tick
+    })
 end
 
 ---------------------------------------------------
 -- REMOTE INTERFACE (for other mods)
 ---------------------------------------------------
 remote.add_interface("mapping_bot_mod", {
+    -- entity mapped/updated event
     get_event = function()
         return EVENT_on_entity_mapped
     end,
+
+    -- map cleared event
+    get_clear_event = function()
+        return EVENT_on_mapped_entities_cleared
+    end,
+
+    -- Snapshot of current map
     get_mapped_entities = function()
         return ensure_root().shared_mapped_entities
     end
@@ -325,5 +341,9 @@ script.on_event("mekatrol-mapping-bot-clear", function(event)
         return
     end
 
-    clear_all_mapped_entities(pdata)
+    clear_all_mapped_entities(pdata, {
+        reason = "player_clear",
+        player_index = event.player_index
+    })
 end)
+
