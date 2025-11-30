@@ -23,7 +23,7 @@ local visuals = require("visuals")
 ---------------------------------------------------
 local REPAIR_TOOL_NAME = "repair-pack"
 local REPAIR_TOOLS_PER_ENTITY = 1
-local REPAIR_TOOL_HEALTH_INCREMENT_PCT = 0.1
+local REPAIR_TOOL_HEALTH_INCREMENT_PCT = 1
 
 ---------------------------------------------------
 -- HEALTH HELPERS / MAX HEALTH OVERRIDES
