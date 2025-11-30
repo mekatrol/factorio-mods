@@ -8,6 +8,9 @@
 ---------------------------------------------------
 local SEARCH_RADIUS = 32
 
+-- Must match "name" in info.json
+local MOD_NAME = "mapping_bot_mod"
+
 ---------------------------------------------------
 -- MODULES
 ---------------------------------------------------
@@ -112,6 +115,39 @@ local function get_entity_key(entity)
 end
 
 ---------------------------------------------------
+-- CLEAR ALL MAPPED ENTITIES + VISUALS
+---------------------------------------------------
+
+local function clear_all_mapped_entities(player, pdata)
+    if not pdata then
+        return
+    end
+
+    ----------------------------------------------------------------
+    -- 1. Wipe ALL rendering objects created by this mod
+    ----------------------------------------------------------------
+    -- This removes:
+    --   - All mapped entity boxes
+    --   - Any search-radius circles
+    --   - Any other rendering from this mod
+    ----------------------------------------------------------------
+    pcall(rendering.clear, MOD_NAME)
+
+    ----------------------------------------------------------------
+    -- 2. Reset per-player mapping state
+    ----------------------------------------------------------------
+    pdata.mapped_entities = {}
+    pdata.mapped_entity_visuals = {}
+    pdata.vis_search_radius_circle = nil
+
+    ----------------------------------------------------------------
+    -- 3. Reset shared global map
+    ----------------------------------------------------------------
+    local root = ensure_root()
+    root.shared_mapped_entities = {}
+end
+
+---------------------------------------------------
 -- UPSERT MAPPED ENTITY
 ---------------------------------------------------
 
@@ -142,7 +178,8 @@ local function upsert_mapped_entity(player, pdata, entity, tick)
 
         -- Draw rectangle
         if visuals.add_mapped_entity_box then
-            pdata.mapped_entity_visuals[key] = visuals.add_mapped_entity_box(player, pdata, entity)
+            local id = visuals.add_mapped_entity_box(player, pdata, entity)
+            pdata.mapped_entity_visuals[key] = id
         end
     else
         -- Update existing entry
@@ -221,8 +258,6 @@ local function clear_all_mapped(player, pdata)
     if visuals.clear_search_radius_circle then
         visuals.clear_search_radius_circle(pdata)
     end
-
-    player.print("[MappingBot] All mapped entity data cleared.")
 end
 
 ---------------------------------------------------
@@ -258,5 +293,15 @@ end)
 
 script.on_event("mekatrol-mapping-bot-clear", function(event)
     local player = game.get_player(event.player_index)
-    clear_all_mapped(player, get_player_data(event.player_index))
+    if not player then
+        return
+    end
+
+    local pdata = get_player_data(event.player_index)
+    if not pdata then
+        return
+    end
+
+    clear_all_mapped_entities(player, pdata)
 end)
+
