@@ -1,29 +1,5 @@
 local visuals = {}
 
-function visuals.clear_bot_health_bar(pdata)
-    if pdata.bot_health_bg and pdata.bot_health_bg.valid then
-        pdata.bot_health_bg:destroy()
-    end
-    if pdata.bot_health_fg and pdata.bot_health_fg.valid then
-        pdata.bot_health_fg:destroy()
-    end
-    if pdata.bot_health_text and pdata.bot_health_text.valid then
-        pdata.bot_health_text:destroy()
-    end
-    pdata.bot_health_bg = nil
-    pdata.bot_health_fg = nil
-    pdata.bot_health_text = nil
-end
-
-function visuals.clear_bot_highlight(pdata)
-    if pdata.vis_highlight_object and pdata.vis_highlight_object.valid then
-        pdata.vis_highlight_object:destroy()
-    end
-    pdata.vis_highlight_object = nil
-end
-
--- Existing clear_lines/clear_damaged_markers are good; keep them.
-
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
 function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_offset)
@@ -307,17 +283,4 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     }
 end
 
--- Master “clear everything” helper:
-function visuals.clear_all(pdata)
-    if not pdata then
-        return
-    end
-
-    visuals.clear_bot_health_bar(pdata)
-    visuals.clear_bot_highlight(pdata)
-    visuals.clear_lines(pdata)
-    visuals.clear_damaged_markers(pdata)
-end
-
 return visuals
-

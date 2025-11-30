@@ -761,7 +761,9 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
         pdata.damaged_entities = nil
         pdata.damaged_entities_next_repair_index = 1
 
-        visuals.clear_damaged_markers(pdata)
+        -- clear all visuals
+        visuals.clear_all(pdata)
+
         pathfinding.reset_bot_path(pdata)
 
         if pdata.vis_highlight_object then
