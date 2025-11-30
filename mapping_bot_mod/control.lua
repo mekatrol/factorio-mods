@@ -14,16 +14,13 @@ local MOD_NAME = "mapping_bot_mod"
 ---------------------------------------------------
 -- MODULES
 ---------------------------------------------------
-
 local visuals = require("visuals")
 
 ---------------------------------------------------
--- NON-STATIC BLACKLIST (YOUR ORIGINAL RULES)
----------------------------------------------------
+-- NON-STATIC BLACKLIST
 -- Any type listed here is *not* mapped.
 -- Everything else (including item-entity and turrets) IS mapped.
 ---------------------------------------------------
-
 local NON_STATIC_TYPES = {
     ["character"] = true,
     ["car"] = true,
@@ -71,7 +68,6 @@ end
 ---------------------------------------------------
 -- ROOT STORAGE
 ---------------------------------------------------
-
 local function ensure_root()
     storage.mapping_bot_mod = storage.mapping_bot_mod or {}
     storage.mapping_bot_mod.players = storage.mapping_bot_mod.players or {}
@@ -82,7 +78,6 @@ end
 ---------------------------------------------------
 -- PER-PLAYER DATA
 ---------------------------------------------------
-
 local function get_player_data(idx)
     local root = ensure_root()
     local pdata = root.players[idx]
@@ -104,7 +99,6 @@ end
 ---------------------------------------------------
 -- ENTITY KEY
 ---------------------------------------------------
-
 local function get_entity_key(entity)
     if entity.unit_number then
         return entity.unit_number
@@ -115,42 +109,8 @@ local function get_entity_key(entity)
 end
 
 ---------------------------------------------------
--- CLEAR ALL MAPPED ENTITIES + VISUALS
----------------------------------------------------
-
-local function clear_all_mapped_entities(player, pdata)
-    if not pdata then
-        return
-    end
-
-    ----------------------------------------------------------------
-    -- 1. Wipe ALL rendering objects created by this mod
-    ----------------------------------------------------------------
-    -- This removes:
-    --   - All mapped entity boxes
-    --   - Any search-radius circles
-    --   - Any other rendering from this mod
-    ----------------------------------------------------------------
-    pcall(rendering.clear, MOD_NAME)
-
-    ----------------------------------------------------------------
-    -- 2. Reset per-player mapping state
-    ----------------------------------------------------------------
-    pdata.mapped_entities = {}
-    pdata.mapped_entity_visuals = {}
-    pdata.vis_search_radius_circle = nil
-
-    ----------------------------------------------------------------
-    -- 3. Reset shared global map
-    ----------------------------------------------------------------
-    local root = ensure_root()
-    root.shared_mapped_entities = {}
-end
-
----------------------------------------------------
 -- UPSERT MAPPED ENTITY
 ---------------------------------------------------
-
 local function upsert_mapped_entity(player, pdata, entity, tick)
     local key = get_entity_key(entity)
     if not key then
@@ -190,9 +150,8 @@ local function upsert_mapped_entity(player, pdata, entity, tick)
 end
 
 ---------------------------------------------------
--- SPAWN BOT
+-- BOT MANAGEMENT
 ---------------------------------------------------
-
 local function ensure_bot_for_player(player, pdata)
     if pdata.mapping_bot and pdata.mapping_bot.valid then
         return pdata.mapping_bot
@@ -207,10 +166,6 @@ local function ensure_bot_for_player(player, pdata)
     pdata.mapping_bot = bot
     return bot
 end
-
----------------------------------------------------
--- FOLLOW + MAP
----------------------------------------------------
 
 local function update_bot(player, pdata, tick)
     local bot = ensure_bot_for_player(player, pdata)
@@ -240,30 +195,39 @@ local function update_bot(player, pdata, tick)
 end
 
 ---------------------------------------------------
--- CLEAR ALL MAP DATA
+-- CLEAR ALL MAP DATA (ENTITIES + VISUALS)
 ---------------------------------------------------
-
-local function clear_all_mapped(player, pdata)
-    for _, id in pairs(pdata.mapped_entity_visuals) do
-        local ok, obj = pcall(rendering.get_object_by_id, id)
-        if ok and obj and obj.valid then
-            obj.destroy()
-        end
+local function clear_all_mapped_entities(pdata)
+    if not pdata then
+        return
     end
 
+    ----------------------------------------------------------------
+    -- 1. Wipe ALL rendering objects created by this mod
+    --    This removes:
+    --      - All mapped entity boxes
+    --      - Any search-radius circles
+    --      - Any other rendering from this mod
+    ----------------------------------------------------------------
+    pcall(rendering.clear, MOD_NAME)
+
+    ----------------------------------------------------------------
+    -- 2. Reset per-player mapping state
+    ----------------------------------------------------------------
     pdata.mapped_entities = {}
     pdata.mapped_entity_visuals = {}
-    ensure_root().shared_mapped_entities = {}
+    pdata.vis_search_radius_circle = nil
 
-    if visuals.clear_search_radius_circle then
-        visuals.clear_search_radius_circle(pdata)
-    end
+    ----------------------------------------------------------------
+    -- 3. Reset shared global map
+    ----------------------------------------------------------------
+    local root = ensure_root()
+    root.shared_mapped_entities = {}
 end
 
 ---------------------------------------------------
 -- EVENTS
 ---------------------------------------------------
-
 script.on_event(defines.events.on_tick, function(event)
     for _, player in pairs(game.connected_players) do
         local pdata = get_player_data(player.index)
@@ -292,16 +256,10 @@ script.on_event("mekatrol-mapping-bot-toggle", function(event)
 end)
 
 script.on_event("mekatrol-mapping-bot-clear", function(event)
-    local player = game.get_player(event.player_index)
-    if not player then
-        return
-    end
-
     local pdata = get_player_data(event.player_index)
     if not pdata then
         return
     end
 
-    clear_all_mapped_entities(player, pdata)
+    clear_all_mapped_entities(pdata)
 end)
-

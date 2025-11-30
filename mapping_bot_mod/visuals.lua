@@ -1,19 +1,43 @@
 local visuals = {}
 
+---------------------------------------------------
+-- Helper to safely destroy a rendering object
+---------------------------------------------------
+local function destroy_render_handle(handle)
+    if not handle then
+        return
+    end
+
+    local t = type(handle)
+
+    -- If it's a numeric id (normal case)
+    if t == "number" then
+        local ok, obj = pcall(rendering.get_object_by_id, handle)
+        if ok and obj and obj.valid then
+            obj.destroy()
+        end
+        return
+    end
+
+    -- If it's a rendering object/userdata from previous code
+    if (t == "userdata" or t == "table") and handle.destroy then
+        if handle.valid ~= false then
+            handle:destroy()
+        end
+    end
+end
+
+---------------------------------------------------
+-- BOT HEALTH BAR
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
+---------------------------------------------------
 function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_offset)
     if not (bot and bot.valid and max_health and max_health > 0) then
         -- Cleanup if bot missing
-        if pdata.bot_health_bg and pdata.bot_health_bg.valid then
-            pdata.bot_health_bg:destroy()
-        end
-        if pdata.bot_health_fg and pdata.bot_health_fg.valid then
-            pdata.bot_health_fg:destroy()
-        end
-        if pdata.bot_health_text and pdata.bot_health_text.valid then
-            pdata.bot_health_text:destroy()
-        end
+        destroy_render_handle(pdata.bot_health_bg)
+        destroy_render_handle(pdata.bot_health_fg)
+        destroy_render_handle(pdata.bot_health_text)
         pdata.bot_health_bg = nil
         pdata.bot_health_fg = nil
         pdata.bot_health_text = nil
@@ -24,17 +48,16 @@ function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_o
     local ratio = math.max(0, math.min(1, health / max_health))
 
     local pos = bot.position
+    local y_offset = bot_highlight_y_offset or 0
 
     -- Position/size for the bar (just below the bot)
     local bar_width = 0.8
     local bar_height = 0.10
     local bar_y_off = 0.6 -- vertical offset below bot
 
-    local y_offset = bot_highlight_y_offset or 0
-
     local x1 = pos.x - bar_width / 2
     local x2 = pos.x + bar_width / 2
-    local y1 = pos.y + bar_y_off + bot_highlight_y_offset
+    local y1 = pos.y + bar_y_off + y_offset
     local y2 = y1 + bar_height
 
     local fg_x2 = x1 + bar_width * ratio
@@ -91,7 +114,7 @@ function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_o
     local text_y_off = 0.8
     local text_pos = {
         x = pos.x,
-        y = pos.y + text_y_off + bot_highlight_y_offset
+        y = pos.y + text_y_off + y_offset
     }
 
     local text_value = string.format("%.0f/%.0f", health, max_health)
@@ -118,12 +141,13 @@ function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_o
     end
 end
 
+---------------------------------------------------
+-- BOT / PLAYER LINES
+---------------------------------------------------
 function visuals.clear_lines(pdata)
     if pdata.vis_lines then
         for _, obj in pairs(pdata.vis_lines) do
-            if obj and obj.valid then
-                obj:destroy()
-            end
+            destroy_render_handle(obj)
         end
         pdata.vis_lines = nil
     end
@@ -135,7 +159,6 @@ function visuals.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_off
     end
 
     local y_offset = bot_highlight_y_offset or 0
-
     local bot_pos = bot.position
     local to_pos = {
         x = bot_pos.x,
@@ -208,33 +231,6 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
 end
 
 ---------------------------------------------------
--- Helper to safely destroy a rendering object
----------------------------------------------------
-local function destroy_render_handle(handle)
-    if not handle then
-        return
-    end
-
-    local t = type(handle)
-
-    -- If it's a numeric id (normal case)
-    if t == "number" then
-        local ok, obj = pcall(rendering.get_object_by_id, handle)
-        if ok and obj and obj.valid then
-            obj.destroy()
-        end
-        return
-    end
-
-    -- If it's a rendering object/userdata from previous code
-    if (t == "userdata" or t == "table") and handle.destroy then
-        if handle.valid ~= false then
-            handle:destroy()
-        end
-    end
-end
-
----------------------------------------------------
 -- Green box around mapped entities
 ---------------------------------------------------
 function visuals.add_mapped_entity_box(player, pdata, entity)
@@ -291,9 +287,7 @@ function visuals.update_search_radius_circle(player, pdata, bot, radius)
         radius = radius,
         width = 4,
         filled = false,
-
-        -- Anchor to entity so it follows the bot automatically
-        target = bot,
+        target = bot, -- anchor so it follows the bot
         surface = bot.surface,
         players = {player},
         draw_on_ground = true
@@ -309,4 +303,5 @@ function visuals.clear_search_radius_circle(pdata)
         pdata.vis_search_radius_circle = nil
     end
 end
+
 return visuals
