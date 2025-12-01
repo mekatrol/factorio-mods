@@ -172,13 +172,11 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
     local chest_packs_available = 0
     local chest = pdata.repair_chest
 
-    if chest and chest.valid and chest.name == "iron-chest" then
-        -- Get chest inventory
+    if chest and chest.valid and (chest.type == "container" or chest.type == "logistic-container") then
+        -- Get chest inventory (always defines.inventory.chest for these types)
         local inv = chest.get_inventory(defines.inventory.chest)
 
-        -- Is inventory valid?
-        if (inv and inv.valid) then
-
+        if inv and inv.valid then
             -- Get available repair pack items count
             chest_packs_available = inv.get_item_count(repair_pack_name)
         end
