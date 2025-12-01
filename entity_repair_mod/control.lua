@@ -634,12 +634,13 @@ local function rebuild_repair_route(player, bot, pdata)
 
     local search_center = player.position
 
+    visuals.draw_bot_player_visuals(player, bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
+
     local damaged = find_damaged_entities(bot, search_center, ENTITY_SEARCH_RADIUS)
 
     if not damaged or #damaged == 0 then
         pdata.damaged_entities = nil
         pdata.damaged_entities_next_repair_index = 1
-        visuals.draw_bot_player_visuals(player, bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
         return
     end
 

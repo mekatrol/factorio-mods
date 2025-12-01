@@ -241,13 +241,27 @@ function visuals.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_off
 
     pdata.vis_lines = pdata.vis_lines or {}
 
-    local line = rendering.draw_line {
-        color = {
+    -- choose line color based on bot mode
+    -- red when repairing, grey when following or anything else
+    local line_color
+    if pdata.last_mode == "repair" then
+        line_color = {
+            r = 0.5,
+            g = 0.1,
+            b = 0.1,
+            a = 0.7
+        } -- bright red, clearly visible
+    else
+        line_color = {
             r = 0.3,
             g = 0.3,
             b = 0.3,
             a = 0.1
-        },
+        } -- original grey
+    end
+
+    local line = rendering.draw_line {
+        color = line_color,
         width = 1,
         from = player.position,
         to = to_pos,
