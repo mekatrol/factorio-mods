@@ -923,7 +923,6 @@ local function update_repair_bot_for_player(player, pdata)
 
     if not targets or #targets == 0 then
         if pdata.last_mode ~= "follow" then
-            player.print("[MekatrolRepairBot] mode: FOLLOWING PLAYER")
             pdata.last_mode = "follow"
         end
         visuals.clear_damaged_markers(pdata)
@@ -934,7 +933,6 @@ local function update_repair_bot_for_player(player, pdata)
         return
     else
         if pdata.last_mode ~= "repair" then
-            player.print("[MekatrolRepairBot] mode: REPAIRING DAMAGE")
             pdata.last_mode = "repair"
         end
     end
@@ -976,7 +974,6 @@ local function update_repair_bot_for_player(player, pdata)
 
     if dist_sq <= (ENTITY_REPAIR_DISTANCE * ENTITY_REPAIR_DISTANCE) then
         if pdata.last_mode ~= "repair" then
-            player.print("[MekatrolRepairBot] mode: REPAIRING DAMAGE")
             pdata.last_mode = "repair"
         end
 
@@ -1096,7 +1093,6 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
 
         pdata.last_mode = "follow"
         player.print("[MekatrolRepairBot] Repair bot enabled.")
-        player.print("[MekatrolRepairBot] mode: FOLLOWING PLAYER")
     else
         if pdata.repair_bot and pdata.repair_bot.valid then
             pdata.repair_bot.destroy()
@@ -1130,7 +1126,6 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
 
         pdata.last_mode = "off"
         player.print("[MekatrolRepairBot] Repair bot disabled.")
-        player.print("[MekatrolRepairBot] mode: OFF")
     end
 end)
 
