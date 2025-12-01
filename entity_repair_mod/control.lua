@@ -244,7 +244,8 @@ local function init_player(player)
             bot_path_target = nil,
 
             -- visuals (rendered on display)
-            vis_highlight_object = nil,
+            vis_bot_highlight = nil,
+            vis_chest_highlight = nil,
             vis_lines = nil,
             vis_damaged_markers = nil,
             vis_damaged_lines = nil,
@@ -277,7 +278,8 @@ local function init_player(player)
         pdata.bot_path_target = pdata.bot_path_target or nil
 
         -- visuals (rendered on display)
-        pdata.vis_highlight_object = pdata.vis_highlight_object or nil
+        pdata.vis_bot_highlight = pdata.vis_bot_highlight or nil
+        pdata.vis_chest_highlight = pdata.vis_chest_highlight or nil
         pdata.vis_lines = pdata.vis_lines or pdata.vis_lines
         pdata.vis_damaged_markers = pdata.vis_damaged_markers or nil
         pdata.vis_damaged_lines = pdata.vis_damaged_lines or nil
@@ -909,7 +911,11 @@ local function update_repair_bot_for_player(player, pdata)
     -- draw rect around bot
     visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
 
-    rebuild_repair_route(player, bot, pdata)
+    -- draw rect around chest
+    local chest = pdata.repair_chest
+    if (chest and chest.valid) then
+        visuals.draw_chest_highlight(chest, pdata, 0)
+    end
 
     -- the bot should repair itself first
     repair_bot_self_heal(player, bot, pdata)
@@ -1103,15 +1109,24 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
 
         -- clear all visuals
         visuals.clear_all(pdata)
+        visuals.force_clear_mod_objects(pdata)
 
         pathfinding.reset_bot_path(pdata)
 
-        if pdata.vis_highlight_object then
-            local obj = pdata.vis_highlight_object
+        if pdata.vis_bot_highlight then
+            local obj = pdata.vis_bot_highlight
             if obj and obj.valid then
                 obj:destroy()
             end
-            pdata.vis_highlight_object = nil
+            pdata.vis_bot_highlight = nil
+        end
+
+        if pdata.vis_chest_highlight then
+            local obj = pdata.vis_chest_highlight
+            if obj and obj.valid then
+                obj:destroy()
+            end
+            pdata.vis_chest_highlight = nil
         end
 
         pdata.last_mode = "off"

@@ -202,18 +202,18 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     local left_top = {cx - size, cy - size * 1.5}
     local right_bottom = {cx + size, cy + size}
 
-    if pdata.vis_highlight_object then
-        local obj = pdata.vis_highlight_object
+    if pdata.vis_bot_highlight then
+        local obj = pdata.vis_bot_highlight
         if obj and obj.valid then
             obj.left_top = left_top
             obj.right_bottom = right_bottom
             return
         else
-            pdata.vis_highlight_object = nil
+            pdata.vis_bot_highlight = nil
         end
     end
 
-    pdata.vis_highlight_object = rendering.draw_rectangle {
+    pdata.vis_bot_highlight = rendering.draw_rectangle {
         color = {
             r = 0,
             g = 0.2,

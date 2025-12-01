@@ -30,10 +30,17 @@ function visuals.clear_bot_health_bar(pdata)
 end
 
 function visuals.clear_bot_highlight(pdata)
-    if pdata.vis_highlight_object and pdata.vis_highlight_object.valid then
-        pdata.vis_highlight_object:destroy()
+    if pdata.vis_bot_highlight and pdata.vis_bot_highlight.valid then
+        pdata.vis_bot_highlight:destroy()
     end
-    pdata.vis_highlight_object = nil
+    pdata.vis_bot_highlight = nil
+end
+
+function visuals.clear_chest_highlight(pdata)
+    if pdata.vis_chest_highlight and pdata.vis_chest_highlight.valid then
+        pdata.vis_chest_highlight:destroy()
+    end
+    pdata.vis_chest_highlight = nil
 end
 
 -- Call this every tick (or at your bot update interval)
@@ -346,18 +353,18 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     local left_top = {cx - size, ui_y - size * 1.5}
     local right_bottom = {cx + size, ui_y + size}
 
-    if pdata.vis_highlight_object then
-        local obj = pdata.vis_highlight_object
+    if pdata.vis_bot_highlight then
+        local obj = pdata.vis_bot_highlight
         if obj and obj.valid then
             obj.left_top = left_top
             obj.right_bottom = right_bottom
             return
         else
-            pdata.vis_highlight_object = nil
+            pdata.vis_bot_highlight = nil
         end
     end
 
-    pdata.vis_highlight_object = rendering.draw_rectangle {
+    pdata.vis_bot_highlight = rendering.draw_rectangle {
         color = {
             r = 0,
             g = 0.2,
@@ -374,6 +381,53 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     }
 end
 
+---------------------------------------------------
+-- CHEST HIGHLIGHT
+---------------------------------------------------
+function visuals.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
+    if not (chest and chest.valid) then
+        visuals.clear_chest_highlight(pdata)
+        return
+    end
+
+    local size = 0.6
+    local pos = chest.position
+
+    -- Shared baseline:
+    local ui_y = pos.y + (chest_highlight_y_offset or 0)
+    local cx = pos.x
+
+    local left_top = {cx - size, ui_y - size}
+    local right_bottom = {cx + size, ui_y + size}
+
+    if pdata.vis_chest_highlight then
+        local obj = pdata.vis_chest_highlight
+        if obj and obj.valid then
+            obj.left_top = left_top
+            obj.right_bottom = right_bottom
+            return
+        else
+            pdata.vis_chest_highlight = nil
+        end
+    end
+
+    pdata.vis_chest_highlight = rendering.draw_rectangle {
+        color = {
+            r = 0.8,
+            g = 0.0,
+            b = 0.8,
+            a = 0.1
+        },
+        filled = false,
+        width = 2,
+        left_top = left_top,
+        right_bottom = right_bottom,
+        surface = chest.surface,
+        draw_on_ground = true,
+        only_in_alt_mode = false
+    }
+end
+
 -- Master “clear everything” helper:
 function visuals.clear_all(pdata)
     if not pdata then
@@ -382,6 +436,7 @@ function visuals.clear_all(pdata)
 
     visuals.clear_bot_health_bar(pdata)
     visuals.clear_bot_highlight(pdata)
+    visuals.clear_chest_highlight(pdata)
     visuals.clear_lines(pdata)
     visuals.clear_damaged_markers(pdata)
 end
