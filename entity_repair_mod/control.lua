@@ -917,6 +917,11 @@ local function update_repair_bot_for_player(player, pdata)
         visuals.draw_chest_highlight(chest, pdata, 0)
     end
 
+    -- Build/refresh the list of damaged entities around the player.
+    -- This must run before we look at pdata.damaged_entities, otherwise
+    -- we will never have any targets to repair.
+    rebuild_repair_route(player, bot, pdata)
+
     -- the bot should repair itself first
     repair_bot_self_heal(player, bot, pdata)
 
