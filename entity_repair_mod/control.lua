@@ -43,6 +43,9 @@ local REPAIR_PACK_HEALTH_PER_PACK = 100
 local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["mekatrol-repair-bot"] = REPAIR_BOT_HEALTH,
     ["mekatrol-mapping-bot"] = 100,
+    ["mekatrol-cleanup-bot"] = 100,
+    ["construction-robot"] = 100,
+    ["logistic-robot"] = 100,
     ["stone-wall"] = 350,
     ["gun-turret"] = 400,
     ["fast-transport-belt"] = 160,
@@ -72,7 +75,10 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["storage-tank"] = 500,
     ["offshore-pump"] = 150,
     ["boiler"] = 200,
-    ["steam-engine"] = 400
+    ["steam-engine"] = 400,
+    ["flamethrower-turret"] = 1400,
+    ["pump"] = 180,
+
 }
 
 local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
