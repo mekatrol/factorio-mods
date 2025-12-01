@@ -38,7 +38,7 @@ end
 
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
-function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highlight_y_offset, repair_tool_name)
+function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highlight_y_offset, repair_pack_name)
     if not (bot and bot.valid and max_health and max_health > 0) then
         -- Cleanup if bot missing
         if pdata.bot_health_bg and pdata.bot_health_bg.valid then
@@ -160,7 +160,7 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
         return
     end
 
-    local player_packs_available = inv.get_item_count(repair_tool_name)
+    local player_packs_available = inv.get_item_count(repair_pack_name)
 
     local chest_packs_available = 0
     local chest = pdata.repair_chest
@@ -173,7 +173,7 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
         if (inv and inv.valid) then
 
             -- Get available repair pack items count
-            chest_packs_available = inv.get_item_count(repair_tool_name)
+            chest_packs_available = inv.get_item_count(repair_pack_name)
         end
     end
 
