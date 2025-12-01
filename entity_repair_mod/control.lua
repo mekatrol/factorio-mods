@@ -446,10 +446,6 @@ local function refill_repair_pool_from_chest(player, pdata, bot)
 
     bot.teleport(old_pos)
 
-    local msg = string.format("[MekatrolRepairBot] Retrieved %d repair packs from chest. Pool=%d", removed,
-        pdata.repair_health_pool or 0)
-    player.print(msg)
-
     return removed * REPAIR_PACK_HEALTH_PER_PACK
 end
 
@@ -545,9 +541,6 @@ local function consume_repair_health(player, pdata, requested_health, bot)
 
     pool = pool - spent
     pdata.repair_health_pool = pool
-
-    local msg = string.format("[MekatrolRepairBot] Spending %d with %d left in the pool", spent, pool)
-    player.print(msg)
 
     return spent
 end
