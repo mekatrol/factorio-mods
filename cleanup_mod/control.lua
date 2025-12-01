@@ -272,14 +272,27 @@ local function move_bot_towards(bot, target)
     local d2 = dx * dx + dy * dy
 
     if d2 == 0 then
+        -- Already at target
+        -- game.print(string.format("[CleanupBot] at target (%.2f, %.2f)", bp.x, bp.y))
         return
     end
 
     local dist = math.sqrt(d2)
 
+    if BOT_STEP_DISTANCE <= 0 then
+        game.print(string.format("[CleanupBot] ERROR: BOT_STEP_DISTANCE <= 0 (%.6f) – bot cannot move",
+            BOT_STEP_DISTANCE))
+        return
+    end
+
+    -- Snap if very close
     if dist <= BOT_STEP_DISTANCE then
-        -- Close enough: snap to the target.
-        bot.teleport(target)
+        local ok = bot.teleport(target)
+        -- Debug
+        -- game.print(string.format(
+        --     "[CleanupBot] SNAP (%.2f, %.2f) -> (%.2f, %.2f); ok=%s",
+        --     bp.x, bp.y, target.x, target.y, tostring(ok)
+        -- ))
         return
     end
 
@@ -291,7 +304,14 @@ local function move_bot_towards(bot, target)
         y = bp.y + ny * BOT_STEP_DISTANCE
     }
 
-    bot.teleport(new_pos)
+    local ok = bot.teleport(new_pos)
+
+    -- Optional debug: comment out once you see it move
+    -- game.print(string.format(
+    --     "[CleanupBot] STEP (%.2f, %.2f) -> (%.2f, %.2f) target (%.2f, %.2f); step=%.3f; ok=%s",
+    --     bp.x, bp.y, new_pos.x, new_pos.y, target.x, target.y,
+    --     BOT_STEP_DISTANCE, tostring(ok)
+    -- ))
 end
 
 ----------------------------------------------------------------------
@@ -580,12 +600,12 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     -- Visual overlays
     ------------------------------------------------------------------
     visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
-    
+
     -- search circle
     if visuals.update_search_radius_circle then
         visuals.update_search_radius_circle(player, pdata, bot, ITEM_SEARCH_RADIUS)
     end
-    
+
     if chest and chest.valid then
         visuals.draw_chest_highlight(chest, pdata, CHEST_HIGHLIGHT_Y_OFFSET)
     else
