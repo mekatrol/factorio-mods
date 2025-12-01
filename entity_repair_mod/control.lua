@@ -52,6 +52,7 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["electric-mining-drill"] = 300,
     ["inserter"] = 150,
     ["iron-chest"] = 200,
+    ["steel-chest"] = 350,
     ["character"] = 250,
     ["fast-splitter"] = 180,
     ["transport-belt"] = 150,
@@ -351,7 +352,8 @@ local function find_repair_chest(player, pdata)
     end
 
     -- Reuse cached chest only if it is still valid and still has repair packs.
-    if pdata.repair_chest and pdata.repair_chest.valid and pdata.repair_chest.name == "iron-chest" then
+    if pdata.repair_chest and pdata.repair_chest.valid and
+        (pdata.repair_chest.type == "container" or pdata.repair_chest.type == "logistic-container") then
         local inv = pdata.repair_chest.get_inventory(defines.inventory.chest)
         if inv and inv.valid and inv.get_item_count(REPAIR_PACK_NAME) > 0 then
             return pdata.repair_chest
@@ -364,11 +366,13 @@ local function find_repair_chest(player, pdata)
     local surface = player.surface
     local force = player.force
 
+    -- Find any chest-like entity on this surface/force:
+    --   * type = "container"          (wooden/iron/steel/tool chests, etc.)
+    --   * type = "logistic-container" (requester/provider/storage chests, etc.)
     local chests = surface.find_entities_filtered {
-        name = "iron-chest",
-        force = force
+        force = force,
+        type = {"container", "logistic-container"}
     }
-
     if not chests or #chests == 0 then
         pdata.repair_chest = nil
         return nil
