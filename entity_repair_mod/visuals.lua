@@ -153,14 +153,29 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
     }
 
     -------------------------------------------------------
-    -- Text (e.g. "75→100") just below the bar
+    -- Text (e.g. "75→100→30") just below the bar
     -------------------------------------------------------
     local inv = player.get_main_inventory()
     if not inv then
         return
     end
 
-    local packs_available = inv.get_item_count(repair_tool_name)
+    local player_packs_available = inv.get_item_count(repair_tool_name)
+
+    local chest_packs_available = 0
+    local chest = pdata.repair_chest
+
+    if chest and chest.valid and chest.name == "iron-chest" then
+        -- Get chest inventory
+        local inv = chest.get_inventory(defines.inventory.chest)
+
+        -- Is inventory valid?
+        if (inv and inv.valid) then
+
+            -- Get available repair pack items count
+            chest_packs_available = inv.get_item_count(repair_tool_name)
+        end
+    end
 
     local text_y = bar_y_start + bar_height + 0.15
     local text_pos = {
@@ -168,7 +183,8 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
         y = text_y
     }
 
-    local text_value = string.format("%d→%d", pdata.repair_health_pool or 0, packs_available)
+    local text_value = string.format("%d→%d→%d", pdata.repair_health_pool or 0, chest_packs_available,
+        player_packs_available)
 
     if pdata.bot_health_text and pdata.bot_health_text.valid then
         pdata.bot_health_text.target = text_pos
