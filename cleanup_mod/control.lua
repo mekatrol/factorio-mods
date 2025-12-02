@@ -48,7 +48,7 @@ local BOT_HIGHLIGHT_Y_OFFSET = -1.0
 local CHEST_HIGHLIGHT_Y_OFFSET = 0.0
 
 -- Max different item types the bot can carry at once.
-local BOT_MAX_ITEM_TYPES = 5
+local BOT_MAX_ITEM_COUNT = 5
 
 -- Where the bot sits relative to the player when it can't place items.
 local FOLLOW_OFFSET = {
@@ -119,7 +119,6 @@ local function init_player(player)
 
     -- Carried items: table[name] = count, plus running total.
     pdata.carried_items = pdata.carried_items or {}
-    pdata.carried_item_count = pdata.carried_item_count or 0
     pdata.unplaceable_items = pdata.unplaceable_items or {}
 
     -- line from bot to current target (item, chest, or roam point).
@@ -145,25 +144,28 @@ local function distance_squared(a, b)
     return dx * dx + dy * dy
 end
 
-local function table_size(t)
-    local n = 0
-    if not t then
+local function get_total_carried(pdata)
+    local total = 0
+    if not pdata or not pdata.carried_items then
+        game.print("zero carried")
         return 0
     end
-    for _ in pairs(t) do
-        n = n + 1
+    for _, count in pairs(pdata.carried_items) do
+        if count and count > 0 then
+            total = total + count
+        end
     end
-    return n
+    return total    
 end
 
--- Capacity is "how many different item types" we can carry.
-local function can_carry_more_of(pdata, name)
-    local t = pdata.carried_items or {}
-    -- If we already carry this type, we can always take more of it.
-    if t[name] then
-        return true
+-- How much free capacity (by item count) remains.
+local function get_free_capacity(pdata)
+    local carried = get_total_carried(pdata)
+    local free = BOT_MAX_ITEM_COUNT - carried
+    if free < 0 then
+        free = 0
     end
-    return table_size(t) < BOT_MAX_ITEM_TYPES
+    return free
 end
 
 local function find_best_container_for_item(player, bot, item_name)
@@ -425,9 +427,9 @@ local function add_to_carried(pdata, name, count)
         return
     end
 
+    pdata.carried_items = pdata.carried_items or {}
     local t = pdata.carried_items
     t[name] = (t[name] or 0) + count
-    pdata.carried_item_count = (pdata.carried_item_count or 0) + count
 end
 
 -- Pick up all item entities within a small radius around the bot.
@@ -456,19 +458,37 @@ local function pick_up_nearby_items(player, bot, pdata)
 
     for _, ent in pairs(items) do
         if ent.valid and ent.stack and ent.stack.valid_for_read then
-            local name = ent.stack.name
-            local count = ent.stack.count
+            local free = get_free_capacity(pdata)
+            if free <= 0 then
+                -- No more capacity at all; stop picking up.
+                break
+            end
 
-            if can_carry_more_of(pdata, name) then
-                add_to_carried(pdata, name, count)
-                ent.destroy()
+            local name = ent.stack.name
+            local stack_count = ent.stack.count
+            local take = math.min(stack_count, free)
+
+            if take > 0 then
+                add_to_carried(pdata, name, take)
+
+                if take == stack_count then
+                    -- Took it all, remove the entity.
+                    ent.destroy()
+                else
+                    -- Partially consume this ground stack.
+                    ent.stack.count = stack_count - take
+                end
+
                 picked_any = true
             end
         end
     end
 
-    if picked_any and pdata.carried_item_count > 0 then
-        pdata.mode = pdata.mode == "idle" and "pickup" or pdata.mode
+    if picked_any then
+        local total = get_total_carried(pdata)
+        if total > 0 and (pdata.mode == "idle" or pdata.mode == "roam") then
+            pdata.mode = "pickup"
+        end
     end
 
     return picked_any
@@ -478,7 +498,7 @@ end
 -- DEPOSITING ITEMS INTO CHEST / PLAYER
 ----------------------------------------------------------------------
 local function deposit_carried_items(player, pdata, bot)
-    local total = pdata.carried_item_count or 0
+    local total = get_total_carried(pdata)
     if total <= 0 then
         return false
     end
@@ -488,7 +508,7 @@ local function deposit_carried_items(player, pdata, bot)
     local any_inserted = false
 
     for name, count in pairs(pdata.carried_items) do
-        if count > 0 then
+        if count and count > 0 then
             local container = find_best_container_for_item(player, bot, name)
             if container then
                 local inv = container.get_inventory(defines.inventory.chest)
@@ -498,15 +518,11 @@ local function deposit_carried_items(player, pdata, bot)
                         count = count
                     }
 
-                    local remaining = count - inserted
-                    pdata.carried_item_count = (pdata.carried_item_count or 0) - inserted
-                    if pdata.carried_item_count < 0 then
-                        pdata.carried_item_count = 0
-                    end
-
                     if inserted > 0 then
                         any_inserted = true
                     end
+
+                    local remaining = count - inserted
 
                     if remaining > 0 then
                         -- Container already has the item but is now full.
@@ -572,11 +588,13 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     --        b) If found, head for it.
     --        c) Otherwise, random roam within the radius.
     ------------------------------------------------------------------
-    local carrying_anything = (pdata.carried_item_count or 0) > 0
+    local carried_total = get_total_carried(pdata)
+    local carrying_anything = carried_total > 0
 
     -- When carrying items, always try to deposit into suitable containers.
     if carrying_anything then
         deposit_carried_items(player, pdata, bot)
+        carried_total = get_total_carried(pdata) -- recompute after deposit
     end
 
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
@@ -651,6 +669,8 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
         }
     end
 
+    local chest = find_nearest_storage_chest(player, pdata)
+
     ------------------------------------------------------------------
     -- Visual overlays
     ------------------------------------------------------------------
@@ -668,7 +688,11 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
         visuals.clear_chest_highlight(pdata)
     end
     visuals.draw_bot_player_line(player, bot, pdata, pdata.mode or "idle")
-    visuals.draw_status_text(bot, pdata, pdata.mode or "idle", pdata.carried_item_count or 0, BOT_HIGHLIGHT_Y_OFFSET)
+
+    local carried_total_for_ui = get_total_carried(pdata)
+
+    visuals.draw_status_text(bot, pdata, pdata.mode or "idle", carried_total_for_ui, BOT_HIGHLIGHT_Y_OFFSET,
+        BOT_MAX_ITEM_COUNT)
 
     -- line from bot to current target (item, chest, or roam point).
     -- The visual function itself will only show it in pickup mode.
@@ -760,7 +784,6 @@ script.on_event("mekatrol-toggle-cleanup-bot", function(event)
 
         -- Clear carried items and visuals.
         pdata.carried_items = {}
-        pdata.carried_item_count = 0
         pdata.unplaceable_items = {}
 
         visuals.clear_all(pdata)

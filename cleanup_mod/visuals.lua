@@ -320,7 +320,7 @@ end
 --   shows mode and how many items are currently carried.
 ----------------------------------------------------------------------
 
-function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight_y_offset)
+function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight_y_offset, max_capacity)
     if not (bot and bot.valid) then
         visuals.clear_status_text(pdata)
         return
@@ -329,20 +329,26 @@ function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight
     local pos = bot.position
     local ui_y = pos.y + (bot_highlight_y_offset or 0) + 0.8
 
-    local text
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
+    local count = carried_count or 0
+    local cap = max_capacity or count
 
+    local text
     if has_unplaceable then
+        -- Show which items cannot be placed
         local names = {}
         for name, _ in pairs(pdata.unplaceable_items) do
             names[#names + 1] = name
         end
         table.sort(names)
         local list = table.concat(names, ", ")
-        -- Rule 4: show which type(s) cannot be placed.
         text = string.format("NO CONTAINER: %s", list)
+    elseif count > 0 then
+        -- Always show the live count while carrying anything
+        text = string.format("Carrying: %d/%d", count, cap)
     else
-        text = string.format("[%s] items: %d", mode or "idle", carried_count or 0)
+        -- Nothing carried
+        text = string.format("[%s] items: %d", mode or "idle", 0)
     end
 
     if pdata.vis_status_text and pdata.vis_status_text.valid then
