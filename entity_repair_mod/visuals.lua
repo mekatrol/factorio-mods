@@ -44,40 +44,54 @@ function visuals.clear_chest_highlight(pdata)
 end
 
 ---------------------------------------------------
--- DESTROYED ENTITIES OVERLAY (SAFE VERSION)
+-- DESTROYED ENTITIES OVERLAY
+--  - Shows list in top-left of screen (camera)
+--  - Low opacity text so map is visible underneath
+--  - Large font scale
 ---------------------------------------------------
 
+-- Compute the world-space position that corresponds
+-- to the top-left corner of the screen for this player.
+local function get_screen_top_left_world(player)
+    -- Fallbacks in case any field is missing
+    local res = player.display_resolution or {
+        width = 1920,
+        height = 1080
+    }
+    local scale = player.display_scale or 1
+    local zoom = player.zoom or 1
+
+    -- “Effective” resolution after UI scaling
+    local w_pixels = res.width / scale
+    local h_pixels = res.height / scale
+
+    -- 1 tile = 32 pixels at zoom = 1
+    local tiles_per_pixel = 1 / (32 * zoom)
+
+    local half_w_tiles = (w_pixels * tiles_per_pixel) / 2
+    local half_h_tiles = (h_pixels * tiles_per_pixel) / 2
+
+    local cx = player.position.x
+    local cy = player.position.y
+
+    -- world position of top-left corner
+    return {
+        x = cx - half_w_tiles,
+        y = cy - half_h_tiles
+    }
+end
+
 function visuals.clear_destroyed_overlay(pdata)
+    if not pdata then
+        return
+    end
     if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
         pdata.destroyed_overlay_text:destroy()
     end
     pdata.destroyed_overlay_text = nil
 end
 
-local function get_surface_name_from_entry(e)
-    -- Prefer an actual surface handle if you stored it
-    if e.surface and e.surface.valid then
-        return e.surface.name
-    end
-
-    -- Next, try a surface_index if present and valid
-    if e.surface_index ~= nil then
-        local surf = game.surfaces[e.surface_index]
-        if surf then
-            return surf.name
-        end
-    end
-
-    -- Or a stored name
-    if e.surface_name ~= nil then
-        return e.surface_name
-    end
-
-    -- Fallback
-    return "?"
-end
-
--- destroyed_list: array/map of { position={x,y}, type, name, surface/surface_index/surface_name }
+-- destroyed_list: array or map of {name=..., type=..., position=..., surface=...}
 function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
     if not (player and player.valid) then
         return
@@ -85,7 +99,7 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
 
     destroyed_list = destroyed_list or {}
 
-    -- empty list → clear overlay
+    -- Check if there is anything to show
     local has_any = false
     for _ in pairs(destroyed_list) do
         has_any = true
@@ -97,71 +111,63 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
     end
 
     -------------------------------------------------------
-    -- Build text block
+    -- Keep text the same size regardless of zoom
+    -------------------------------------------------------
+    local base_scale = 2.2
+    local zoom = player.zoom or 1
+    local effective_scale = base_scale / zoom
+
+    -------------------------------------------------------
+    -- Build overlay text
     -------------------------------------------------------
     local lines = {"[Destroyed entities]"}
-    local idx = 0
 
+    local i = 0
     for _, e in pairs(destroyed_list) do
-        idx = idx + 1
-
+        i = i + 1
         local pos = e.position or {
             x = 0,
             y = 0
         }
         local sname = (e.surface and e.surface.valid and e.surface.name) or "?"
-        local name = e.name or "?"
-        local etype = e.type or "?"
-
-        lines[#lines + 1] = string.format("%d) %s (%s) @ %s [%.1f, %.1f]", idx, name, etype, sname, pos.x, pos.y)
+        lines[#lines + 1] = string.format("%d) %s (%s) @ %s [%.1f, %.1f]", i, e.name or "?", e.type or "?", sname,
+            pos.x, pos.y)
     end
 
     local text = table.concat(lines, "\n")
 
     -------------------------------------------------------
-    -- Decide what to anchor to
-    -- Prefer the player CHARACTER (LuaEntity); otherwise
-    -- fall back to a world position near the player.
+    -- Top-left of the current camera + small margin
     -------------------------------------------------------
-    local anchor_entity = player.character
-    local target
+    local tl = get_screen_top_left_world(player)
 
-    if anchor_entity and anchor_entity.valid then
-        -- HUD-style anchor relative to the character
-        target = {
-            entity = anchor_entity,
-            offset = {
-                x = -10,
-                y = -8
-            } -- tweak for “top-left”
-        }
-    else
-        -- No character (e.g. god/editor mode) → approximate using position
-        local pp = player.position
-        target = {
-            x = pp.x - 10,
-            y = pp.y - 8
-        }
-    end
+    local margin_tiles_x = 0.5
+    local margin_tiles_y = 0.5
+
+    local target_pos = {
+        x = tl.x + margin_tiles_x,
+        y = tl.y + margin_tiles_y
+    }
 
     -------------------------------------------------------
-    -- Create or update the rendering text
+    -- Draw or update the text
     -------------------------------------------------------
     if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
         pdata.destroyed_overlay_text.text = text
-        pdata.destroyed_overlay_text.target = target
+        pdata.destroyed_overlay_text.target = target_pos
+        pdata.destroyed_overlay_text.scale = effective_scale
     else
         pdata.destroyed_overlay_text = rendering.draw_text {
             text = text,
             surface = player.surface,
-            target = target,
+            target = target_pos,
             color = {
-                r = 1,
-                g = 1,
-                b = 1,
-                a = 0.55
-            }, -- semi-transparent
-            scale = 2.8, -- bigger font
+                r = 0.8,
+                g = 0.8,
+                b = 0,
+                a = 0.6
+            }, -- semi-transparent white
+            scale = effective_scale,
             alignment = "left",
             vertical_alignment = "top",
             draw_on_ground = false,
