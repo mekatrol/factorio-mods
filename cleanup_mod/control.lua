@@ -180,7 +180,7 @@ local function find_best_container_for_item(player, bot, item_name)
 
     -- Look near the player, so "local" storage around you is used.
     local candidates = surface.find_entities_filtered {
-        position = player.position,
+        position = bot.position,
         radius = CONTAINER_SEARCH_RADIUS,
         force = player.force,
         type = CONTAINER_TYPES
@@ -211,6 +211,7 @@ local function find_any_container_for_carried_items(player, bot, pdata)
     if not (player and player.valid and bot and bot.valid) then
         return nil
     end
+
     if not pdata.carried_items then
         return nil
     end
@@ -592,17 +593,6 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     local surface = bot.surface
     local pp = player.position
     local bp = bot.position
-
-    -- If bot somehow wandered too far, snap it back near the player.
-    local max_d2 = (CLEANUP_ROAM_RADIUS * 1.3) ^ 2
-    if distance_squared(bp, pp) > max_d2 then
-        bot.teleport({
-            x = pp.x - 1,
-            y = pp.y - 1
-        })
-        bp = bot.position
-        pdata.target_position = nil
-    end
 
     ------------------------------------------------------------------
     -- Look for items near the bot and pick them up.
