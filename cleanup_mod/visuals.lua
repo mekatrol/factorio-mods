@@ -120,7 +120,7 @@ end
 --   aligned if your bot sprite is tall or offset.
 ----------------------------------------------------------------------
 
-function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset, has_unplaceable)
+function visuals.draw_bot_highlight(bot, pdata, has_unplaceable)
     if not (bot and bot.valid) then
         visuals.clear_bot_highlight(pdata)
         return
@@ -147,7 +147,7 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset, has_unpl
     local pos = bot.position
     local size = 0.6
 
-    local ui_y = pos.y + (bot_highlight_y_offset or 0)
+    local ui_y = pos.y
     local left_top = {pos.x - size, ui_y - size}
     local right_bottom = {pos.x + size, ui_y + size}
 
@@ -320,14 +320,14 @@ end
 --   shows mode and how many items are currently carried.
 ----------------------------------------------------------------------
 
-function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight_y_offset, max_capacity)
+function visuals.draw_status_text(bot, pdata, mode, carried_count, max_capacity)
     if not (bot and bot.valid) then
         visuals.clear_status_text(pdata)
         return
     end
 
     local pos = bot.position
-    local ui_y = pos.y + (bot_highlight_y_offset or 0) + 0.8
+    local ui_y = pos.y
 
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
     local count = carried_count or 0

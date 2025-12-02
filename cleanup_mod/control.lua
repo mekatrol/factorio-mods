@@ -44,7 +44,6 @@ local ITEM_SEARCH_RADIUS = 12.0
 local CHEST_INTERACT_DISTANCE = 1.5
 
 -- Visual offsets
-local BOT_HIGHLIGHT_Y_OFFSET = -1.0
 local CHEST_HIGHLIGHT_Y_OFFSET = 0.0
 
 -- Max different item types the bot can carry at once.
@@ -558,7 +557,8 @@ local function deposit_carried_items(player, pdata, bot)
                         -- Container already has the item but is now full.
                         pdata.carried_items[name] = remaining
                         pdata.unplaceable_items[name] = true
-                        player.print("[color=green][MekatrolCleanupBot][/color] No container space for item '" .. name .. "'.")
+                        player.print(
+                            "[color=green][MekatrolCleanupBot][/color] No container space for item '" .. name .. "'.")
                     else
                         pdata.carried_items[name] = nil
                         pdata.unplaceable_items[name] = nil
@@ -567,7 +567,8 @@ local function deposit_carried_items(player, pdata, bot)
             else
                 -- Rule 1: no container available that already has this type.
                 pdata.unplaceable_items[name] = true
-                player.print("[color=green][MekatrolCleanupBot][/color] No container found that already contains '" .. name .. "'.")
+                player.print("[color=green][MekatrolCleanupBot][/color] No container found that already contains '" ..
+                                 name .. "'.")
             end
         end
     end
@@ -659,7 +660,9 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
                 if count and count > 0 then
                     if not pdata.unplaceable_items[name] then
                         pdata.unplaceable_items[name] = true
-                        player.print("[color=green][MekatrolCleanupBot][/color] No container found that already contains '" .. name .. "'.")
+                        player.print(
+                            "[color=green][MekatrolCleanupBot][/color] No container found that already contains '" ..
+                                name .. "'.")
                     end
                 end
             end
@@ -738,7 +741,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     -- Visual overlays
     ------------------------------------------------------------------
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
-    visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET, has_unplaceable)
+    visuals.draw_bot_highlight(bot, pdata, has_unplaceable)
 
     -- search circle
     if visuals.update_search_radius_circle then
@@ -754,8 +757,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
     local carried_total_for_ui = get_total_carried(pdata)
 
-    visuals.draw_status_text(bot, pdata, pdata.mode or "idle", carried_total_for_ui, BOT_HIGHLIGHT_Y_OFFSET,
-        BOT_MAX_ITEM_COUNT)
+    visuals.draw_status_text(bot, pdata, pdata.mode or "idle", carried_total_for_ui, BOT_MAX_ITEM_COUNT)
 
     -- line from bot to current target (item, chest, or roam point).
     -- The visual function itself will only show it in pickup mode.

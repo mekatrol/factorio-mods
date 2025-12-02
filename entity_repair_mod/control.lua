@@ -77,7 +77,9 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["boiler"] = 200,
     ["steam-engine"] = 400,
     ["flamethrower-turret"] = 1400,
-    ["pump"] = 180
+    ["pump"] = 180,
+    ["oil-refinery"] = 350,
+    ["chemical-plant"] = 300
 }
 
 local ignore_names = {
