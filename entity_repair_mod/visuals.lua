@@ -101,6 +101,16 @@ function visuals.clear_destroyed_overlay(pdata)
         end
     end
     pdata.destroyed_overlay_texts = nil
+
+    -- Lines from player to destroyed entities
+    if pdata.destroyed_overlay_lines then
+        for _, obj in pairs(pdata.destroyed_overlay_lines) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+    end
+    pdata.destroyed_overlay_lines = nil
 end
 
 -- destroyed_list: array or map of {name=..., type=..., position=..., surface=...}
@@ -133,6 +143,7 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
     -- Build overlay text
     -------------------------------------------------------
     local lines = {"Destroyed entities:"}
+    local entity_positions = {}
 
     local i = 0
     for _, e in pairs(destroyed_list) do
@@ -143,6 +154,7 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
         }
 
         lines[#lines + 1] = string.format("%d) [%.1f, %.1f]→%s", i, pos.x, pos.y, e.name or "?")
+        entity_positions[#entity_positions + 1] = pos
     end
 
     -------------------------------------------------------
@@ -196,7 +208,7 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
                     g = 1,
                     b = 0,
                     a = 0.8
-                }, -- semi-transparent white
+                }, -- semi-transparent yellow
                 scale = effective_scale,
                 alignment = "left",
                 vertical_alignment = "top",
@@ -217,6 +229,45 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
             end
             pdata.destroyed_overlay_texts[idx] = nil
         end
+    end
+
+    -------------------------------------------------------
+    -- Draw / update lines from player to each destroyed site
+    -------------------------------------------------------
+    -- Clear old lines
+    if pdata.destroyed_overlay_lines then
+        for _, obj in pairs(pdata.destroyed_overlay_lines) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+    end
+    pdata.destroyed_overlay_lines = {}
+
+    local player_pos = player.position
+
+    for _, pos in ipairs(entity_positions) do
+        local line = rendering.draw_line {
+            color = {
+                r = 1,
+                g = 0.2,
+                b = 0.2,
+                a = 0.4
+            }, -- soft red, semi-transparent
+            width = 2,
+            from = {
+                x = player_pos.x,
+                y = player_pos.y
+            },
+            to = {
+                x = pos.x,
+                y = pos.y
+            },
+            surface = player.surface,
+            draw_on_ground = true,
+            only_in_alt_mode = false
+        }
+        pdata.destroyed_overlay_lines[#pdata.destroyed_overlay_lines + 1] = line
     end
 end
 
@@ -632,4 +683,3 @@ function visuals.clear_all(pdata)
 end
 
 return visuals
-
