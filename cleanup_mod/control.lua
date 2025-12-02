@@ -48,7 +48,7 @@ local BOT_HIGHLIGHT_Y_OFFSET = -1.0
 local CHEST_HIGHLIGHT_Y_OFFSET = 0.0
 
 -- Max different item types the bot can carry at once.
-local BOT_MAX_ITEM_COUNT = 5
+local BOT_MAX_ITEM_COUNT = 100
 
 -- Where the bot sits relative to the player when it can't place items.
 local FOLLOW_OFFSET = {
