@@ -165,13 +165,15 @@ local function infer_max_health_from_world(name, force)
         if helpers and helpers.write_file then
             helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
         else
-            game.print("[color=green][MekatrolRepairBot][/color][WARN] helpers.write_file not available; cannot write to disk.")
+            game.print(
+                "[color=green][MekatrolRepairBot][/color][WARN] helpers.write_file not available; cannot write to disk.")
         end
 
         return suggested
     else
         game.print(string.format(
-            "[color=green][MekatrolRepairBot][/color][INFO] Could not infer max health for '%s' (no live entities with health).", name))
+            "[color=green][MekatrolRepairBot][/color][INFO] Could not infer max health for '%s' (no live entities with health).",
+            name))
         return nil
     end
 end
@@ -785,7 +787,8 @@ local function repair_bot_self_heal(player, bot, pdata)
     if not player_has_repair_capacity(player, pdata) then
         if not pdata.out_of_repair_packs_warned then
             pdata.out_of_repair_packs_warned = true
-            player.print("[color=green][MekatrolRepairBot][/color] No repair packs in chest or inventory. Bot cannot repair.")
+            player.print(
+                "[color=green][MekatrolRepairBot][/color] No repair packs in chest or inventory. Bot cannot repair.")
         end
         return
     end
@@ -839,7 +842,8 @@ local function repair_entities_near(player, surface, force, center, radius, bot)
     if not player_has_repair_capacity(player, pdata) then
         if not pdata.out_of_repair_packs_warned then
             pdata.out_of_repair_packs_warned = true
-            player.print("[color=green][MekatrolRepairBot][/color] No repair packs in chest or inventory. Bot cannot repair.")
+            player.print(
+                "[color=green][MekatrolRepairBot][/color] No repair packs in chest or inventory. Bot cannot repair.")
         end
         return
     end
@@ -1023,13 +1027,15 @@ local function on_mapping_bot_entity_mapped(e)
 
     local info = e.info or {}
     -- Do whatever the repair bot should do with this entity
-    local msg = string.format("[color=green][MekatrolRepairBot][/color] NEW mapped entity: key=%s, name=%s, surface=%d (first_seen=%d)",
+    local msg = string.format(
+        "[color=green][MekatrolRepairBot][/color] NEW mapped entity: key=%s, name=%s, surface=%d (first_seen=%d)",
         tostring(e.key), info.name or "<nil>", info.surface_index or -1, info.last_seen_tick or -1)
     -- game.print(msg)
 end
 
 local function on_mapping_bot_entities_cleared(e)
-    local msg = string.format("[color=green][MekatrolRepairBot][/color] Mapping cleared (reason=%s, player_index=%s, tick=%d)",
+    local msg = string.format(
+        "[color=green][MekatrolRepairBot][/color] Mapping cleared (reason=%s, player_index=%s, tick=%d)",
         tostring(e.reason), tostring(e.player_index), e.tick or -1)
     -- game.print(msg)
 
@@ -1061,6 +1067,129 @@ end
 ---------------------------------------------------
 -- LIFECYCLE EVENTS
 ---------------------------------------------------
+----------------------------------------------------------------------
+-- ENTITY CREATE / DESTROY DEBUG LOGGING
+----------------------------------------------------------------------
+
+local function print_info(prefix, ent)
+    if not (ent and ent.valid) then
+        return
+    end
+
+    local force_name = "nil"
+    if ent.force and ent.force.valid then
+        force_name = ent.force.name
+    end
+
+    if force_name == "enemy" then
+        return
+    end
+
+    game.print({"", prefix, " force=", force_name, " type=", ent.type or "nil", " name=", ent.name or "nil"})
+end
+
+----------------------------------------------------------------------
+-- Creation logger
+----------------------------------------------------------------------
+local function log_entity_created(event)
+    -- Different events put the entity in different fields.
+    local ent = event.created_entity or event.entity or event.destination or event.source
+
+    if not (ent and ent.valid) then
+        return
+    end
+
+    print_info("[color=green][CREATE][/color]:" .. tostring(event.name), ent)
+end
+
+----------------------------------------------------------------------
+-- Removal logger
+----------------------------------------------------------------------
+local function log_entity_removed(event)
+    local ent = event.entity or event.source
+    if not (ent and ent.valid) then
+        return
+    end
+
+    print_info("[color=red][REMOVE][/color]:" .. tostring(event.name), ent)
+end
+
+----------------------------------------------------------------------
+-- Item entity spawned logger
+----------------------------------------------------------------------
+local function log_item_spawned(event)
+    local ent = event.entity
+    if not (ent and ent.valid) then
+        return
+    end
+
+    print_info("[ITEM-SPAWN:" .. tostring(event.name) .. "]", ent)
+end
+
+----------------------------------------------------------------------
+-- REGISTER CREATION EVENTS (ONE PER CALL)
+----------------------------------------------------------------------
+
+-- Player placed entity
+script.on_event(defines.events.on_built_entity, log_entity_created)
+
+-- Construction robot placed entity
+script.on_event(defines.events.on_robot_built_entity, log_entity_created)
+
+-- Script raised built
+script.on_event(defines.events.script_raised_built, log_entity_created)
+
+-- Script raised revive (ghost -> entity)
+script.on_event(defines.events.script_raised_revive, log_entity_created)
+
+-- Entity cloned
+script.on_event(defines.events.on_entity_cloned, log_entity_created)
+
+-- Trigger created entity (explosions, capsules, etc.)
+script.on_event(defines.events.on_trigger_created_entity, log_entity_created)
+
+-- Units spawned (from spawners)
+script.on_event(defines.events.on_entity_spawned, log_entity_created)
+
+-- Unified entity-created event (Factorio 2)
+if defines.events.on_entity_created then
+    script.on_event(defines.events.on_entity_created, log_entity_created)
+end
+
+----------------------------------------------------------------------
+-- REGISTER REMOVAL / MINING / DEATH EVENTS (ONE PER CALL)
+----------------------------------------------------------------------
+
+-- Player mined entity
+script.on_event(defines.events.on_player_mined_entity, log_entity_removed)
+
+-- Robot mined entity
+script.on_event(defines.events.on_robot_mined_entity, log_entity_removed)
+
+-- Entity died (killed)
+script.on_event(defines.events.on_entity_died, log_entity_removed)
+
+-- Script destroyed entity
+script.on_event(defines.events.script_raised_destroy, log_entity_removed)
+
+-- Unified entity-removed event (Factorio 2)
+if defines.events.on_entity_removed then
+    script.on_event(defines.events.on_entity_removed, log_entity_removed)
+end
+
+-- Ground item entities being created
+if defines.events.on_item_spawned then
+    script.on_event(defines.events.on_item_spawned, log_item_spawned)
+end
+
+-- Player created
+script.on_event(defines.events.on_player_created, function(event)
+    local player = game.get_player(event.player_index)
+    if player then
+        init_player(player)
+    end
+end)
+
 script.on_init(function()
     storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
 
@@ -1073,13 +1202,6 @@ script.on_configuration_changed(function(_)
 
     -- Re-register in case event id changed or mod set changed
     register_mapping_bot_event()
-end)
-
-script.on_event(defines.events.on_player_created, function(event)
-    local player = game.get_player(event.player_index)
-    if player then
-        init_player(player)
-    end
 end)
 
 script.on_load(function()
