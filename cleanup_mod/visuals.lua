@@ -120,10 +120,28 @@ end
 --   aligned if your bot sprite is tall or offset.
 ----------------------------------------------------------------------
 
-function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
+function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset, has_unplaceable)
     if not (bot and bot.valid) then
         visuals.clear_bot_highlight(pdata)
         return
+    end
+
+    local color
+    if has_unplaceable then
+        -- Rule 4: bright red rectangle when container cannot be found.
+        color = {
+            r = 1.0,
+            g = 0.1,
+            b = 0.1,
+            a = 0.6
+        }
+    else
+        color = {
+            r = 0.2,
+            g = 0.2,
+            b = 0.0,
+            a = 0.2
+        }
     end
 
     local pos = bot.position
@@ -140,12 +158,7 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     end
 
     pdata.vis_bot_highlight = rendering.draw_rectangle {
-        color = {
-            r = 0.2,
-            g = 0.2,
-            b = 0.0,
-            a = 0.2
-        },
+        color = color,
         filled = false,
         width = 2,
         left_top = left_top,
@@ -316,7 +329,21 @@ function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight
     local pos = bot.position
     local ui_y = pos.y + (bot_highlight_y_offset or 0) + 0.8
 
-    local text = string.format("[%s] items: %d", mode or "idle", carried_count or 0)
+    local text
+    local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
+
+    if has_unplaceable then
+        local names = {}
+        for name, _ in pairs(pdata.unplaceable_items) do
+            names[#names + 1] = name
+        end
+        table.sort(names)
+        local list = table.concat(names, ", ")
+        -- Rule 4: show which type(s) cannot be placed.
+        text = string.format("NO CONTAINER: %s", list)
+    else
+        text = string.format("[%s] items: %d", mode or "idle", carried_count or 0)
+    end
 
     if pdata.vis_status_text and pdata.vis_status_text.valid then
         pdata.vis_status_text.target = {
