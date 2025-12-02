@@ -616,11 +616,30 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     end
 end
 
+---------------------------------------------------
+-- CLEANUP HELPERS
+---------------------------------------------------
+local function cleanup_old_bots()
+    for _, surface in pairs(game.surfaces) do
+        for _, e in pairs(surface.find_entities_filtered {
+            name = "mekatrol-cleanup-bot"
+        }) do
+            if e.valid then
+                e.destroy()
+            end
+        end
+    end
+end
+
 ----------------------------------------------------------------------
 -- EVENT HANDLERS
 ----------------------------------------------------------------------
 
 script.on_init(function()
+
+    -- cleanup any old bots (if starting from an existing save converted to this mod)
+    cleanup_old_bots()
+
     local s = get_mod_storage()
     -- Initialize existing players (e.g. when mod is added to ongoing save).
     for _, player in pairs(game.players) do
@@ -629,6 +648,9 @@ script.on_init(function()
 end)
 
 script.on_configuration_changed(function(_)
+    -- cleanup any old bots when mod/game configuration changes
+    cleanup_old_bots()
+
     local s = get_mod_storage()
     for _, player in pairs(game.players) do
         init_player(player)

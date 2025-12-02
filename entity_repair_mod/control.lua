@@ -77,8 +77,11 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["boiler"] = 200,
     ["steam-engine"] = 400,
     ["flamethrower-turret"] = 1400,
-    ["pump"] = 180,
+    ["pump"] = 180
+}
 
+local ignore_names = {
+    ["mekatrol-cleanup-bot"] = true
 }
 
 local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
@@ -571,7 +574,9 @@ local function find_damaged_entities(bot, center, radius)
     local damaged = {}
 
     for _, ent in pairs(candidates) do
-        if ent ~= bot and is_entity_damaged(ent) then
+        if ent ~= bot and not ignore_names[ent.name] and is_entity_damaged(ent) then
+
+            game.print(ent.name)
             damaged[#damaged + 1] = ent
         end
     end
