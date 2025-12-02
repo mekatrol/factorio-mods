@@ -105,13 +105,20 @@ local function init_player(player)
     -- Carried items: table[name] = count, plus running total.
     pdata.carried_items = pdata.carried_items or {}
     pdata.carried_item_count = pdata.carried_item_count or 0
-
+    -- NEW: line from bot to current target (item, chest, or roam point).
+    -- The visual function itself will only show it in pickup mode.
+    if pdata.target_position then
+        visuals.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
+    else
+        visuals.draw_target_line(bot, pdata, nil, pdata.mode or "idle") -- clears old line
+    end
     -- Visual references:
     pdata.vis_bot_highlight = pdata.vis_bot_highlight or nil
     pdata.vis_chest_highlight = pdata.vis_chest_highlight or nil
     pdata.vis_bot_lines = pdata.vis_bot_lines or nil
     pdata.vis_status_text = pdata.vis_status_text or nil
     pdata.vis_search_radius_circle = pdata.vis_search_radius_circle or nil
+    pdata.vis_target_line = pdata.vis_target_line or nil
 end
 
 local function distance_squared(a, b)
@@ -548,6 +555,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
         if nearest_item and nearest_item.valid then
             pdata.mode = "pickup"
+            data.target_entity = nearest_item
             pdata.target_position = {
                 x = nearest_item.position.x,
                 y = nearest_item.position.y
@@ -613,6 +621,14 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     end
     visuals.draw_bot_player_line(player, bot, pdata, pdata.mode or "idle")
     visuals.draw_status_text(bot, pdata, pdata.mode or "idle", pdata.carried_item_count or 0, BOT_HIGHLIGHT_Y_OFFSET)
+
+    -- line from bot to current target (item, chest, or roam point).
+    -- The visual function itself will only show it in pickup mode.
+    if pdata.target_position then
+        visuals.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
+    else
+        visuals.draw_target_line(bot, pdata, nil, pdata.mode or "idle") -- clears old line
+    end
 end
 
 ----------------------------------------------------------------------

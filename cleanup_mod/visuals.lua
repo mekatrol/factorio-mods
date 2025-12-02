@@ -348,6 +348,57 @@ function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight
 end
 
 ----------------------------------------------------------------------
+-- Line from bot to its current target position.
+--
+-- We only show this in "pickup" mode; in other modes it is cleared.
+----------------------------------------------------------------------
+function visuals.draw_target_line(bot, pdata, target_pos, mode)
+    if not pdata then
+        return
+    end
+
+    -- If no valid target or wrong mode, just clear any existing line.
+    if mode ~= "pickup" or not (bot and bot.valid and target_pos) then
+        visuals.clear_target_line(pdata)
+        return
+    end
+
+    local from_pos = bot.position
+    local to_pos = target_pos
+
+    -- Color: reddish to indicate "hunting items"
+    local color = {
+        r = 1.0,
+        g = 0.2,
+        b = 0.2,
+        a = 0.7
+    }
+
+    if pdata.vis_target_line and pdata.vis_target_line.valid then
+        -- Update existing line
+        pdata.vis_target_line.from = from_pos
+        pdata.vis_target_line.to = to_pos
+        pdata.vis_target_line.color = color
+        return
+    end
+
+    -- Create new line
+    pdata.vis_target_line = rendering.draw_line {
+        color = color,
+        width = 1,
+        from = from_pos,
+        to = to_pos,
+        surface = bot.surface,
+        draw_on_ground = true,
+        only_in_alt_mode = false
+    }
+end
+
+function visuals.clear_target_line(pdata)
+    clear_object("vis_target_line", pdata)
+end
+
+----------------------------------------------------------------------
 -- Master reset for all visuals associated with this player’s bot.
 ----------------------------------------------------------------------
 
@@ -361,6 +412,7 @@ function visuals.clear_all(pdata)
     visuals.clear_search_radius_circle(pdata)
     visuals.clear_bot_line(pdata)
     visuals.clear_status_text(pdata)
+    visuals.clear_target_line(pdata)
 end
 
 return visuals
