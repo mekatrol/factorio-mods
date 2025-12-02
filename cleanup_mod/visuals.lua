@@ -351,10 +351,12 @@ function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight
         text = string.format("[%s] items: %d", mode or "idle", 0)
     end
 
+    local Y_OFFSET = 0.8
+
     if pdata.vis_status_text and pdata.vis_status_text.valid then
         pdata.vis_status_text.target = {
             x = pos.x,
-            y = ui_y
+            y = ui_y + Y_OFFSET
         }
         pdata.vis_status_text.text = text
         return
@@ -365,7 +367,7 @@ function visuals.draw_status_text(bot, pdata, mode, carried_count, bot_highlight
         surface = bot.surface,
         target = {
             x = pos.x,
-            y = ui_y
+            y = ui_y + Y_OFFSET
         },
         color = {
             r = 1,

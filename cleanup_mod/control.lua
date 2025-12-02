@@ -155,7 +155,7 @@ local function get_total_carried(pdata)
             total = total + count
         end
     end
-    return total    
+    return total
 end
 
 -- How much free capacity (by item count) remains.
@@ -197,6 +197,35 @@ local function find_best_container_for_item(player, bot, item_name)
                 local d2 = distance_squared(bp, c.position)
                 if not best_d2 or d2 < best_d2 then
                     best = c
+                    best_d2 = d2
+                end
+            end
+        end
+    end
+
+    return best
+end
+
+-- Find the nearest suitable container for ANY carried item type.
+local function find_any_container_for_carried_items(player, bot, pdata)
+    if not (player and player.valid and bot and bot.valid) then
+        return nil
+    end
+    if not pdata.carried_items then
+        return nil
+    end
+
+    local best
+    local best_d2
+    local bp = bot.position
+
+    for name, count in pairs(pdata.carried_items) do
+        if count and count > 0 then
+            local container = find_best_container_for_item(player, bot, name)
+            if container and container.valid then
+                local d2 = distance_squared(bp, container.position)
+                if not best_d2 or d2 < best_d2 then
+                    best = container
                     best_d2 = d2
                 end
             end
@@ -582,40 +611,67 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
     ------------------------------------------------------------------
     -- Decide what we are trying to do next:
-    --   1. If carrying items and we have a chest: head to chest.
-    --   2. If not carrying items:
-    --        a) Look for the nearest ground item (around bot, then player).
-    --        b) If found, head for it.
-    --        c) Otherwise, random roam within the radius.
+    --   1. If carrying items and we have a suitable container: go there.
+    --   2. If carrying items but no container: follow the player (no-container mode).
+    --   3. If not carrying items: look for ground items or roam.
     ------------------------------------------------------------------
     local carried_total = get_total_carried(pdata)
     local carrying_anything = carried_total > 0
 
-    -- When carrying items, always try to deposit into suitable containers.
-    if carrying_anything then
-        deposit_carried_items(player, pdata, bot)
-        carried_total = get_total_carried(pdata) -- recompute after deposit
-    end
-
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
 
+    if carrying_anything and not has_unplaceable then
+        -- We have items and (so far) no unplaceable ones: try to find a container.
+        local container = find_any_container_for_carried_items(player, bot, pdata)
+
+        if container and container.valid then
+            local d2_chest = distance_squared(bp, container.position)
+            if d2_chest <= (CHEST_INTERACT_DISTANCE * CHEST_INTERACT_DISTANCE) then
+                -- Close enough: actually deposit now.
+                deposit_carried_items(player, pdata, bot)
+                carried_total = get_total_carried(pdata)
+
+                if carried_total <= 0 then
+                    -- All done, go back to roaming.
+                    pdata.mode = "roam"
+                    pdata.target_position = nil
+                end
+            else
+                -- Not at the chest yet: head towards it.
+                pdata.mode = "returning"
+                pdata.target_position = {
+                    x = container.position.x,
+                    y = container.position.y
+                }
+            end
+        else
+            -- No container for any carried item type.
+            pdata.unplaceable_items = pdata.unplaceable_items or {}
+            for name, count in pairs(pdata.carried_items) do
+                if count and count > 0 then
+                    if not pdata.unplaceable_items[name] then
+                        pdata.unplaceable_items[name] = true
+                        player.print("[CleanupBot] No container found that already contains '" .. name .. "'.")
+                    end
+                end
+            end
+            has_unplaceable = true
+        end
+    end
+
+    -- If any items are unplaceable, follow the player at offset.
     if has_unplaceable then
-        ------------------------------------------------------------------
-        -- Rule 3: once no suitable container can be found, follow player
-        -- at offset (-2, +2).
-        ------------------------------------------------------------------
         pdata.mode = "no-container"
         pdata.target_position = {
             x = pp.x + FOLLOW_OFFSET.x,
             y = pp.y + FOLLOW_OFFSET.y
         }
-    else
+    elseif not carrying_anything then
         ------------------------------------------------------------------
-        -- Normal behaviour: look for items to pick up, otherwise roam.
+        -- Normal behaviour when empty: look for items to pick up, otherwise roam.
         ------------------------------------------------------------------
         local nearest_item = find_nearest_ground_item(surface, bp, ITEM_SEARCH_RADIUS)
         if not nearest_item then
-            -- If nothing near bot, try around the player.
             nearest_item = find_nearest_ground_item(surface, pp, ITEM_SEARCH_RADIUS)
         end
 
@@ -626,7 +682,6 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
                 y = nearest_item.position.y
             }
         else
-            -- No items, just roam randomly within radius.
             if not pdata.target_position or pdata.mode ~= "roam" then
                 pick_random_roam_target(player, bot, pdata)
             end
