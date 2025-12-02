@@ -262,7 +262,7 @@ local function ensure_bot_for_player(player, pdata)
     }
 
     if not bot then
-        player.print("[CleanupBot] Failed to create cleanup bot.")
+        player.print("[color=green][MekatrolCleanupBot][/color] Failed to create cleanup bot.")
         return nil
     end
 
@@ -278,7 +278,7 @@ local function ensure_bot_for_player(player, pdata)
     }
     pdata.stuck_tick_counter = 0
 
-    player.print("[CleanupBot] Cleanup bot spawned.")
+    player.print("[color=green][MekatrolCleanupBot][/color] Cleanup bot spawned.")
 
     return bot
 end
@@ -393,7 +393,7 @@ local function move_bot_towards(bot, target)
 
     local dist = math.sqrt(d2)
     if BOT_STEP_DISTANCE <= 0 then
-        game.print("[CleanupBot] ERROR: BOT_STEP_DISTANCE <= 0")
+        game.print("[color=green][MekatrolCleanupBot][/color] ERROR: BOT_STEP_DISTANCE <= 0")
         return
     end
 
@@ -412,7 +412,7 @@ local function move_bot_towards(bot, target)
     local ok = bot.teleport(new_pos)
     local after = bot.position
 
-    -- game.print(string.format("[CleanupBot] STEP from (%.2f, %.2f) to (%.2f, %.2f), ok=%s, after=(%.2f, %.2f)", before.x,
+    -- game.print(string.format("[color=green][MekatrolCleanupBot][/color] STEP from (%.2f, %.2f) to (%.2f, %.2f), ok=%s, after=(%.2f, %.2f)", before.x,
     --     before.y, new_pos.x, new_pos.y, tostring(ok), after.x, after.y))
 end
 
@@ -558,7 +558,7 @@ local function deposit_carried_items(player, pdata, bot)
                         -- Container already has the item but is now full.
                         pdata.carried_items[name] = remaining
                         pdata.unplaceable_items[name] = true
-                        player.print("[CleanupBot] No container space for item '" .. name .. "'.")
+                        player.print("[color=green][MekatrolCleanupBot][/color] No container space for item '" .. name .. "'.")
                     else
                         pdata.carried_items[name] = nil
                         pdata.unplaceable_items[name] = nil
@@ -567,7 +567,7 @@ local function deposit_carried_items(player, pdata, bot)
             else
                 -- Rule 1: no container available that already has this type.
                 pdata.unplaceable_items[name] = true
-                player.print("[CleanupBot] No container found that already contains '" .. name .. "'.")
+                player.print("[color=green][MekatrolCleanupBot][/color] No container found that already contains '" .. name .. "'.")
             end
         end
     end
@@ -659,7 +659,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
                 if count and count > 0 then
                     if not pdata.unplaceable_items[name] then
                         pdata.unplaceable_items[name] = true
-                        player.print("[CleanupBot] No container found that already contains '" .. name .. "'.")
+                        player.print("[color=green][MekatrolCleanupBot][/color] No container found that already contains '" .. name .. "'.")
                     end
                 end
             end
@@ -837,7 +837,7 @@ script.on_event("mekatrol-toggle-cleanup-bot", function(event)
     if pdata.cleanup_bot_enabled then
         ensure_bot_for_player(player, pdata)
         pdata.mode = "idle"
-        player.print("[CleanupBot] Enabled.")
+        player.print("[color=green][MekatrolCleanupBot][/color] Enabled.")
     else
         -- Destroy bot entity if present.
         if pdata.cleanup_bot and pdata.cleanup_bot.valid then
@@ -854,7 +854,7 @@ script.on_event("mekatrol-toggle-cleanup-bot", function(event)
         pdata.target_position = nil
         pdata.mode = "idle"
 
-        player.print("[CleanupBot] Disabled.")
+        player.print("[color=green][MekatrolCleanupBot][/color] Disabled.")
     end
 end)
 

@@ -68,7 +68,7 @@ local function place_tree_near_player(player)
             force = "neutral"
         }
     else
-        player.print("[Augment] No free space to place a tree nearby.")
+        player.print("[color=green][MekatrolTreeSpawnBot][/color] No free space to place a tree nearby.")
     end
 end
 
@@ -83,9 +83,9 @@ script.on_event("augment-toggle-tree", function(event)
     pdata.enabled = not pdata.enabled
 
     if pdata.enabled then
-        player.print("[Augment] Tree spawning enabled.")
+        player.print("[color=green][MekatrolTreeSpawnBot][/color] Tree spawning enabled.")
     else
-        player.print("[Augment] Tree spawning disabled.")
+        player.print("[color=green][MekatrolTreeSpawnBot][/color] Tree spawning disabled.")
     end
 end)
 

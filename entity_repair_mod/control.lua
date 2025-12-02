@@ -118,13 +118,13 @@ local function scan_player_entities_for_max_health(force)
                         local suggested = math.floor(h + 0.5)
                         local line = string.format("[\"%s\"] = %d,\n", name, suggested)
 
-                        game.print("[MekatrolRepairBot][SCAN] " .. line)
+                        game.print("[color=green][MekatrolRepairBot][/color][SCAN] " .. line)
 
                         if helpers and helpers.write_file then
                             helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
                         else
                             game.print(
-                                "[MekatrolRepairBot][WARN] helpers.write_file not available; cannot write to disk.")
+                                "[color=green][MekatrolRepairBot][/color][WARN] helpers.write_file not available; cannot write to disk.")
                         end
                     end
                 end
@@ -156,22 +156,22 @@ local function infer_max_health_from_world(name, force)
     if max_health_seen > 0 then
         local suggested = math.floor(max_health_seen + 0.5)
         game.print(string.format(
-            "[MekatrolRepairBot][INFO] Observed max health %.1f for '%s' (force=%s). Suggested: ENTITY_MAX_HEALTH[\"%s\"] = %d",
+            "[color=green][MekatrolRepairBot][/color][INFO] Observed max health %.1f for '%s' (force=%s). Suggested: ENTITY_MAX_HEALTH[\"%s\"] = %d",
             max_health_seen, name, force.name, name, suggested))
 
         local line = string.format("[\"%s\"] = %d,\n", name, suggested)
-        game.print("[MekatrolRepairBot][INFO] " .. line)
+        game.print("[color=green][MekatrolRepairBot][/color][INFO] " .. line)
 
         if helpers and helpers.write_file then
             helpers.write_file("mekatrol_repair_mod_maxhealth_scan.txt", line, true)
         else
-            game.print("[MekatrolRepairBot][WARN] helpers.write_file not available; cannot write to disk.")
+            game.print("[color=green][MekatrolRepairBot][/color][WARN] helpers.write_file not available; cannot write to disk.")
         end
 
         return suggested
     else
         game.print(string.format(
-            "[MekatrolRepairBot][INFO] Could not infer max health for '%s' (no live entities with health).", name))
+            "[color=green][MekatrolRepairBot][/color][INFO] Could not infer max health for '%s' (no live entities with health).", name))
         return nil
     end
 end
@@ -575,8 +575,6 @@ local function find_damaged_entities(bot, center, radius)
 
     for _, ent in pairs(candidates) do
         if ent ~= bot and not ignore_names[ent.name] and is_entity_damaged(ent) then
-
-            game.print(ent.name)
             damaged[#damaged + 1] = ent
         end
     end
@@ -688,9 +686,9 @@ local function ensure_bot_for_player(player, pdata)
         pdata.damaged_entities_next_repair_index = 1
         pathfinding.reset_bot_path(pdata)
 
-        player.print("[MekatrolRepairBot] bot spawned.")
+        player.print("[color=green][MekatrolRepairBot][/color] bot spawned.")
     else
-        player.print("[MekatrolRepairBot] failed to spawn bot.")
+        player.print("[color=green][MekatrolRepairBot][/color] failed to spawn bot.")
     end
 end
 
@@ -787,7 +785,7 @@ local function repair_bot_self_heal(player, bot, pdata)
     if not player_has_repair_capacity(player, pdata) then
         if not pdata.out_of_repair_packs_warned then
             pdata.out_of_repair_packs_warned = true
-            player.print("[MekatrolRepairBot] No repair packs in chest or inventory. Bot cannot repair.")
+            player.print("[color=green][MekatrolRepairBot][/color] No repair packs in chest or inventory. Bot cannot repair.")
         end
         return
     end
@@ -817,12 +815,12 @@ local function repair_bot_self_heal(player, bot, pdata)
         bot.health = math.min(max, bot.health + spent)
         pdata.out_of_repair_packs_warned = false
         -- DEBUG: you can log before/after if needed
-        -- player.print(string.format("[MekatrolRepairBot] Bot self-healed %.1f (%.1f -> %.1f)", spent, before_health, bot.health))
+        -- player.print(string.format("[color=green][MekatrolRepairBot][/color] Bot self-healed %.1f (%.1f -> %.1f)", spent, before_health, bot.health))
     else
         -- No durability available anymore – warn once.
         if not pdata.out_of_repair_packs_warned and not player_has_repair_capacity(player, pdata) then
             pdata.out_of_repair_packs_warned = true
-            player.print("[MekatrolRepairBot] Out of repair packs; bot cannot self-repair.")
+            player.print("[color=green][MekatrolRepairBot][/color] Out of repair packs; bot cannot self-repair.")
         end
     end
 end
@@ -841,7 +839,7 @@ local function repair_entities_near(player, surface, force, center, radius, bot)
     if not player_has_repair_capacity(player, pdata) then
         if not pdata.out_of_repair_packs_warned then
             pdata.out_of_repair_packs_warned = true
-            player.print("[MekatrolRepairBot] No repair packs in chest or inventory. Bot cannot repair.")
+            player.print("[color=green][MekatrolRepairBot][/color] No repair packs in chest or inventory. Bot cannot repair.")
         end
         return
     end
@@ -883,7 +881,7 @@ local function repair_entities_near(player, surface, force, center, radius, bot)
             if not player_has_repair_capacity(player, pdata) then
                 if not pdata.out_of_repair_packs_warned then
                     pdata.out_of_repair_packs_warned = true
-                    player.print("[MekatrolRepairBot] Out of repair packs; stopping repairs.")
+                    player.print("[color=green][MekatrolRepairBot][/color] Out of repair packs; stopping repairs.")
                 end
                 return
             end
@@ -1025,13 +1023,13 @@ local function on_mapping_bot_entity_mapped(e)
 
     local info = e.info or {}
     -- Do whatever the repair bot should do with this entity
-    local msg = string.format("[MekatrolRepairBot] NEW mapped entity: key=%s, name=%s, surface=%d (first_seen=%d)",
+    local msg = string.format("[color=green][MekatrolRepairBot][/color] NEW mapped entity: key=%s, name=%s, surface=%d (first_seen=%d)",
         tostring(e.key), info.name or "<nil>", info.surface_index or -1, info.last_seen_tick or -1)
     -- game.print(msg)
 end
 
 local function on_mapping_bot_entities_cleared(e)
-    local msg = string.format("[MekatrolRepairBot] Mapping cleared (reason=%s, player_index=%s, tick=%d)",
+    local msg = string.format("[color=green][MekatrolRepairBot][/color] Mapping cleared (reason=%s, player_index=%s, tick=%d)",
         tostring(e.reason), tostring(e.player_index), e.tick or -1)
     -- game.print(msg)
 
@@ -1107,7 +1105,7 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
         ensure_bot_for_player(player, pdata)
 
         pdata.last_mode = "follow"
-        player.print("[MekatrolRepairBot] Repair bot enabled.")
+        player.print("[color=green][MekatrolRepairBot][/color] Repair bot enabled.")
     else
         if pdata.repair_bot and pdata.repair_bot.valid then
             pdata.repair_bot.destroy()
@@ -1140,7 +1138,7 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
         end
 
         pdata.last_mode = "off"
-        player.print("[MekatrolRepairBot] Repair bot disabled.")
+        player.print("[color=green][MekatrolRepairBot][/color] Repair bot disabled.")
     end
 end)
 
@@ -1164,7 +1162,7 @@ script.on_event(defines.events.on_tick, function(event)
 
     local pdata = get_player_data(player.index)
     if not pdata then
-        player.print("[MekatrolRepairBot] Player found but no pdata exists.")
+        player.print("[color=green][MekatrolRepairBot][/color] Player found but no pdata exists.")
         return
     end
 

@@ -200,9 +200,9 @@ local function ensure_bot_for_player(player, pdata)
         pdata.damaged_entities = nil
         pdata.damaged_entities_next_repair_index = 1
 
-        player.print("[MekatrolMappingBot] bot spawned.")
+        player.print("[color=green][MekatrolMappingBot][/color] bot spawned.")
     else
-        player.print("[MekatrolMappingBot] failed to spawn bot.")
+        player.print("[color=green][MekatrolMappingBot][/color] failed to spawn bot.")
     end
 
     pdata.mapping_bot = bot
@@ -331,7 +331,7 @@ script.on_event("mekatrol-mapping-bot-toggle", function(event)
             pdata.mapping_bot.destroy()
         end
         pdata.mapping_bot = nil
-        player.print("[MappingBot] Bot disabled.")
+        player.print("[color=green][MekatrolMappingBot][/color] Bot disabled.")
     end
 end)
 
