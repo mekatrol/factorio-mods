@@ -85,10 +85,22 @@ function visuals.clear_destroyed_overlay(pdata)
     if not pdata then
         return
     end
+
+    -- Backwards compatibility: single text object
     if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
         pdata.destroyed_overlay_text:destroy()
     end
     pdata.destroyed_overlay_text = nil
+
+    -- New: multiple text objects, one per line
+    if pdata.destroyed_overlay_texts then
+        for _, obj in pairs(pdata.destroyed_overlay_texts) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+    end
+    pdata.destroyed_overlay_texts = nil
 end
 
 -- destroyed_list: array or map of {name=..., type=..., position=..., surface=...}
@@ -120,21 +132,18 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
     -------------------------------------------------------
     -- Build overlay text
     -------------------------------------------------------
-    local lines = {"[Destroyed entities]"}
+    local lines = {"Destroyed entities:"}
 
     local i = 0
     for _, e in pairs(destroyed_list) do
         i = i + 1
         local pos = e.position or {
-            x = 0,
-            y = 0
+            x = e.x or 0,
+            y = e.y or 0
         }
-        local sname = (e.surface and e.surface.valid and e.surface.name) or "?"
-        lines[#lines + 1] = string.format("%d) %s (%s) @ %s [%.1f, %.1f]", i, e.name or "?", e.type or "?", sname,
-            pos.x, pos.y)
-    end
 
-    local text = table.concat(lines, "\n")
+        lines[#lines + 1] = string.format("%d) [%.1f, %.1f]→%s", i, pos.x, pos.y, e.name or "?")
+    end
 
     -------------------------------------------------------
     -- Top-left of the current camera + small margin
@@ -144,7 +153,7 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
     local margin_tiles_x = 0.5
     local margin_tiles_y = 0.5
 
-    local target_pos = {
+    local base_pos = {
         x = tl.x + margin_tiles_x,
         y = tl.y + margin_tiles_y
     }
@@ -152,27 +161,62 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
     -------------------------------------------------------
     -- Draw or update the text
     -------------------------------------------------------
+    -- Clear any legacy single-text usage
     if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
-        pdata.destroyed_overlay_text.text = text
-        pdata.destroyed_overlay_text.target = target_pos
-        pdata.destroyed_overlay_text.scale = effective_scale
-    else
-        pdata.destroyed_overlay_text = rendering.draw_text {
-            text = text,
-            surface = player.surface,
-            target = target_pos,
-            color = {
-                r = 0.8,
-                g = 0.8,
-                b = 0,
-                a = 0.6
-            }, -- semi-transparent white
-            scale = effective_scale,
-            alignment = "left",
-            vertical_alignment = "top",
-            draw_on_ground = false,
-            only_in_alt_mode = false
+        pdata.destroyed_overlay_text:destroy()
+    end
+    pdata.destroyed_overlay_text = nil
+
+    -- Ensure table exists
+    pdata.destroyed_overlay_texts = pdata.destroyed_overlay_texts or {}
+
+    -- Line spacing in tiles, scaled with text size
+    local base_line_spacing_tiles = 0.8
+    local line_spacing = base_line_spacing_tiles * (effective_scale / base_scale)
+
+    -- Update/create one visual per line
+    for index, line in ipairs(lines) do
+        local line_pos = {
+            x = base_pos.x,
+            y = base_pos.y + (index - 1) * line_spacing
         }
+
+        local obj = pdata.destroyed_overlay_texts[index]
+        if obj and obj.valid then
+            obj.text = line
+            obj.target = line_pos
+            obj.scale = effective_scale
+        else
+            pdata.destroyed_overlay_texts[index] = rendering.draw_text {
+                text = line,
+                surface = player.surface,
+                target = line_pos,
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 0,
+                    a = 0.8
+                }, -- semi-transparent white
+                scale = effective_scale,
+                alignment = "left",
+                vertical_alignment = "top",
+                draw_on_ground = false,
+                only_in_alt_mode = false
+            }
+        end
+    end
+
+    -- Destroy any extra visuals if the list shrank
+    local count = #pdata.destroyed_overlay_texts
+    local needed = #lines
+    if count > needed then
+        for idx = needed + 1, count do
+            local obj = pdata.destroyed_overlay_texts[idx]
+            if obj and obj.valid then
+                obj:destroy()
+            end
+            pdata.destroyed_overlay_texts[idx] = nil
+        end
     end
 end
 

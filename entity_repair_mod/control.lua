@@ -117,8 +117,14 @@ local function add_destroyed_site(ent)
     sites[surf_index][#sites[surf_index] + 1] = {
         x = pos.x,
         y = pos.y,
+        position = {
+            x = pos.x,
+            y = pos.y
+        },
         name = ent.name,
-        type = ent.type
+        type = ent.type,
+        surface = ent.surface,
+        surface_name = ent.surface.name
     }
 end
 
@@ -1382,7 +1388,8 @@ script.on_event(defines.events.on_tick, function(event)
 
     -- Update overlay for destroyed player entities
     local destroyed_sites = get_destroyed_sites()
-    visuals.update_destroyed_overlay(player, pdata, destroyed_sites)
+    local surface_index = player.surface.index
+    visuals.update_destroyed_overlay(player, pdata, destroyed_sites[surface_index] or {})
 
     if pdata.repair_bot_enabled then
         update_repair_bot_for_player(player, pdata)
