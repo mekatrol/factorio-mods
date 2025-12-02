@@ -23,7 +23,7 @@ local CLEANUP_BOT_UPDATE_INTERVAL = 5
 
 -- Bot movement:
 -- Tiles per second, converted to tiles per update step.
-local BOT_SPEED_TILES_PER_SECOND = 4.0
+local BOT_SPEED_TILES_PER_SECOND = 6.0
 local TICKS_PER_SECOND = 60
 local BOT_STEP_DISTANCE = (BOT_SPEED_TILES_PER_SECOND * CLEANUP_BOT_UPDATE_INTERVAL) / TICKS_PER_SECOND
 
@@ -273,52 +273,38 @@ local function move_bot_towards(bot, target)
         return
     end
 
-    local bp = bot.position
-    local dx = target.x - bp.x
-    local dy = target.y - bp.y
+    local before = bot.position
+    local dx = target.x - before.x
+    local dy = target.y - before.y
     local d2 = dx * dx + dy * dy
 
     if d2 == 0 then
-        -- Already at target
-        -- game.print(string.format("[CleanupBot] at target (%.2f, %.2f)", bp.x, bp.y))
         return
     end
 
     local dist = math.sqrt(d2)
-
     if BOT_STEP_DISTANCE <= 0 then
-        game.print(string.format("[CleanupBot] ERROR: BOT_STEP_DISTANCE <= 0 (%.6f) – bot cannot move",
-            BOT_STEP_DISTANCE))
+        game.print("[CleanupBot] ERROR: BOT_STEP_DISTANCE <= 0")
         return
     end
 
-    -- Snap if very close
+    local new_pos
     if dist <= BOT_STEP_DISTANCE then
-        local ok = bot.teleport(target)
-        -- Debug
-        -- game.print(string.format(
-        --     "[CleanupBot] SNAP (%.2f, %.2f) -> (%.2f, %.2f); ok=%s",
-        --     bp.x, bp.y, target.x, target.y, tostring(ok)
-        -- ))
-        return
+        new_pos = target
+    else
+        local nx = dx / dist
+        local ny = dy / dist
+        new_pos = {
+            x = before.x + nx * BOT_STEP_DISTANCE,
+            y = before.y + ny * BOT_STEP_DISTANCE
+        }
     end
-
-    local nx = dx / dist
-    local ny = dy / dist
-
-    local new_pos = {
-        x = bp.x + nx * BOT_STEP_DISTANCE,
-        y = bp.y + ny * BOT_STEP_DISTANCE
-    }
 
     local ok = bot.teleport(new_pos)
+    local after = bot.position
 
-    -- Optional debug: comment out once you see it move
-    -- game.print(string.format(
-    --     "[CleanupBot] STEP (%.2f, %.2f) -> (%.2f, %.2f) target (%.2f, %.2f); step=%.3f; ok=%s",
-    --     bp.x, bp.y, new_pos.x, new_pos.y, target.x, target.y,
-    --     BOT_STEP_DISTANCE, tostring(ok)
-    -- ))
+    -- game.print(string.format("[CleanupBot] STEP from (%.2f, %.2f) to (%.2f, %.2f), ok=%s, after=(%.2f, %.2f)", before.x,
+    --     before.y, new_pos.x, new_pos.y, tostring(ok), after.x, after.y))
 end
 
 ----------------------------------------------------------------------
