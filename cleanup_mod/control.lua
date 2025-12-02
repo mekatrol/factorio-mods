@@ -620,8 +620,26 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
 
+    ------------------------------------------------------------------
+    -- Retry: if we previously had unplaceable items, see if a
+    -- suitable container exists now. If so, clear the flag so the
+    -- normal container logic runs again.
+    ------------------------------------------------------------------
+    if has_unplaceable and carrying_anything then
+        local retry_container = find_any_container_for_carried_items(player, bot, pdata)
+        if retry_container and retry_container.valid then
+            -- A container for at least one carried item exists now.
+            -- Let the normal logic below handle movement/deposit.
+            pdata.unplaceable_items = {}
+            has_unplaceable = false
+        end
+    end
+
+    ------------------------------------------------------------------
+    -- Normal container / no-container logic
+    ------------------------------------------------------------------
     if carrying_anything and not has_unplaceable then
-        -- We have items and (so far) no unplaceable ones: try to find a container.
+        -- We have items and (currently) no unplaceable ones: try to find a container.
         local container = find_any_container_for_carried_items(player, bot, pdata)
 
         if container and container.valid then
