@@ -43,6 +43,133 @@ function visuals.clear_chest_highlight(pdata)
     pdata.vis_chest_highlight = nil
 end
 
+---------------------------------------------------
+-- DESTROYED ENTITIES OVERLAY (SAFE VERSION)
+---------------------------------------------------
+
+function visuals.clear_destroyed_overlay(pdata)
+    if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
+        pdata.destroyed_overlay_text:destroy()
+    end
+    pdata.destroyed_overlay_text = nil
+end
+
+local function get_surface_name_from_entry(e)
+    -- Prefer an actual surface handle if you stored it
+    if e.surface and e.surface.valid then
+        return e.surface.name
+    end
+
+    -- Next, try a surface_index if present and valid
+    if e.surface_index ~= nil then
+        local surf = game.surfaces[e.surface_index]
+        if surf then
+            return surf.name
+        end
+    end
+
+    -- Or a stored name
+    if e.surface_name ~= nil then
+        return e.surface_name
+    end
+
+    -- Fallback
+    return "?"
+end
+
+-- destroyed_list: array/map of { position={x,y}, type, name, surface/surface_index/surface_name }
+function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
+    if not (player and player.valid) then
+        return
+    end
+
+    destroyed_list = destroyed_list or {}
+
+    -- empty list → clear overlay
+    local has_any = false
+    for _ in pairs(destroyed_list) do
+        has_any = true
+        break
+    end
+    if not has_any then
+        visuals.clear_destroyed_overlay(pdata)
+        return
+    end
+
+    -------------------------------------------------------
+    -- Build text block
+    -------------------------------------------------------
+    local lines = {"[Destroyed entities]"}
+    local idx = 0
+
+    for _, e in pairs(destroyed_list) do
+        idx = idx + 1
+
+        local pos = e.position or {
+            x = 0,
+            y = 0
+        }
+        local sname = (e.surface and e.surface.valid and e.surface.name) or "?"
+        local name = e.name or "?"
+        local etype = e.type or "?"
+
+        lines[#lines + 1] = string.format("%d) %s (%s) @ %s [%.1f, %.1f]", idx, name, etype, sname, pos.x, pos.y)
+    end
+
+    local text = table.concat(lines, "\n")
+
+    -------------------------------------------------------
+    -- Decide what to anchor to
+    -- Prefer the player CHARACTER (LuaEntity); otherwise
+    -- fall back to a world position near the player.
+    -------------------------------------------------------
+    local anchor_entity = player.character
+    local target
+
+    if anchor_entity and anchor_entity.valid then
+        -- HUD-style anchor relative to the character
+        target = {
+            entity = anchor_entity,
+            offset = {
+                x = -10,
+                y = -8
+            } -- tweak for “top-left”
+        }
+    else
+        -- No character (e.g. god/editor mode) → approximate using position
+        local pp = player.position
+        target = {
+            x = pp.x - 10,
+            y = pp.y - 8
+        }
+    end
+
+    -------------------------------------------------------
+    -- Create or update the rendering text
+    -------------------------------------------------------
+    if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
+        pdata.destroyed_overlay_text.text = text
+        pdata.destroyed_overlay_text.target = target
+    else
+        pdata.destroyed_overlay_text = rendering.draw_text {
+            text = text,
+            surface = player.surface,
+            target = target,
+            color = {
+                r = 1,
+                g = 1,
+                b = 1,
+                a = 0.55
+            }, -- semi-transparent
+            scale = 2.8, -- bigger font
+            alignment = "left",
+            vertical_alignment = "top",
+            draw_on_ground = false,
+            only_in_alt_mode = false
+        }
+    end
+end
+
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
 function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highlight_y_offset, repair_pack_name)
@@ -451,6 +578,7 @@ function visuals.clear_all(pdata)
     visuals.clear_chest_highlight(pdata)
     visuals.clear_lines(pdata)
     visuals.clear_damaged_markers(pdata)
+    visuals.clear_destroyed_overlay(pdata)
 end
 
 return visuals

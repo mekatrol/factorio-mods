@@ -86,6 +86,69 @@ local ignore_names = {
 
 local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
 
+---------------------------------------------------
+-- DESTROYED PLAYER ENTITIES TRACKING
+---------------------------------------------------
+local DESTROYED_SITE_MATCH_RADIUS = 1.0
+local DESTROYED_SITE_MATCH_RADIUS_SQ = DESTROYED_SITE_MATCH_RADIUS * DESTROYED_SITE_MATCH_RADIUS
+
+local function get_destroyed_sites()
+    storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
+    local s = storage.mekatrol_repair_mod
+    s.destroyed_sites = s.destroyed_sites or {}
+    return s.destroyed_sites
+end
+
+local function add_destroyed_site(ent)
+    if not (ent and ent.valid) then
+        return
+    end
+
+    -- Only track player-force entities
+    if not (ent.force and ent.force.valid and ent.force.name == "player") then
+        return
+    end
+
+    local sites = get_destroyed_sites()
+    local surf_index = ent.surface.index
+    sites[surf_index] = sites[surf_index] or {}
+
+    local pos = ent.position
+    sites[surf_index][#sites[surf_index] + 1] = {
+        x = pos.x,
+        y = pos.y,
+        name = ent.name,
+        type = ent.type
+    }
+end
+
+local function remove_sites_near_entity(ent)
+    if not (ent and ent.valid) then
+        return
+    end
+
+    local sites = get_destroyed_sites()
+    local surf_index = ent.surface.index
+    local list = sites[surf_index]
+    if not list or #list == 0 then
+        return
+    end
+
+    local pos = ent.position
+    local px, py = pos.x, pos.y
+
+    local new_list = {}
+    for _, site in ipairs(list) do
+        local dx = site.x - px
+        local dy = site.y - py
+        if (dx * dx + dy * dy) > DESTROYED_SITE_MATCH_RADIUS_SQ then
+            new_list[#new_list + 1] = site
+        end
+    end
+
+    sites[surf_index] = new_list
+end
+
 local function get_discovered_table()
     storage.mekatrol_repair_mod = storage.mekatrol_repair_mod or {}
     local s = storage.mekatrol_repair_mod
@@ -263,6 +326,8 @@ local function init_player(player)
             vis_damaged_lines = nil,
             vis_bot_path = nil,
             vis_current_waypoint = nil,
+            -- destroyed-entities overlay
+            vis_destroyed_overlay = pdata.vis_destroyed_overlay or nil,
 
             -- accumulated durability from already-consumed repair packs
             -- measured in "health points" that can be spent across entities
@@ -297,6 +362,8 @@ local function init_player(player)
         pdata.vis_damaged_lines = pdata.vis_damaged_lines or nil
         pdata.vis_bot_path = pdata.vis_bot_path or nil
         pdata.vis_current_waypoint = pdata.vis_current_waypoint or nil
+        -- destroyed-entities overlay
+        pdata.vis_destroyed_overlay = pdata.vis_destroyed_overlay or nil
 
         -- durability pool may not exist in older saves
         pdata.repair_health_pool = pdata.repair_health_pool or 0
@@ -1127,33 +1194,59 @@ local function log_item_spawned(event)
 end
 
 ----------------------------------------------------------------------
+-- Creation wrapper: log + clear destroyed site at that position
+----------------------------------------------------------------------
+local function on_entity_built_and_cleanup_destroyed(event)
+    log_entity_created(event)
+
+    local ent = event.created_entity or event.entity or event.destination or event.source
+    if ent and ent.valid then
+        -- Any entity created near a destroyed site removes that site,
+        -- even if type is different.
+        remove_sites_near_entity(ent)
+    end
+end
+
+----------------------------------------------------------------------
+-- Death wrapper: log + record destroyed site
+----------------------------------------------------------------------
+local function on_entity_died_and_record(event)
+    log_entity_removed(event)
+
+    local ent = event.entity
+    if ent and ent.valid then
+        add_destroyed_site(ent)
+    end
+end
+
+----------------------------------------------------------------------
 -- REGISTER CREATION EVENTS (ONE PER CALL)
 ----------------------------------------------------------------------
 
 -- Player placed entity
-script.on_event(defines.events.on_built_entity, log_entity_created)
+script.on_event(defines.events.on_built_entity, on_entity_built_and_cleanup_destroyed)
 
 -- Construction robot placed entity
-script.on_event(defines.events.on_robot_built_entity, log_entity_created)
+script.on_event(defines.events.on_robot_built_entity, on_entity_built_and_cleanup_destroyed)
 
 -- Script raised built
-script.on_event(defines.events.script_raised_built, log_entity_created)
+script.on_event(defines.events.script_raised_built, on_entity_built_and_cleanup_destroyed)
 
 -- Script raised revive (ghost -> entity)
-script.on_event(defines.events.script_raised_revive, log_entity_created)
+script.on_event(defines.events.script_raised_revive, on_entity_built_and_cleanup_destroyed)
 
 -- Entity cloned
-script.on_event(defines.events.on_entity_cloned, log_entity_created)
+script.on_event(defines.events.on_entity_cloned, on_entity_built_and_cleanup_destroyed)
 
 -- Trigger created entity (explosions, capsules, etc.)
-script.on_event(defines.events.on_trigger_created_entity, log_entity_created)
+script.on_event(defines.events.on_trigger_created_entity, on_entity_built_and_cleanup_destroyed)
 
 -- Units spawned (from spawners)
-script.on_event(defines.events.on_entity_spawned, log_entity_created)
+script.on_event(defines.events.on_entity_spawned, on_entity_built_and_cleanup_destroyed)
 
 -- Unified entity-created event (Factorio 2)
 if defines.events.on_entity_created then
-    script.on_event(defines.events.on_entity_created, log_entity_created)
+    script.on_event(defines.events.on_entity_created, on_entity_built_and_cleanup_destroyed)
 end
 
 ----------------------------------------------------------------------
@@ -1166,8 +1259,8 @@ script.on_event(defines.events.on_player_mined_entity, log_entity_removed)
 -- Robot mined entity
 script.on_event(defines.events.on_robot_mined_entity, log_entity_removed)
 
--- Entity died (killed)
-script.on_event(defines.events.on_entity_died, log_entity_removed)
+-- Entity died (killed) -> we track destroyed sites here
+script.on_event(defines.events.on_entity_died, on_entity_died_and_record)
 
 -- Script destroyed entity
 script.on_event(defines.events.script_raised_destroy, log_entity_removed)
@@ -1175,11 +1268,6 @@ script.on_event(defines.events.script_raised_destroy, log_entity_removed)
 -- Unified entity-removed event (Factorio 2)
 if defines.events.on_entity_removed then
     script.on_event(defines.events.on_entity_removed, log_entity_removed)
-end
-
--- Ground item entities being created
-if defines.events.on_item_spawned then
-    script.on_event(defines.events.on_item_spawned, log_item_spawned)
 end
 
 -- Player created
@@ -1291,6 +1379,10 @@ script.on_event(defines.events.on_tick, function(event)
     if event.tick % MAX_HEALTH_SCAN_INTERVAL == 0 then
         scan_player_entities_for_max_health(player.force)
     end
+
+    -- Update overlay for destroyed player entities
+    local destroyed_sites = get_destroyed_sites()
+    visuals.update_destroyed_overlay(player, pdata, destroyed_sites)
 
     if pdata.repair_bot_enabled then
         update_repair_bot_for_player(player, pdata)
