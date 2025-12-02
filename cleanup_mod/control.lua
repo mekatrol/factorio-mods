@@ -555,7 +555,6 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
         if nearest_item and nearest_item.valid then
             pdata.mode = "pickup"
-            data.target_entity = nearest_item
             pdata.target_position = {
                 x = nearest_item.position.x,
                 y = nearest_item.position.y
