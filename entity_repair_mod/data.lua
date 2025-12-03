@@ -43,6 +43,7 @@ local repair_bot = {
     selection_box = nil,
 
     render_layer = "object",
+    max_health = 100,
 
     -- Use the vanilla logistic robot's idle animation as our picture.
     picture = base_robot.idle or {
