@@ -16,6 +16,7 @@ local visuals = require("visuals")
 ----------------------------------------------------------------------
 -- TUNABLE CONSTANTS
 ----------------------------------------------------------------------
+local CUSTOM_BOT_HEALTH = 500
 
 -- How often the bot logic runs (in ticks).
 -- 5 ticks ~ 12 updates per second.
@@ -261,13 +262,14 @@ local function ensure_bot_for_player(player, pdata)
     }
 
     if not bot then
-        player.print("[color=green][MekatrolCleanupBot][/color] Failed to create cleanup bot.")
+        player.print("[color=red][MekatrolCleanupBot][/color] failed to create cleanup bot.")
         return nil
     end
 
     -- Use the bot more like a flying helper. Usually safe to be indestructible.
-    bot.destructible = false
-
+    bot.destructible = true
+    bot.health = CUSTOM_BOT_HEALTH
+    
     pdata.cleanup_bot = bot
     pdata.target_position = nil
     pdata.mode = "idle"
@@ -277,7 +279,7 @@ local function ensure_bot_for_player(player, pdata)
     }
     pdata.stuck_tick_counter = 0
 
-    player.print("[color=green][MekatrolCleanupBot][/color] Cleanup bot spawned.")
+    player.print("[color=green][MekatrolCleanupBot][/color] bot spawned.")
 
     return bot
 end

@@ -1,7 +1,7 @@
 ---------------------------------------------------
 -- CONFIGURATION
 ---------------------------------------------------
-local REPAIR_BOT_HEALTH = 100
+local CUSTOM_BOT_HEALTH = 500
 local REPAIR_BOT_UPDATE_INTERVAL = 5
 local BOT_SPEED_TILES_PER_SECOND = 4.0
 local MAX_HEALTH_SCAN_INTERVAL = 3600
@@ -40,8 +40,8 @@ local REPAIR_PACK_HEALTH_PER_PACK = 100
 -- HEALTH HELPERS / MAX HEALTH OVERRIDES
 ---------------------------------------------------
 local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
-    ["mekatrol-repair-bot"] = REPAIR_BOT_HEALTH,
-    ["mekatrol-mapping-bot"] = 100,
+    ["mekatrol-repair-bot"] = CUSTOM_BOT_HEALTH,
+    ["mekatrol-mapping-bot"] = CUSTOM_BOT_HEALTH,
     ["mekatrol-cleanup-bot"] = 100,
     ["construction-robot"] = 100,
     ["logistic-robot"] = 100,
@@ -757,16 +757,16 @@ local function ensure_bot_for_player(player, pdata)
 
     if bot then
         bot.destructible = true
-        bot.health = REPAIR_BOT_HEALTH
+        bot.health = CUSTOM_BOT_HEALTH
+        
         pdata.repair_bot = bot
-
         pdata.damaged_entities = nil
         pdata.damaged_entities_next_repair_index = 1
         pathfinding.reset_bot_path(pdata)
 
         player.print("[color=green][MekatrolRepairBot][/color] bot spawned.")
     else
-        player.print("[color=green][MekatrolRepairBot][/color] failed to spawn bot.")
+        player.print("[color=red][MekatrolRepairBot][/color] failed to spawn bot.")
     end
 end
 
@@ -992,7 +992,7 @@ local function update_repair_bot_for_player(player, pdata)
     -- clear any drawn lines
     visuals.clear_lines(pdata)
 
-    local max = get_entity_max_health(bot) or REPAIR_BOT_HEALTH
+    local max = get_entity_max_health(bot) or CUSTOM_BOT_HEALTH
     visuals.update_bot_health_bar(player, bot, pdata, max, REPAIR_PACK_NAME)
 
     -- draw rect around bot
