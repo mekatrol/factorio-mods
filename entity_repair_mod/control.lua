@@ -55,12 +55,12 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["inserter"] = 150,
     ["iron-chest"] = 200,
     ["steel-chest"] = 350,
+    ["storage-chest"] = 350,
     ["character"] = 250,
     ["fast-splitter"] = 180,
     ["transport-belt"] = 150,
     ["splitter"] = 170,
     ["stone-furnace"] = 200,
-    ["assembling-machine-1"] = 300,
     ["underground-belt"] = 150,
     ["burner-inserter"] = 100,
     ["burner-mining-drill"] = 150,
@@ -79,7 +79,9 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["pump"] = 180,
     ["oil-refinery"] = 350,
     ["chemical-plant"] = 300,
-    ["roboport"] = 500
+    ["roboport"] = 500,
+    ["assembling-machine-1"] = 300,
+    ["assembling-machine-2"] = 350
 }
 
 local ignore_names = {
@@ -758,7 +760,7 @@ local function ensure_bot_for_player(player, pdata)
     if bot then
         bot.destructible = true
         bot.health = CUSTOM_BOT_HEALTH
-        
+
         pdata.repair_bot = bot
         pdata.damaged_entities = nil
         pdata.damaged_entities_next_repair_index = 1

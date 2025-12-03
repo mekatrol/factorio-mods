@@ -47,6 +47,10 @@ local cleanup_bot = {
     -- Small (or nil) collision box. We do NOT set collision_mask;
     -- the default is fine and teleport will still work.
     collision_box = {{-0.1, -0.1}, {0.1, 0.1}},
+    collision_mask = {
+        layers = {}
+    },
+
     selection_box = nil,
 
     render_layer = "object",
