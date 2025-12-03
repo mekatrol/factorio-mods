@@ -8,7 +8,6 @@ local MAX_HEALTH_SCAN_INTERVAL = 3600
 local ENTITY_SEARCH_RADIUS = 256.0
 local ENTITY_REPAIR_DISTANCE = 2.0
 local ENTITY_REPAIR_RADIUS = 20.0
-local BOT_HIGHLIGHT_Y_OFFSET = -1.2
 local BOT_FOLLOW_DISTANCE = 1.0
 local BOT_STEP_DISTANCE = 0.8
 
@@ -79,10 +78,12 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["flamethrower-turret"] = 1400,
     ["pump"] = 180,
     ["oil-refinery"] = 350,
-    ["chemical-plant"] = 300
+    ["chemical-plant"] = 300,
+    ["roboport"] = 500
 }
 
 local ignore_names = {
+    ["mekatrol-repair-bot"] = true,
     ["mekatrol-cleanup-bot"] = true
 }
 
@@ -717,7 +718,7 @@ local function rebuild_repair_route(player, bot, pdata)
 
     local search_center = player.position
 
-    visuals.draw_bot_player_visuals(player, bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
+    visuals.draw_bot_player_visuals(player, bot, pdata)
 
     local damaged = find_damaged_entities(bot, search_center, ENTITY_SEARCH_RADIUS)
 
@@ -727,7 +728,7 @@ local function rebuild_repair_route(player, bot, pdata)
         return
     end
 
-    visuals.draw_damaged_visuals(bot, pdata, damaged, BOT_HIGHLIGHT_Y_OFFSET)
+    visuals.draw_damaged_visuals(bot, pdata, damaged)
 
     pdata.damaged_entities = build_nearest_route(damaged, bot)
     pdata.damaged_entities_next_repair_index = 1
@@ -992,10 +993,10 @@ local function update_repair_bot_for_player(player, pdata)
     visuals.clear_lines(pdata)
 
     local max = get_entity_max_health(bot) or REPAIR_BOT_HEALTH
-    visuals.update_bot_health_bar(player, bot, pdata, max, BOT_HIGHLIGHT_Y_OFFSET, REPAIR_PACK_NAME)
+    visuals.update_bot_health_bar(player, bot, pdata, max, REPAIR_PACK_NAME)
 
     -- draw rect around bot
-    visuals.draw_bot_highlight(bot, pdata, BOT_HIGHLIGHT_Y_OFFSET)
+    visuals.draw_bot_highlight(bot, pdata)
 
     -- draw rect around chest
     local chest = pdata.repair_chest

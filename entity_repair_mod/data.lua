@@ -20,51 +20,37 @@ data:extend({{
 -- - Always uses the "working" animation so it looks like it's repairing.
 ----------------------------------------------------------------------
 
-do
-    -- Grab the vanilla construction robot prototype.
-    local base = data.raw["construction-robot"]["construction-robot"]
-    if not base then
-        error("Base construction-robot prototype not found")
-    end
-
-    -- Deep copy the vanilla robot so we start from a valid definition.
-    local repair_bot = table.deepcopy(base)
-
-    ------------------------------------------------------------------
-    -- Basic identity / visibility
-    ------------------------------------------------------------------
-    repair_bot.name = "mekatrol-repair-bot"
-    repair_bot.localised_name = {"entity-name.mekatrol-repair-bot"} -- optional, add locale if you like
-
-    -- Hide it from normal player interaction:
-    -- - not-on-map: no minimap dot
-    -- - not-blueprintable: cannot be included in blueprints
-    -- - not-deconstructable: can’t be marked for deconstruction
-    repair_bot.flags = {"placeable-player", "not-on-map", "not-blueprintable", "not-deconstructable"}
-
-    repair_bot.speed = base.speed
-
-    -- Make sure it doesn’t do real logistic/construction work on its own.
-    repair_bot.max_payload_size = 0
-    repair_bot.construction_radius = 0
-    repair_bot.logistic_radius = 0
-    repair_bot.energy_per_move = "0J"
-    repair_bot.energy_per_tick = "0J"
-
-    ------------------------------------------------------------------
-    -- GRAPHICS: always look like a working construction robot
-    --
-    -- We override the idle / in_motion sprites to reuse the vanilla
-    -- "working" and "shadow_working" animations so the bot is always
-    -- shown as repairing.
-    ------------------------------------------------------------------
-    repair_bot.idle = base.working
-    repair_bot.in_motion = base.working
-    repair_bot.shadow_idle = base.shadow_working
-    repair_bot.shadow_in_motion = base.shadow_working
-
-    ------------------------------------------------------------------
-    -- Register the new prototype
-    ------------------------------------------------------------------
-    data:extend({repair_bot})
+local base_robot = data.raw["construction-robot"]["construction-robot"]
+if not base_robot then
+    error("Base construction-robot prototype not found")
 end
+
+local repair_bot = {
+    type = "simple-entity-with-owner",
+    name = "mekatrol-repair-bot",
+    localised_name = {"entity-name.mekatrol-repair-bot"},
+
+    -- Reuse icon from vanilla robot
+    icon = base_robot.icon,
+    icon_size = base_robot.icon_size,
+    icon_mipmaps = base_robot.icon_mipmaps,
+
+    flags = {"placeable-off-grid", "not-on-map", "not-blueprintable", "not-deconstructable", "not-selectable-in-game"},
+
+    -- Small (or nil) collision box. We do NOT set collision_mask;
+    -- the default is fine and teleport will still work.
+    collision_box = {{-0.1, -0.1}, {0.1, 0.1}},
+    selection_box = nil,
+
+    render_layer = "object",
+
+    -- Use the vanilla logistic robot's idle animation as our picture.
+    picture = base_robot.idle or {
+        filename = "__base__/graphics/entity/construction-robot/construction-robot.png",
+        width = 32,
+        height = 32,
+        shift = {0, 0}
+    }
+}
+
+data:extend({repair_bot})

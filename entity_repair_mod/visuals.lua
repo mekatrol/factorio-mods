@@ -273,7 +273,7 @@ end
 
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
-function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highlight_y_offset, repair_pack_name)
+function visuals.update_bot_health_bar(player, bot, pdata, max_health, repair_pack_name)
     if not (bot and bot.valid and max_health and max_health > 0) then
         -- Cleanup if bot missing
         if pdata.bot_health_bg and pdata.bot_health_bg.valid then
@@ -298,7 +298,7 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
     -- Shared "UI baseline" for all bot overlays
     -------------------------------------------------------
     local pos = bot.position
-    local ui_y = pos.y + (bot_highlight_y_offset or 0) + 0.3
+    local ui_y = pos.y + 0.3
 
     local bar_width = 0.8
     local bar_height = 0.10
@@ -416,7 +416,7 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, bot_highl
         y = text_y
     }
 
-    local text_value = string.format("%d→%d→%d", pdata.repair_health_pool or 0, chest_packs_available,
+    local text_value = string.format("%d→%d→%d", pdata.repair_health_pool, chest_packs_available,
         player_packs_available)
 
     if pdata.bot_health_text and pdata.bot_health_text.valid then
@@ -452,12 +452,12 @@ function visuals.clear_lines(pdata)
     end
 end
 
-function visuals.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_offset)
+function visuals.draw_bot_player_visuals(player, bot, pdata)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
 
-    local y_offset = bot_highlight_y_offset or 0
+    local y_offset = 0
 
     local bot_pos = bot.position
     local to_pos = {
@@ -522,17 +522,15 @@ function visuals.clear_damaged_markers(pdata)
     end
 end
 
-function visuals.draw_damaged_visuals(bot, pdata, damaged_entities, bot_highlight_y_offset)
+function visuals.draw_damaged_visuals(bot, pdata, damaged_entities)
     if not damaged_entities or #damaged_entities == 0 then
         return
     end
 
-    local y_offset = bot_highlight_y_offset or 0
-
     local bot_pos = bot.position
     local to_pos = {
         x = bot_pos.x,
-        y = bot_pos.y + y_offset
+        y = bot_pos.y
     }
 
     pdata.vis_damaged_markers = pdata.vis_damaged_markers or {}
@@ -578,7 +576,7 @@ end
 ---------------------------------------------------
 -- BOT HIGHLIGHT
 ---------------------------------------------------
-function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
+function visuals.draw_bot_highlight(bot, pdata)
     if not (bot and bot.valid) then
         return
     end
@@ -587,7 +585,7 @@ function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     local pos = bot.position
 
     -- Shared baseline:
-    local ui_y = pos.y + (bot_highlight_y_offset or 0)
+    local ui_y = pos.y
     local cx = pos.x
 
     local left_top = {cx - size, ui_y - size * 1.5}
