@@ -46,6 +46,8 @@ local BOT_STEP_DISTANCE = 0.18
 -- If the bot is further away than this, it will move closer.
 local BOT_FOLLOW_DISTANCE = 1.0
 
+local BOT_SIDE_OFFSET_DISTANCE = 2.0
+
 ----------------------------------------------------------------------
 -- UTILITY: PRINT HELPER
 --
@@ -104,7 +106,10 @@ end
 --           lines         = <array of LuaRenderObject or nil>
 --       },
 --       bot_enabled  = <boolean>,                -- Whether bot logic is active.
---       bot_mode     = <string>                  -- "follow", "wander", etc.
+--       bot_mode     = <string>,                 -- "follow", "wander", etc.
+--       bot_mode     = <string>,                 -- "follow", "wander", etc.
+--       last_player_position     = {x, y} or nil,
+--       last_player_side_offset_x = <number>,    -- last chosen side offset (+/- BOT_SIDE_OFFSET_DISTANCE)
 --   }
 ----------------------------------------------------------------------
 
@@ -152,7 +157,9 @@ local function get_player_state(player_index)
                 lines = nil
             },
             bot_enabled = false, -- default: bot off until toggled
-            bot_mode = "follow" -- default behavior: follow player
+            bot_mode = "follow", -- default behavior: follow player
+            last_player_position = nil, -- used to infer player movement direction
+            last_player_side_offset_x = -BOT_SIDE_OFFSET_DISTANCE -- uses as the last player offset x
         }
         all_states[player_index] = player_state
 
@@ -171,6 +178,8 @@ local function get_player_state(player_index)
             player_state.bot_enabled = false
         end
         player_state.bot_mode = player_state.bot_mode or "follow"
+        player_state.last_player_position = player_state.last_player_position or nil
+        player_state.last_player_side_offset_x = player_state.last_player_side_offset_x or -BOT_SIDE_OFFSET_DISTANCE
     end
 
     return player_state
@@ -395,14 +404,24 @@ end
 ----------------------------------------------------------------------
 -- BOT MOVEMENT: FOLLOW PLAYER
 --
--- follow_player(player, bot_entity)
+-- follow_player(player, bot_entity, player_state)
 --
 -- PURPOSE:
---   Keeps the bot at approximately BOT_FOLLOW_DISTANCE behind the
---   player. If the bot drifts too far, it moves closer.
+--   Keeps the bot near the player, and chooses which side (left/right)
+--   to follow on. The X offset is only changed when the player
+--   actually changes horizontal movement direction:
+--
+--     * If player starts moving left (dx < -ε) and was not already
+--       "right side", we flip the bot to the RIGHT side (+x offset).
+--
+--     * If player starts moving right (dx > +ε) and was not already
+--       "left side", we flip the bot to the LEFT side (-x offset).
+--
+--   If the player is standing still or moving mostly vertically,
+--   we keep the current side (no offset change).
 ----------------------------------------------------------------------
 
-local function follow_player(player, bot_entity)
+local function follow_player(player, bot_entity, player_state)
     if not (player and player.valid and bot_entity and bot_entity.valid) then
         return
     end
@@ -410,25 +429,81 @@ local function follow_player(player, bot_entity)
     local bot_pos = bot_entity.position
     local player_pos = player.position
 
+    ------------------------------------------------------------------
+    -- 1. Determine player movement along X and update side only
+    --    when direction changes.
+    ------------------------------------------------------------------
+    local prev_pos = player_state.last_player_position
+    local moving_left = false
+    local moving_right = false
+
+    if prev_pos then
+        local dx_move = player_pos.x - prev_pos.x
+        local epsilon = 0.1 -- small threshold to ignore tiny jitter
+
+        if dx_move < -epsilon then
+            moving_left = true
+        elseif dx_move > epsilon then
+            moving_right = true
+        end
+    end
+
+    -- Update stored previous position for next tick.
+    player_state.last_player_position = {
+        x = player_pos.x,
+        y = player_pos.y
+    }
+
+    ------------------------------------------------------------------
+    -- 2. Choose side offset X.
+    --
+    -- We only change side_offset_x when the player actually moves
+    -- left/right past the epsilon threshold. Otherwise we keep the
+    -- previous offset stored in state.
+    ------------------------------------------------------------------
+    local side_offset_x = player_state.last_player_side_offset_x or -BOT_SIDE_OFFSET_DISTANCE
+
+    if moving_left and side_offset_x ~= BOT_SIDE_OFFSET_DISTANCE then
+        -- Player is moving left-ish; flip bot to the RIGHT side.
+        side_offset_x = BOT_SIDE_OFFSET_DISTANCE
+    elseif moving_right and side_offset_x ~= -BOT_SIDE_OFFSET_DISTANCE then
+        -- Player is moving right-ish; flip bot to the LEFT side.
+        side_offset_x = -BOT_SIDE_OFFSET_DISTANCE
+    end
+
+    -- Persist the chosen side offset so we only change it on direction changes.
+    player_state.last_player_side_offset_x = side_offset_x
+
+    ------------------------------------------------------------------
+    -- 3. Check follow distance (radial)
+    ------------------------------------------------------------------
     local dx = player_pos.x - bot_pos.x
     local dy = player_pos.y - bot_pos.y
     local dist_sq = dx * dx + dy * dy
     local desired_sq = BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE
 
     -- Only move if we are further than the desired follow distance.
-    if dist_sq > desired_sq then
-        -- Target position: a slight offset behind the player, so the bot
-        -- isn't overlapping them directly.
-        local offset_x = -2.0
-        local offset_y = -2.0
-
-        local target_pos = {
-            x = player_pos.x + offset_x,
-            y = player_pos.y + offset_y
-        }
-
-        move_bot_towards(player, bot_entity, target_pos)
+    if dist_sq <= desired_sq then
+        return
     end
+
+    ------------------------------------------------------------------
+    -- 4. Build target position using the chosen side offset.
+    --
+    -- Vertical offset remains constant so the bot sits slightly
+    -- "behind" the player.
+    ------------------------------------------------------------------
+    local offset_y = -2.0
+
+    local target_pos = {
+        x = player_pos.x + side_offset_x,
+        y = player_pos.y + offset_y
+    }
+
+    ------------------------------------------------------------------
+    -- 5. Move bot towards the chosen side position
+    ------------------------------------------------------------------
+    move_bot_towards(player, bot_entity, target_pos)
 end
 
 ---------------------------------------------------
@@ -460,7 +535,7 @@ local function update_bot_for_player(player, player_state)
 
     -- Behavior: follow player if in follow mode.
     if player_state.bot_mode == "follow" then
-        follow_player(player, bot_entity)
+        follow_player(player, bot_entity, player_state)
     end
 end
 
