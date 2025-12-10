@@ -527,9 +527,6 @@ local function update_bot_for_player(player, player_state)
     -- Clear existing lines from previous tick before drawing new ones.
     visuals.clear_lines(player_state)
 
-    -- Draw or update the rectangle highlight around the bot.
-    visuals.draw_bot_highlight(player, player_state)
-
     -- Draw any lines (e.g. line from player to bot).
     visuals.draw_bot_player_visuals(player, bot_entity, player_state)
 
