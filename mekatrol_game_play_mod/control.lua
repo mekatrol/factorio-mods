@@ -69,14 +69,23 @@ local function get_player_state(player_index)
         -- New state for this player.
         state = {
             entity = nil,
-            vis_bot_highlight = nil,
+            visuals = {
+                bot_highlight = nil
+            },
             bot_enabled = false
         }
         all[player_index] = state
+
     else
-        -- State previously existed: ensure all fields are there.
+        -- State previously existed: ensure all fields are present.
         state.entity = state.entity or nil
-        state.vis_bot_highlight = state.vis_bot_highlight or nil
+
+        -- Ensure visuals table exists.
+        state.visuals = state.visuals or {}
+
+        -- Ensure expected members in visuals table.
+        state.visuals.bot_highlight = state.visuals.bot_highlight or nil
+
         state.bot_enabled = state.bot_enabled or false
     end
 

@@ -8,7 +8,7 @@
 --
 --   Highlights are implemented as rectangles drawn on the world
 --   surface. Each highlight is stored in the player's persistent state
---   (`vis_bot_highlight`) and updated or destroyed depending on the
+--   (`visuals.bot_highlight`) and updated or destroyed depending on the
 --   bot's position or lifecycle.
 --
 --   This file intentionally does NOT perform entity logic or storage
@@ -17,15 +17,15 @@
 local visuals = {}
 
 ---------------------------------------------------
--- FUNCTION: clear_bot_highlight(pdata)
+-- FUNCTION: clear_bot_highlight(player_state)
 --
 -- PURPOSE:
 --   Removes any existing highlight rectangle for the player's bot.
 --
 -- PARAMETERS:
---   pdata : table
+--   player_state : table
 --       The per-player state table that contains:
---         * pdata.vis_bot_highlight — a LuaRenderObject or nil.
+--         * player_state.visuals.bot_highlight — a LuaRenderObject or nil.
 --
 -- BEHAVIOR:
 --   * If a highlight exists and is still valid, it is explicitly
@@ -39,15 +39,15 @@ local visuals = {}
 --   * Calling this before redrawing ensures old rectangles do not
 --     remain on screen.
 ---------------------------------------------------
-function visuals.clear_bot_highlight(pdata)
+function visuals.clear_bot_highlight(player_state)
     -- If a highlight exists and the LuaRenderObject is still alive:
-    if pdata.vis_bot_highlight and pdata.vis_bot_highlight.valid then
+    if player_state.visuals.bot_highlight and player_state.visuals.bot_highlight.valid then
         -- Destroy it to remove the rectangle from the world.
-        pdata.vis_bot_highlight:destroy()
+        player_state.visuals.bot_highlight:destroy()
     end
 
     -- Ensure reference is cleared even if it wasn't valid.
-    pdata.vis_bot_highlight = nil
+    player_state.visuals.bot_highlight = nil
 end
 
 ---------------------------------------------------
@@ -66,7 +66,7 @@ end
 --   player_state : table
 --       The per-player state containing:
 --         * player_state.entity            — the bot entity.
---         * player_state.vis_bot_highlight — existing highlight or nil.
+--         * player_state.visuals.bot_highlight — existing highlight or nil.
 --
 -- BEHAVIOR:
 --   1. If the bot does not exist or is invalid, the function exits.
@@ -111,11 +111,16 @@ function visuals.draw_bot_highlight(player, player_state)
     local left_top = {cx - size, ui_y - size * 1.5}
     local right_bottom = {cx + size, ui_y + size}
 
+    -- Do nothing if visuals not defined
+    if not player_state.visuals then
+        return
+    end
+
     ------------------------------------------------------------------
     -- 3. Update existing highlight (if it exists)
     ------------------------------------------------------------------
-    if player_state.vis_bot_highlight then
-        local obj = player_state.vis_bot_highlight
+    if player_state.visuals.bot_highlight then
+        local obj = player_state.visuals.bot_highlight
 
         if obj and obj.valid then
             -- A valid rectangle already exists; update its geometry
@@ -125,14 +130,14 @@ function visuals.draw_bot_highlight(player, player_state)
             return
         else
             -- The old rendering object reference is invalid, so clear it.
-            player_state.vis_bot_highlight = nil
+            player_state.visuals.bot_highlight = nil
         end
     end
 
     ------------------------------------------------------------------
     -- 4. Create a new highlight rectangle for this bot
     ------------------------------------------------------------------
-    player_state.vis_bot_highlight = rendering.draw_rectangle {
+    player_state.visuals.bot_highlight = rendering.draw_rectangle {
         -- Rectangle color (semi-transparent turquoise/greenish).
         color = {
             r = 0,
