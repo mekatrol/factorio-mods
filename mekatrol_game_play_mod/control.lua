@@ -70,7 +70,8 @@ local function get_player_state(player_index)
         state = {
             entity = nil,
             visuals = {
-                bot_highlight = nil
+                bot_highlight = nil,
+                lines = nil
             },
             bot_enabled = false
         }
@@ -85,6 +86,7 @@ local function get_player_state(player_index)
 
         -- Ensure expected members in visuals table.
         state.visuals.bot_highlight = state.visuals.bot_highlight or nil
+        state.visuals.lines = state.visuals.lines or nil
 
         state.bot_enabled = state.bot_enabled or false
     end
@@ -99,15 +101,17 @@ end
 local function destroy_player_bot(player, silent)
     local state = get_player_state(player.index)
 
+    -- destroy the bot if it exists
     local bot = state.entity
     if bot and bot.valid then
         bot.destroy()
     end
+
+    -- clear all visuals
+    visuals.clear_all(state)
+
     state.entity = nil
     state.bot_enabled = false
-
-    -- Clear any lingering visual highlight for this bot.
-    visuals.clear_bot_highlight(state)
 
     if not silent then
         print_bot_message(player, "yellow", "deactivated")
@@ -236,8 +240,14 @@ end
 ---------------------------------------------------
 
 local function update_bot_for_player(player, player_state)
-    -- Draw/update rectangle around bot.
+    -- clear any drawn lines
+    visuals.clear_lines(player_state)
+
+    -- draw/update rectangle around bot.
     visuals.draw_bot_highlight(player, player_state)
+
+    -- draw any lines
+    visuals.draw_bot_player_visuals(player, player_state.entity, player_state)
 end
 
 ----------------------------------------------------------------------

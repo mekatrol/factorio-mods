@@ -50,6 +50,64 @@ function visuals.clear_bot_highlight(player_state)
     player_state.visuals.bot_highlight = nil
 end
 
+function visuals.clear_lines(player_state)
+    if player_state.visuals.lines then
+        for _, obj in pairs(player_state.visuals.lines) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+        player_state.visuals.lines = nil
+    end
+end
+
+function visuals.draw_bot_player_visuals(player, bot, player_state)
+    if not (player and player.valid and bot and bot.valid) then
+        return
+    end
+
+    local y_offset = 0
+
+    local bot_pos = bot.position
+    local to_pos = {
+        x = bot_pos.x,
+        y = bot_pos.y + y_offset
+    }
+
+    player_state.visuals.lines = player_state.visuals.lines or {}
+
+    -- choose line color based on bot mode
+    -- red when repairing, grey when following or anything else
+    local line_color
+    if player_state.last_mode == "repair" then
+        line_color = {
+            r = 0.5,
+            g = 0.1,
+            b = 0.1,
+            a = 0.7
+        } -- bright red, clearly visible
+    else
+        line_color = {
+            r = 0.3,
+            g = 0.3,
+            b = 0.3,
+            a = 0.1
+        } -- original grey
+    end
+
+    local line = rendering.draw_line {
+        color = line_color,
+        width = 1,
+        from = player.position,
+        to = to_pos,
+        surface = bot.surface,
+        draw_on_ground = true,
+        only_in_alt_mode = false
+    }
+
+    player_state.visuals.lines[#player_state.visuals.lines + 1] = line
+end
+
 ---------------------------------------------------
 -- FUNCTION: draw_bot_highlight(player, player_state)
 --
@@ -168,6 +226,18 @@ function visuals.draw_bot_highlight(player, player_state)
         -- Only the specified player sees this highlight.
         players = {player}
     }
+end
+
+----------------------------------------------------------------------
+-- “clear everything” helper:
+----------------------------------------------------------------------
+function visuals.clear_all(player_state)
+    if not player_state then
+        return
+    end
+
+    visuals.clear_lines(player_state)
+    visuals.clear_bot_highlight(player_state)
 end
 
 ----------------------------------------------------------------------
