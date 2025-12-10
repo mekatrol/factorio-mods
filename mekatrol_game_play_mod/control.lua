@@ -25,7 +25,7 @@
 --         - visuals.clear_lines(player_state)
 --         - visuals.clear_bot_highlight(player_state)
 --         - visuals.draw_bot_highlight(player, player_state)
---         - visuals.draw_bot_player_visuals(player, bot, player_state, radius)
+--         - visuals.draw_lines(player, bot, player_state, color)
 ----------------------------------------------------------------------
 ---------------------------------------------------
 -- MODULES
@@ -74,8 +74,8 @@ local BOT_SIDE_OFFSET_DISTANCE = 2.0
 ----------------------------------------------------------------------
 
 local WANDER_STEP_DISTANCE = 5.0
-local WANDER_DETECTION_RADIUS = 6.0
-local WANDER_SURVEY_RADIUS = 10.0
+local WANDER_DETECTION_RADIUS = 5.0
+local WANDER_SURVEY_RADIUS = 6.0
 
 ----------------------------------------------------------------------
 -- BOT MODES
@@ -89,7 +89,7 @@ local WANDER_SURVEY_RADIUS = 10.0
 --   This allows O(1) lookups when cycling or validating modes.
 ----------------------------------------------------------------------
 
-local BOT_MODES = {"follow", "wander"}
+local BOT_MODES = {"follow", "wander", "survey"}
 
 local BOT_MODE_INDEX = {}
 for i, mode_name in ipairs(BOT_MODES) do
@@ -772,9 +772,10 @@ local function wander_bot(player, bot_entity, player_state)
         radius = WANDER_DETECTION_RADIUS
     }
 
+    local player_character = player.character
     local found_any = false
     for _, entity in ipairs(nearby) do
-        if entity.valid and entity ~= bot_entity then
+        if entity.valid and entity ~= bot_entity and (not player_character or entity ~= player_character) then
             found_any = true
             break
         end
@@ -790,6 +791,8 @@ local function wander_bot(player, bot_entity, player_state)
 
         print_bot_message(player, "yellow", "wander detected entities near (%.1f, %.1f); stopping to survey.",
             new_pos.x, new_pos.y)
+
+        set_player_bot_mode(player, player_state, "survey")
     end
 end
 
@@ -851,9 +854,60 @@ local function update_bot_for_player(player, player_state)
     -- Clear existing lines from previous tick before drawing new ones.
     visuals.clear_lines(player_state)
 
+    -- Draw/update highlight and optional radius circle
+    visuals.draw_bot_highlight(player, player_state)
+
+    -- draw circle radius if needed
+    local radius = nil
+    local radius_color = nil
+    local line_color = nil
+
+    if player_state.bot_mode == "wander" then
+        radius = WANDER_DETECTION_RADIUS
+
+        radius_color = {
+            r = 0,
+            g = 0.6,
+            b = 1,
+            a = 0.8
+        }
+
+        line_color = radius_color
+    elseif player_state.bot_mode == "survey" then
+        radius = WANDER_SURVEY_RADIUS
+
+        radius_color = {
+            r = 1.0,
+            g = 0.95,
+            b = 0.0,
+            a = 0.8
+        }
+
+        line_color = radius_color
+    elseif player_state.bot_mode == "follow" then
+        -- Follow mode: a softer grey.
+        line_color = {
+            r = 0.3,
+            g = 0.3,
+            b = 0.3,
+            a = 0.1
+        }
+    end
+
+    -- Only draw radius if one defined
+    if radius and radius > 0 then
+        visuals.draw_radius_circle(player, player_state, bot_entity, radius, radius_color)
+    else
+        -- If no radius supplied, ensure any previous circle is removed.
+        visuals.clear_radius_circle(player_state)
+    end
+
     -- Draw any lines (e.g. line from player to bot).
-    -- Line color already depends on player_state.bot_mode in visuals.lua.
-    visuals.draw_bot_player_visuals(player, bot_entity, player_state, WANDER_DETECTION_RADIUS)
+    if line_color then
+        visuals.draw_lines(player, bot_entity, player_state, line_color)
+    else
+
+    end
 
     ------------------------------------------------------------------
     -- Behavior dispatch based on current mode.

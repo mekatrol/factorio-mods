@@ -209,6 +209,8 @@ end
 --
 --   radius       : number
 --       Circle radius in tiles. If nil or <= 0, no circle is drawn.
+--   color        : table
+--       Color to render the radius.
 --
 -- BEHAVIOR:
 --   * Clears any existing radius circle via visuals.clear_radius_circle.
@@ -216,7 +218,7 @@ end
 --     anchored to the bot entity.
 --   * Stores the render reference in player_state.visuals.radius_circle.
 ---------------------------------------------------
-function visuals.draw_radius_circle(player, player_state, bot, radius)
+function visuals.draw_radius_circle(player, player_state, bot, radius, color)
     if not (player_state and player_state.visuals) then
         return
     end
@@ -235,12 +237,7 @@ function visuals.draw_radius_circle(player, player_state, bot, radius)
 
     -- Draw a new circle, anchored to the bot so it follows movement.
     local id = rendering.draw_circle {
-        color = {
-            r = 0,
-            g = 0.6,
-            b = 1,
-            a = 0.8
-        }, -- bright blue, moderately transparent
+        color = color,
         radius = radius,
         width = 1,
         filled = false,
@@ -373,12 +370,11 @@ function visuals.draw_bot_highlight(player, player_state)
 end
 
 ---------------------------------------------------
--- FUNCTION: draw_bot_player_visuals(player, bot_entity, player_state, radius)
+-- FUNCTION: draw_lines(player, bot_entity, player_state, line_color)
 --
 -- PURPOSE:
 --   Draws visual elements that connect the player to their bot:
 --     * Ensures the bot highlight rectangle is up to date.
---     * Optionally draws a radius circle around the bot.
 --     * Draws a line between the player and the bot whose color
 --       depends on the bot mode.
 --
@@ -396,29 +392,22 @@ end
 --         * player_state.visuals.lines   — array of LuaRenderObject
 --           or nil, tracking previously drawn lines.
 --
---   radius       : number|nil
---       Optional radius to visualize around the bot. If nil or <= 0,
---       the radius circle is skipped.
+--   line_color   : table|nil
+--       Optional line color to draw line. If nil line is not drawn..
 --
 -- BEHAVIOR:
 --   1. Validates player, bot, and state.
 --   2. Ensures player_state.visuals and visuals.lines exist.
 --   3. Draws/updates the bot highlight rectangle.
---   4. If a positive radius is provided, draws a circle around the bot.
---   5. Chooses a line color based on bot_mode:
---        - "wander" → red-ish, clearly visible.
---        - "follow" → grey, more subtle.
---        - anything else → no line.
---   6. Draws a line from the player's position to the bot's position.
---   7. Stores the created render object in player_state.visuals.lines.
+--   5. Draws a line from the player's position to the bot's position.
+--   6. Stores the created render object in player_state.visuals.lines.
 --
 -- NOTES:
 --   * The caller is responsible for clearing lines between ticks by
 --     calling visuals.clear_lines(player_state). This prevents old
 --     lines from accumulating.
 ---------------------------------------------------
-function visuals.draw_bot_player_visuals(player, bot_entity, player_state, radius)
-    -- Validate player and bot first.
+function visuals.draw_lines(player, bot_entity, player_state, line_color)
     if not (player and player.valid and bot_entity and bot_entity.valid) then
         return
     end
@@ -434,19 +423,7 @@ function visuals.draw_bot_player_visuals(player, bot_entity, player_state, radiu
     player_state.visuals.lines = player_state.visuals.lines or {}
 
     ------------------------------------------------------------------
-    -- 2. Draw/update highlight and optional radius circle
-    ------------------------------------------------------------------
-    visuals.draw_bot_highlight(player, player_state)
-
-    if radius and radius > 0 then
-        visuals.draw_radius_circle(player, player_state, bot_entity, radius)
-    else
-        -- If no radius supplied, ensure any previous circle is removed.
-        visuals.clear_radius_circle(player_state)
-    end
-
-    ------------------------------------------------------------------
-    -- 3. Compute target position for the line end
+    -- 2. Compute target position for the line end
     ------------------------------------------------------------------
     local y_offset = 0
 
@@ -457,50 +434,22 @@ function visuals.draw_bot_player_visuals(player, bot_entity, player_state, radiu
     }
 
     ------------------------------------------------------------------
-    -- 4. Choose line color based on bot mode
+    -- 3. Draw the line from the player to the bot
     ------------------------------------------------------------------
-    local line_color = nil
-    if player_state.bot_mode == "wander" then
-        -- Wander mode: a more striking red-ish color.
-        line_color = {
-            r = 0.5,
-            g = 0.1,
-            b = 0.1,
-            a = 0.7
+    if line_color then
+        local line = rendering.draw_line {
+            color = line_color,
+            width = 1,
+            from = player.position,
+            to = line_end_pos,
+            surface = bot_entity.surface,
+            draw_on_ground = true,
+            only_in_alt_mode = false,
+            players = {player} -- only this player sees the line
         }
-    elseif player_state.bot_mode == "follow" then
-        -- Follow mode: a softer grey.
-        line_color = {
-            r = 0.3,
-            g = 0.3,
-            b = 0.3,
-            a = 0.1
-        }
-    else
-        -- Unknown or unsupported mode: do not draw a line.
-        line_color = nil
+        -- Track this render object for later cleanup.
+        player_state.visuals.lines[#player_state.visuals.lines + 1] = line
     end
-
-    if not line_color then
-        return
-    end
-
-    ------------------------------------------------------------------
-    -- 5. Draw the line from the player to the bot
-    ------------------------------------------------------------------
-    local line = rendering.draw_line {
-        color = line_color,
-        width = 1,
-        from = player.position,
-        to = line_end_pos,
-        surface = bot_entity.surface,
-        draw_on_ground = true,
-        only_in_alt_mode = false,
-        players = {player} -- only this player sees the line
-    }
-
-    -- Track this render object for later cleanup.
-    player_state.visuals.lines[#player_state.visuals.lines + 1] = line
 end
 
 ----------------------------------------------------------------------
