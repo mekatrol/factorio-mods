@@ -311,6 +311,9 @@ function visuals.draw_bot_player_visuals(player, bot_entity, player_state)
         return
     end
 
+    -- draw highlight rect
+    visuals.draw_bot_highlight(player, player_state)
+
     ------------------------------------------------------------------
     -- 1. Ensure visuals containers exist
     ------------------------------------------------------------------
