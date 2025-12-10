@@ -10,10 +10,13 @@
 --     solely for use by control logic.
 ----------------------------------------------------------------------
 ----------------------------------------------------------------------
--- HOTKEY: toggle game play bot
+-- HOTKEYS
 --
--- This creates a custom input prototype that the control script can
--- subscribe to (script.on_event) and use to toggle the bot on/off.
+-- 1) "mekatrol-game-play-bot-toggle"
+--      - Toggle creation/destruction of the bot.
+-- 2) "mekatrol-game-play-bot-next-mode"
+--      - Cycle through behavior modes:
+--          follow -> wander -> follow -> ...
 ----------------------------------------------------------------------
 data:extend({{
     -- Prototype type for custom keybinds that fire input events.
@@ -29,17 +32,30 @@ data:extend({{
     --   Ctrl + Shift + G
     key_sequence = "CONTROL + SHIFT + G",
 
-    -- How the input interacts with other key handling:
+    -- "none" so the key press is not consumed by script only.
+    consuming = "none"
+}, {
+    -- SECOND HOTKEY: cycle bot modes
     --
-    -- "none" means:
-    --   - The custom-input event is raised when the key is pressed.
-    --   - The key press is NOT consumed; the game/UI may still treat
-    --     the keypress as normal (if any other binding exists).
+    -- This hotkey is used to change the bot's behavior mode
+    -- without destroying/recreating the entity:
+    --   * follow
+    --   * wander
     --
-    -- Other possible values (for reference) are:
-    --   - "game-only"   : Consumes input only for the game world.
-    --   - "script-only" : Consumes input only for scripts.
-    --   - "all"         : Fully consumes the key press everywhere.
+    -- The control script will interpret this as "advance to the
+    -- next mode in the list".
+    type = "custom-input",
+
+    -- Internal name used in control.lua:
+    --   script.on_event("mekatrol-game-play-bot-next-mode", handler)
+    name = "mekatrol-game-play-bot-next-mode",
+
+    -- Default key sequence:
+    --   Ctrl + Shift + H
+    -- You can change this in-game, this is only a default.
+    key_sequence = "CONTROL + SHIFT + H",
+
+    -- Do not fully consume the key (same behavior as the toggle key).
     consuming = "none"
 }})
 

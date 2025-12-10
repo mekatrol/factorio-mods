@@ -5,9 +5,12 @@
 --   Implements runtime logic for the "mekatrol-game-play-bot" entity.
 --
 --   High-level behavior:
---     * Listens for the custom hotkey "mekatrol-game-play-bot-toggle".
+--     * Listens for custom hotkeys:
+--         - "mekatrol-game-play-bot-toggle"
+--         - "mekatrol-game-play-bot-next-mode"
 --     * Per-player, maintains a hidden helper entity ("bot") that:
 --         - Follows the player (default mode).
+--         - Wanders randomly and surveys nearby entities (wander mode).
 --         - Draws simple visuals (highlight + line) so the player can
 --           see where the bot is and how it is linked to them.
 --     * Handles lifecycle:
@@ -46,7 +49,52 @@ local BOT_STEP_DISTANCE = 0.18
 -- If the bot is further away than this, it will move closer.
 local BOT_FOLLOW_DISTANCE = 1.0
 
+-- The side distance from the player that the bot targets when positioning
+-- (can be -BOT_SIDE_OFFSET_DISTANCE or +BOT_SIDE_OFFSET_DISTANCE depending
+-- on player direction).
 local BOT_SIDE_OFFSET_DISTANCE = 2.0
+
+----------------------------------------------------------------------
+-- WANDER MODE TUNING
+--
+-- WANDER_STEP_DISTANCE
+--   Maximum "random hop" distance when the bot is roaming in wander
+--   mode. This is independent of BOT_STEP_DISTANCE, which is the
+--   per-tick movement limit.
+--
+-- WANDER_DETECTION_RADIUS
+--   Radius around the bot in which we consider "any entity found".
+--   Once something is detected (other than the bot itself), the bot
+--   stops roaming and transitions into the "survey" phase.
+--
+-- WANDER_SURVEY_RADIUS
+--   Radius used during the survey phase to enumerate entities in the
+--   local area. These are recorded in per-player state and a summary
+--   is printed to the player.
+----------------------------------------------------------------------
+
+local WANDER_STEP_DISTANCE = 5.0
+local WANDER_DETECTION_RADIUS = 6.0
+local WANDER_SURVEY_RADIUS = 10.0
+
+----------------------------------------------------------------------
+-- BOT MODES
+--
+-- BOT_MODES:
+--   Ordered list of supported behaviors. The "mode cycle" hotkey
+--   uses this array to advance to the next mode in sequence.
+--
+-- BOT_MODE_INDEX:
+--   Reverse lookup: mode_name -> index in BOT_MODES.
+--   This allows O(1) lookups when cycling or validating modes.
+----------------------------------------------------------------------
+
+local BOT_MODES = {"follow", "wander"}
+
+local BOT_MODE_INDEX = {}
+for i, mode_name in ipairs(BOT_MODES) do
+    BOT_MODE_INDEX[mode_name] = i
+end
 
 ----------------------------------------------------------------------
 -- UTILITY: PRINT HELPER
@@ -100,16 +148,28 @@ end
 --
 -- Layout:
 --   storage.game_bot[player_index] = {
---       bot_entity   = <LuaEntity or nil>,       -- The bot entity itself.
+--       bot_entity   = <LuaEntity or nil>,
 --       visuals      = {
 --           bot_highlight = <LuaRenderObject or nil>,
 --           lines         = <array of LuaRenderObject or nil>
 --       },
 --       bot_enabled  = <boolean>,                -- Whether bot logic is active.
 --       bot_mode     = <string>,                 -- "follow", "wander", etc.
---       bot_mode     = <string>,                 -- "follow", "wander", etc.
---       last_player_position     = {x, y} or nil,
+--       last_player_position      = {x, y} or nil,
 --       last_player_side_offset_x = <number>,    -- last chosen side offset (+/- BOT_SIDE_OFFSET_DISTANCE)
+--
+--       -- WANDER MODE STATE:
+--       --   * wander_target_position:
+--       --       Current roam target (random point) or nil.
+--       --   * wander_found_anchor:
+--       --       Anchor position where entities were detected; once
+--       --       set, the bot stops and performs a survey.
+--       --   * wander_mapped_entities:
+--       --       Cached results of the last survey, stored as simple
+--       --       tables ({name=..., position={x=...,y=...}}, ...).
+--       wander_target_position  = {x, y} or nil,
+--       wander_found_anchor     = {x, y} or nil,
+--       wander_mapped_entities  = <array of tables> or nil
 --   }
 ----------------------------------------------------------------------
 
@@ -159,7 +219,12 @@ local function get_player_state(player_index)
             bot_enabled = false, -- default: bot off until toggled
             bot_mode = "follow", -- default behavior: follow player
             last_player_position = nil, -- used to infer player movement direction
-            last_player_side_offset_x = -BOT_SIDE_OFFSET_DISTANCE -- uses as the last player offset x
+            last_player_side_offset_x = -BOT_SIDE_OFFSET_DISTANCE,
+
+            -- Wander mode fields (start with clean slate).
+            wander_target_position = nil,
+            wander_found_anchor = nil,
+            wander_mapped_entities = nil
         }
         all_states[player_index] = player_state
 
@@ -173,16 +238,75 @@ local function get_player_state(player_index)
         player_state.visuals.bot_highlight = player_state.visuals.bot_highlight or nil
         player_state.visuals.lines = player_state.visuals.lines or nil
 
-        -- Defaults for booleans/strings if missing from older saves.
         if player_state.bot_enabled == nil then
             player_state.bot_enabled = false
         end
+
         player_state.bot_mode = player_state.bot_mode or "follow"
         player_state.last_player_position = player_state.last_player_position or nil
         player_state.last_player_side_offset_x = player_state.last_player_side_offset_x or -BOT_SIDE_OFFSET_DISTANCE
+
+        -- Backfill wander-related fields for saves that predate wander mode.
+        player_state.wander_target_position = player_state.wander_target_position or nil
+        player_state.wander_found_anchor = player_state.wander_found_anchor or nil
+        player_state.wander_mapped_entities = player_state.wander_mapped_entities or nil
     end
 
     return player_state
+end
+
+----------------------------------------------------------------------
+-- reset_wander_state(player_state)
+--
+-- PURPOSE:
+--   Clears all wander-specific state so that the next time the bot
+--   enters wander mode it starts with a clean slate.
+----------------------------------------------------------------------
+
+local function reset_wander_state(player_state)
+    if not player_state then
+        return
+    end
+
+    player_state.wander_target_position = nil
+    player_state.wander_found_anchor = nil
+    player_state.wander_mapped_entities = nil
+end
+
+----------------------------------------------------------------------
+-- set_player_bot_mode(player, player_state, new_mode)
+--
+-- PURPOSE:
+--   Safely updates the behavior mode for a player's bot. This:
+--     * Validates the mode against BOT_MODES.
+--     * Resets wander state when leaving wander.
+--     * Prints a feedback message to the player.
+----------------------------------------------------------------------
+
+local function set_player_bot_mode(player, player_state, new_mode)
+    if not player_state then
+        return
+    end
+
+    -- Validate new_mode; fall back to "follow" if unknown.
+    if not BOT_MODE_INDEX[new_mode] then
+        new_mode = "follow"
+    end
+
+    local old_mode = player_state.bot_mode or "follow"
+    if old_mode == new_mode then
+        print_bot_message(player, "yellow", "mode remains %s", new_mode)
+        return
+    end
+
+    -- If we are leaving wander mode, clear any wander-specific state.
+    if old_mode == "wander" then
+        reset_wander_state(player_state)
+    end
+
+    player_state.bot_mode = new_mode
+
+    print_bot_message(player, "green", "mode set to %s", new_mode)
 end
 
 ----------------------------------------------------------------------
@@ -215,6 +339,9 @@ local function destroy_player_bot(player, silent)
     -- Reset core state.
     player_state.bot_entity = nil
     player_state.bot_enabled = false
+
+    -- Clear any wander-related state for cleanliness.
+    reset_wander_state(player_state)
 
     if not silent then
         print_bot_message(player, "yellow", "deactivated")
@@ -475,7 +602,7 @@ local function follow_player(player, bot_entity, player_state)
     player_state.last_player_side_offset_x = side_offset_x
 
     ------------------------------------------------------------------
-    -- 3. Check follow distance (radial)
+    -- 3. Check follow distance (radial).
     ------------------------------------------------------------------
     local dx = player_pos.x - bot_pos.x
     local dy = player_pos.y - bot_pos.y
@@ -501,9 +628,205 @@ local function follow_player(player, bot_entity, player_state)
     }
 
     ------------------------------------------------------------------
-    -- 5. Move bot towards the chosen side position
+    -- 5. Move bot towards the chosen side position.
     ------------------------------------------------------------------
     move_bot_towards(player, bot_entity, target_pos)
+end
+
+----------------------------------------------------------------------
+-- WANDER MODE: RANDOM ROAM + AREA SURVEY
+--
+-- wander_bot(player, bot_entity, player_state)
+--
+-- PURPOSE:
+--   Implements "wander" behavior in two phases:
+--
+--   1) Roam phase:
+--        * Bot picks random nearby points and walks towards them,
+--          continually choosing new random targets as it arrives.
+--        * After each movement, it scans a detection radius
+--          (WANDER_DETECTION_RADIUS) for any entities.
+--        * If any entity (other than itself) is found, the bot:
+--            - Records the current position as an "anchor".
+--            - Stops moving.
+--            - Transitions into the survey phase.
+--
+--   2) Survey phase:
+--        * Bot stays at the anchor position.
+--        * Once per survey, it enumerates all entities in a larger
+--          radius (WANDER_SURVEY_RADIUS) around the anchor.
+--        * Results are stored in player_state.wander_mapped_entities
+--          as simple, serializable tables.
+--        * A summary is printed to the player.
+--
+--   The bot remains stationary at the anchor until the player changes
+--   mode via the mode-cycle hotkey or other script action.
+----------------------------------------------------------------------
+
+local function wander_bot(player, bot_entity, player_state)
+    if not (player and player.valid and bot_entity and bot_entity.valid) then
+        return
+    end
+
+    local surface = bot_entity.surface
+    local bot_pos = bot_entity.position
+
+    ------------------------------------------------------------------
+    -- 1) SURVEY PHASE:
+    --
+    --    If an anchor already exists, the bot has finished roaming
+    --    and is now in survey mode. It does not move; it merely
+    --    records and reports entities once.
+    ------------------------------------------------------------------
+    if player_state.wander_found_anchor then
+        local anchor = player_state.wander_found_anchor
+
+        -- Only perform the survey once per anchor. If results already
+        -- exist, keep the bot idle.
+        if not player_state.wander_mapped_entities then
+            local entities = surface.find_entities_filtered {
+                position = anchor,
+                radius = WANDER_SURVEY_RADIUS
+            }
+
+            local mapped = {}
+            local count = 0
+
+            for _, entity in ipairs(entities) do
+                if entity.valid and entity.name ~= "mekatrol-game-play-bot" then
+                    count = count + 1
+                    mapped[#mapped + 1] = {
+                        name = entity.name,
+                        position = {
+                            x = entity.position.x,
+                            y = entity.position.y
+                        }
+                    }
+                end
+            end
+
+            player_state.wander_mapped_entities = mapped
+
+            if count > 0 then
+                print_bot_message(player, "green", "wander survey at (%.1f, %.1f): mapped %d entities.", anchor.x,
+                    anchor.y, count)
+            else
+                print_bot_message(player, "yellow", "wander survey at (%.1f, %.1f): no entities found.", anchor.x,
+                    anchor.y)
+            end
+        end
+
+        -- Stay put at the anchor until the mode is changed.
+        return
+    end
+
+    ------------------------------------------------------------------
+    -- 2) ROAM PHASE:
+    --
+    --    No anchor yet, so we roam by picking random local targets and
+    --    walking towards them. After each move we scan for entities.
+    ------------------------------------------------------------------
+    local target = player_state.wander_target_position
+    if not target then
+        -- Pick a new random target near the current position.
+        --
+        -- math.random() in Factorio is deterministic per save and is
+        -- safe for gameplay logic.
+        local dx = (math.random() * 2 - 1) * WANDER_STEP_DISTANCE
+        local dy = (math.random() * 2 - 1) * WANDER_STEP_DISTANCE
+
+        target = {
+            x = bot_pos.x + dx,
+            y = bot_pos.y + dy
+        }
+
+        player_state.wander_target_position = target
+    end
+
+    -- Move one step towards the wander target using the same
+    -- movement helper used by other behaviors.
+    move_bot_towards(player, bot_entity, target)
+
+    -- If we got close to the target, clear it so a new one is chosen
+    -- on the next tick, producing a random walk.
+    local new_pos = bot_entity.position
+    local ddx = target.x - new_pos.x
+    local ddy = target.y - new_pos.y
+    local dist_sq = ddx * ddx + ddy * ddy
+    if dist_sq <= (BOT_STEP_DISTANCE * BOT_STEP_DISTANCE) then
+        player_state.wander_target_position = nil
+    end
+
+    ------------------------------------------------------------------
+    -- 3) DETECTION AFTER MOVEMENT:
+    --
+    --    After moving, scan a detection radius around the bot. If any
+    --    entities (besides the bot) are found, record an anchor and
+    --    transition to survey mode. The survey itself will run next
+    --    tick.
+    ------------------------------------------------------------------
+    local nearby = surface.find_entities_filtered {
+        position = new_pos,
+        radius = WANDER_DETECTION_RADIUS
+    }
+
+    local found_any = false
+    for _, entity in ipairs(nearby) do
+        if entity.valid and entity ~= bot_entity then
+            found_any = true
+            break
+        end
+    end
+
+    if found_any then
+        player_state.wander_found_anchor = {
+            x = new_pos.x,
+            y = new_pos.y
+        }
+        player_state.wander_target_position = nil
+        player_state.wander_mapped_entities = nil
+
+        print_bot_message(player, "yellow", "wander detected entities near (%.1f, %.1f); stopping to survey.",
+            new_pos.x, new_pos.y)
+    end
+end
+
+----------------------------------------------------------------------
+-- MODE CYCLING: HOTKEY HANDLER
+--
+-- on_cycle_bot_mode(event)
+--
+-- PURPOSE:
+--   Handler for the "mekatrol-game-play-bot-next-mode" hotkey.
+--   Advances the mode:
+--       follow -> wander -> follow -> ...
+--
+--   This does NOT create or destroy the bot. It only changes the mode
+--   stored in state. If the bot is currently active, it will react to
+--   the new mode on the next tick.
+----------------------------------------------------------------------
+
+local function on_cycle_bot_mode(event)
+    local player = game.get_player(event.player_index)
+    if not (player and player.valid) then
+        return
+    end
+
+    local player_state = get_player_state(player.index)
+    if not player_state then
+        return
+    end
+
+    local current_mode = player_state.bot_mode or "follow"
+    local current_index = BOT_MODE_INDEX[current_mode] or 1
+
+    local next_index = current_index + 1
+    if next_index > #BOT_MODES then
+        next_index = 1
+    end
+
+    local next_mode = BOT_MODES[next_index]
+    set_player_bot_mode(player, player_state, next_mode)
 end
 
 ---------------------------------------------------
@@ -514,11 +837,10 @@ end
 -- PURPOSE:
 --   Performs all per-tick logic for a single player's bot:
 --     * Clear and update visuals (lines + highlight).
---     * Run behavior appropriate for the current mode (e.g. follow).
+--     * Run behavior appropriate for the current mode (follow/wander).
 ---------------------------------------------------
 
 local function update_bot_for_player(player, player_state)
-    -- Safety: must have a valid bot to do anything.
     local bot_entity = player_state.bot_entity
     if not (bot_entity and bot_entity.valid) then
         return
@@ -528,11 +850,22 @@ local function update_bot_for_player(player, player_state)
     visuals.clear_lines(player_state)
 
     -- Draw any lines (e.g. line from player to bot).
+    -- Line color already depends on player_state.bot_mode in visuals.lua.
     visuals.draw_bot_player_visuals(player, bot_entity, player_state)
 
-    -- Behavior: follow player if in follow mode.
+    ------------------------------------------------------------------
+    -- Behavior dispatch based on current mode.
+    ------------------------------------------------------------------
     if player_state.bot_mode == "follow" then
         follow_player(player, bot_entity, player_state)
+
+    elseif player_state.bot_mode == "wander" then
+        wander_bot(player, bot_entity, player_state)
+
+    else
+        -- Unknown mode: do nothing except visuals.
+        -- This is intentionally silent; mode validation is handled by
+        -- set_player_bot_mode.
     end
 end
 
@@ -630,6 +963,11 @@ end)
 -- Custom input name must match the custom-input prototype in data.lua:
 --   name = "mekatrol-game-play-bot-toggle"
 script.on_event("mekatrol-game-play-bot-toggle", on_toggle_bot)
+
+-- Cycle bot modes (follow -> wander -> follow -> ...).
+-- Custom input name must match the custom-input prototype in data.lua:
+--   name = "mekatrol-game-play-bot-next-mode"
+script.on_event("mekatrol-game-play-bot-next-mode", on_cycle_bot_mode)
 
 script.on_event(defines.events.on_entity_died, on_entity_died)
 script.on_event(defines.events.on_player_removed, on_player_removed)
