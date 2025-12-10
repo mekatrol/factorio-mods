@@ -43,6 +43,7 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["mekatrol-repair-bot"] = CUSTOM_BOT_HEALTH,
     ["mekatrol-mapping-bot"] = CUSTOM_BOT_HEALTH,
     ["mekatrol-cleanup-bot"] = 100,
+    ["crash-site-spaceship"] = 600,
     ["construction-robot"] = 100,
     ["logistic-robot"] = 100,
     ["stone-wall"] = 350,
@@ -339,7 +340,7 @@ local function init_player(player)
             vis_bot_path = nil,
             vis_current_waypoint = nil,
             -- destroyed-entities overlay
-            vis_destroyed_overlay = pdata.vis_destroyed_overlay or nil,
+            vis_destroyed_overlay = nil,
 
             -- accumulated durability from already-consumed repair packs
             -- measured in "health points" that can be spent across entities

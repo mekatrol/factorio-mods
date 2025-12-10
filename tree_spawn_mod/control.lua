@@ -1,4 +1,4 @@
-local TICK_INTERVAL = 60 * 60 -- 60 seconds at 60 UPS
+local TICK_INTERVAL = 10 * 60 -- 10 seconds at 60 UPS
 
 local function init()
     storage.tree_spawn_mod = storage.tree_spawn_mod or {
