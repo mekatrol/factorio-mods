@@ -9,15 +9,12 @@
 --     simple-entity-with-owner. It is non-interactable and is intended
 --     solely for use by control logic.
 ----------------------------------------------------------------------
-
-
 ----------------------------------------------------------------------
 -- HOTKEY: toggle game play bot
 --
 -- This creates a custom input prototype that the control script can
 -- subscribe to (script.on_event) and use to toggle the bot on/off.
 ----------------------------------------------------------------------
-
 data:extend({{
     -- Prototype type for custom keybinds that fire input events.
     type = "custom-input",
@@ -46,21 +43,24 @@ data:extend({{
     consuming = "none"
 }})
 
-
 ----------------------------------------------------------------------
--- ENTITY PROTOTYPE: mekatrol-game-play-bot AS A CONSTRUCTION ROBOT-LIKE
+-- ENTITY PROTOTYPE: mekatrol-game-play-bot AS AN ATTACKABLE HELPER
 --
--- This defines an entity that:
---   - Is of type "simple-entity-with-owner".
---   - Has a sprite similar to a construction robot (icon and picture).
---   - Is invisible to normal gameplay:
---       * Not shown on the map.
---       * Not selectable.
---       * Not blueprintable.
---       * Not deconstructable.
---   - Has no collisions, so it does not block or interact physically.
---   - Is intended to be teleported/controlled exclusively via script,
---     effectively acting as a hidden "bot" under script control.
+-- This version is tuned so that biters/spitters can:
+--   - Path to it.
+--   - Attack it.
+--   - Deal real damage (reducing max_health).
+--
+-- The main requirements:
+--   1) Non-empty collision_mask so it exists in the collision world
+--      and enemies can consider it for pathing/attacks.
+
+--   2) An entity type that can be damaged ("simple-entity-with-owner"
+--      is fine for that).
+
+--   3) Belong to a force that enemies are configured to attack
+--      ("player" is enough; your script will choose the force when
+--      creating the entity).
 ----------------------------------------------------------------------
 
 -- Grab the base construction-robot prototype to reuse icon and picture.
@@ -110,53 +110,42 @@ local repair_bot = {
     ------------------------------------------------------------------
     -- FLAGS
     --
-    -- These flags control various interaction and visibility aspects.
-    -- In combination they make this entity:
-    --   - Off-grid: can be placed anywhere.
-    --   - Invisible on the map.
-    --   - Invisible to blueprints.
-    --   - Not deconstructable.
-    --   - Not selectable in game.
+    -- Important for attackability:
+    --   - These flags mainly affect selection, blueprints, and map
+    --     visibility, not whether enemies can damage the entity.
+    --   - Enemies care about:
+    --       * collision (collision_mask)
+    --       * distance/pathing
+    --       * force relationships
     ------------------------------------------------------------------
-
-    flags = {
-        -- "placeable-off-grid":
-        --   - Entity can be placed at arbitrary coordinates, ignoring
-        --     the regular tile grid alignment.
-        --   - It does not obey typical placement rules and can exist
-        --     "between" tiles or overlapping other entities (subject to
-        --     collision masks).
-        "placeable-off-grid",
-
-        -- "not-on-map":
-        --   - This entity will not appear on the world map or minimap.
-        --   - Even if it has a map color defined, it will not be drawn.
-        --   - Useful for invisible helper entities controlled by script.
-        "not-on-map",
-
-        -- "not-blueprintable":
-        --   - Blueprints will ignore this entity.
-        --   - Copy-paste operations and blueprint creation do not
-        --     include it.
-        --   - Ensures player blueprints do not get cluttered with
-        --     hidden helper entities.
-        "not-blueprintable",
-
-        -- "not-deconstructable":
-        --   - Entity cannot be marked for deconstruction.
-        --   - Deconstruction planner and bots will not remove it.
-        --   - Prevents players from accidentally deleting the helper
-        --     entity from the world.
-        "not-deconstructable",
-
-        -- "not-selectable-in-game":
-        --   - Entity cannot be selected by the player cursor.
-        --   - No selection box, no tooltip, no GUI will open.
-        --   - Selection tools and normal clicking will ignore it.
-        --   - This is crucial to keep it fully "invisible" to normal
-        --     gameplay interaction.
-        "not-selectable-in-game"
-    },
+    flags = { -- "placeable-off-grid":
+    --   - Entity can be placed at arbitrary coordinates, ignoring
+    --     the regular tile grid alignment.
+    --   - It does not obey typical placement rules and can exist
+    --     "between" tiles or overlapping other entities (subject to
+    --     collision masks).
+    "placeable-off-grid", -- "not-on-map":
+    --   - This entity will not appear on the world map or minimap.
+    --   - Even if it has a map color defined, it will not be drawn.
+    --   - Useful for invisible helper entities controlled by script.
+    "not-on-map", -- "not-blueprintable":
+    --   - Blueprints will ignore this entity.
+    --   - Copy-paste operations and blueprint creation do not
+    --     include it.
+    --   - Ensures player blueprints do not get cluttered with
+    --     hidden helper entities.
+    "not-blueprintable", -- "not-deconstructable":
+    --   - Entity cannot be marked for deconstruction.
+    --   - Deconstruction planner and bots will not remove it.
+    --   - Prevents players from accidentally deleting the helper
+    --     entity from the world.
+    "not-deconstructable", -- "not-selectable-in-game":
+    --   - Entity cannot be selected by the player cursor.
+    --   - No selection box, no tooltip, no GUI will open.
+    --   - Selection tools and normal clicking will ignore it.
+    --   - This is crucial to keep it fully "invisible" to normal
+    --     gameplay interaction.
+    "not-selectable-in-game"},
 
     ------------------------------------------------------------------
     -- COLLISION AND SELECTION
@@ -164,29 +153,20 @@ local repair_bot = {
 
     -- collision_box:
     --   - Defines the physical bounds used for collision detection.
-    --   - Here it is set very small. However, the actual collision is
-    --     governed by collision_mask below.
-    --   - Even if small, the box is still used for certain internal
-    --     checks and some script operations.
-    collision_box = {{-0.1, -0.1}, {0.1, 0.1}},
+    --   - Big enough to interact with melee range.
+    collision_box = {{-0.2, -0.2}, {0.2, 0.2}},
 
-    -- collision_mask:
-    --   - Governs what this entity collides with.
-    --   - Using "layers = {}" means it collides with nothing at all:
-    --       * It does not block movement of players, units, or trains.
-    --       * It does not block placement of other entities.
-    --       * It is effectively "ghost-like" in the world.
-    --   - This is ideal for a script-only helper that should not affect
-    --     gameplay physics or pathfinding.
+    -- Because this is a flying robot, we use a lightweight collision
+    -- mask that:
+    --   * Makes it a valid target for melee attacks (biters/spitters).
+    --   * Does not make it behave like a grounded solid entity.
+    --   * Uses the Factorio 2.x dictionary-style collision mask.
     collision_mask = {
         layers = {}
     },
 
-    -- selection_box:
-    --   - Controls the area that can be selected with the cursor.
-    --   - Setting this to nil means there is no defined selection area.
-    --   - Combined with "not-selectable-in-game", this guarantees that
-    --     the entity is never directly selectable by the player.
+    -- No selection box so players cannot click it, but it is still
+    -- physically present for enemies:
     selection_box = nil,
 
     ------------------------------------------------------------------
@@ -201,15 +181,33 @@ local repair_bot = {
     render_layer = "object",
 
     -- max_health:
-    --   - Total hit points the entity has.
-    --   - This entity can, in principle, take damage from script or
-    --     certain game events (if ever exposed).
-    --   - High enough to avoid accidental destruction, but the exact
-    --     value depends on how scripts use it.
+    --   - Enemies will reduce this when they attack.
+    --   - When it reaches 0, the entity will be destroyed (triggering
+    --     on_entity_died events, etc.).
     max_health = 500,
 
     ------------------------------------------------------------------
-    -- GRAPHICS (PICTURE)
+    -- RESISTANCES (OPTIONAL)
+    --
+    -- You can optionally tune how much damage different types deal.
+    -- If omitted, it just uses default behavior.
+    --
+    -- Example (uncomment if needed):
+    --
+    -- resistances = {
+    --     {
+    --         type = "physical",
+    --         decrease = 2,
+    --         percent = 20
+    --     },
+    --     {
+    --         type = "acid",
+    --         decrease = 0,
+    --         percent = 0
+    --     }
+    -- },
+    ------------------------------------------------------------------
+
     ------------------------------------------------------------------
 
     -- picture:
