@@ -36,11 +36,11 @@ local visuals = require("visuals")
 
 -- Per-tick update interval (in game ticks).
 -- Example: 5 means "update bot every 5 ticks".
-local BOT_UPDATE_INTERVAL = 5
+local BOT_UPDATE_INTERVAL = 1
 
 -- Maximum distance the bot moves in a single movement step.
 -- Used when interpolating movement towards a target position.
-local BOT_STEP_DISTANCE = 0.8
+local BOT_STEP_DISTANCE = 0.18
 
 -- Desired distance at which the bot should follow behind the player.
 -- If the bot is further away than this, it will move closer.
