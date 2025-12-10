@@ -62,6 +62,7 @@ function visuals.clear_lines(player_state)
 end
 
 function visuals.draw_bot_player_visuals(player, bot, player_state)
+    -- Validate player and bot first.
     if not (player and player.valid and bot and bot.valid) then
         return
     end
@@ -74,38 +75,47 @@ function visuals.draw_bot_player_visuals(player, bot, player_state)
         y = bot_pos.y + y_offset
     }
 
+    -- Ensure visuals + lines tables exist.
+    player_state.visuals = player_state.visuals or {}
     player_state.visuals.lines = player_state.visuals.lines or {}
 
-    -- choose line color based on bot mode
-    -- red when repairing, grey when following or anything else
+    -- Choose line color based on bot mode:
+    --   * "wander": red-ish, visible
+    --   * "follow": grey
+    --   * anything else: no line
     local line_color
-    if player_state.last_mode == "repair" then
+    if player_state.bot_mode == "wander" then
         line_color = {
             r = 0.5,
             g = 0.1,
             b = 0.1,
             a = 0.7
-        } -- bright red, clearly visible
-    else
+        } -- red-ish
+    elseif player_state.bot_mode == "follow" then
         line_color = {
             r = 0.3,
             g = 0.3,
             b = 0.3,
             a = 0.1
-        } -- original grey
+        } -- grey
+    else
+        line_color = nil
     end
 
-    local line = rendering.draw_line {
-        color = line_color,
-        width = 1,
-        from = player.position,
-        to = to_pos,
-        surface = bot.surface,
-        draw_on_ground = true,
-        only_in_alt_mode = false
-    }
+    if line_color then
+        local line = rendering.draw_line {
+            color = line_color,
+            width = 1,
+            from = player.position,
+            to = to_pos,
+            surface = bot.surface,
+            draw_on_ground = true,
+            only_in_alt_mode = false,
+            players = {player} -- only this player sees the line
+        }
 
-    player_state.visuals.lines[#player_state.visuals.lines + 1] = line
+        player_state.visuals.lines[#player_state.visuals.lines + 1] = line
+    end
 end
 
 ---------------------------------------------------

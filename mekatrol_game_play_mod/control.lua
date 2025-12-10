@@ -73,7 +73,8 @@ local function get_player_state(player_index)
                 bot_highlight = nil,
                 lines = nil
             },
-            bot_enabled = false
+            bot_enabled = false,
+            bot_mode = "follow"
         }
         all[player_index] = state
 
@@ -88,7 +89,11 @@ local function get_player_state(player_index)
         state.visuals.bot_highlight = state.visuals.bot_highlight or nil
         state.visuals.lines = state.visuals.lines or nil
 
+        -- disabled by default
         state.bot_enabled = state.bot_enabled or false
+
+        -- follow by default
+        state.bot_mode = state.bot_mode or "follow"
     end
 
     return state
