@@ -25,7 +25,7 @@
 --         - visuals.clear_lines(player_state)
 --         - visuals.clear_bot_highlight(player_state)
 --         - visuals.draw_bot_highlight(player, player_state)
---         - visuals.draw_bot_player_visuals(player, bot, player_state)
+--         - visuals.draw_bot_player_visuals(player, bot, player_state, radius)
 ----------------------------------------------------------------------
 ---------------------------------------------------
 -- MODULES
@@ -214,7 +214,8 @@ local function get_player_state(player_index)
             bot_entity = nil,
             visuals = {
                 bot_highlight = nil,
-                lines = nil
+                lines = nil,
+                radius_circle = nil
             },
             bot_enabled = false, -- default: bot off until toggled
             bot_mode = "follow", -- default behavior: follow player
@@ -237,6 +238,7 @@ local function get_player_state(player_index)
         player_state.visuals = player_state.visuals or {}
         player_state.visuals.bot_highlight = player_state.visuals.bot_highlight or nil
         player_state.visuals.lines = player_state.visuals.lines or nil
+        player_state.visuals.radius_circle = player_state.visuals.radius_circle or nil
 
         if player_state.bot_enabled == nil then
             player_state.bot_enabled = false
@@ -851,7 +853,7 @@ local function update_bot_for_player(player, player_state)
 
     -- Draw any lines (e.g. line from player to bot).
     -- Line color already depends on player_state.bot_mode in visuals.lua.
-    visuals.draw_bot_player_visuals(player, bot_entity, player_state)
+    visuals.draw_bot_player_visuals(player, bot_entity, player_state, WANDER_DETECTION_RADIUS)
 
     ------------------------------------------------------------------
     -- Behavior dispatch based on current mode.
@@ -861,7 +863,6 @@ local function update_bot_for_player(player, player_state)
 
     elseif player_state.bot_mode == "wander" then
         wander_bot(player, bot_entity, player_state)
-
     else
         -- Unknown mode: do nothing except visuals.
         -- This is intentionally silent; mode validation is handled by
