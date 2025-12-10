@@ -19,6 +19,8 @@ local visuals = require("visuals")
 -- CONFIGURATION
 ---------------------------------------------------
 local BOT_UPDATE_INTERVAL = 5
+local BOT_STEP_DISTANCE = 0.8
+local BOT_FOLLOW_DISTANCE = 1.0
 
 ----------------------------------------------------------------------
 -- PRINT HELPER: print_bot_message(player, color, fmt, ...)
@@ -240,6 +242,99 @@ local function on_player_removed(event)
     all[player_index] = nil
 end
 
+local function move_bot_to(player, bot, target)
+    -- Validate bot and target
+    if not (bot and bot.valid and target) then
+        return
+    end
+
+    local tp
+
+    -- Case 1: Factorio-style entity with .position
+    if type(target) == "table" and target.position ~= nil then
+        tp = target.position
+
+        -- Case 2: {x = ?, y = ?}
+    elseif type(target) == "table" and target.x ~= nil and target.y ~= nil then
+        tp = target
+
+        -- Case 3: array-like {x, y}
+    elseif type(target) == "table" and target[1] ~= nil and target[2] ~= nil then
+        tp = {
+            x = target[1],
+            y = target[2]
+        }
+
+        -- Invalid target
+    else
+        -- tostring() avoids crashing on non-table values and produces "table: 0xABC123"
+        local desc = tostring(target)
+        print_bot_message(player, "red", "invalid target: %s", desc)
+        return
+    end
+
+    ----------------------------------------------------------------------
+    -- BOT MOVEMENT
+    ----------------------------------------------------------------------
+
+    local bp = bot.position
+    local dx = tp.x - bp.x
+    local dy = tp.y - bp.y
+    local dist_sq = dx * dx + dy * dy
+
+    -- Already at target?
+    if dist_sq == 0 then
+        return
+    end
+
+    local dist = math.sqrt(dist_sq)
+
+    -- If close enough, teleport directly to target
+    if dist <= BOT_STEP_DISTANCE then
+        bot.teleport {
+            x = tp.x,
+            y = tp.y
+        }
+        return
+    end
+
+    -- Normalize direction vector (dx, dy)
+    local nx = dx / dist
+    local ny = dy / dist
+
+    -- Move one step in the direction
+    bot.teleport {
+        x = bp.x + nx,
+        y = bp.y + ny
+    }
+end
+
+local function follow_player(player, bot)
+    if not (player and player.valid and bot and bot.valid) then
+        return
+    end
+
+    local bp = bot.position
+    local pp = player.position
+
+    local dx = pp.x - bp.x
+    local dy = pp.y - bp.y
+    local dist_sq = dx * dx + dy * dy
+    local desired_sq = BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE
+
+    if dist_sq > desired_sq then
+        local offset_x = -2.0
+        local offset_y = -2.0
+
+        local target_pos = {
+            x = pp.x + offset_x,
+            y = pp.y + offset_y
+        }
+
+        move_bot_to(player, bot, target_pos)
+    end
+end
+
 ---------------------------------------------------
 -- MAIN PER-TICK BOT UPDATE
 ---------------------------------------------------
@@ -253,6 +348,11 @@ local function update_bot_for_player(player, player_state)
 
     -- draw any lines
     visuals.draw_bot_player_visuals(player, player_state.entity, player_state)
+
+    -- follow player if in follow mode
+    if player_state.bot_mode == "follow" then
+        follow_player(player, player_state.entity)
+    end
 end
 
 ----------------------------------------------------------------------
