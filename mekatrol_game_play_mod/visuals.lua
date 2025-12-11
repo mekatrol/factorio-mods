@@ -11,6 +11,7 @@
 --     * An optional line between the player and the bot whose color
 --       depends on the bot's current mode.
 --     * An optional radius circle around the bot (e.g. detection radius).
+--     * Optional boxes around mapped entities.
 --
 --   All render objects are stored in the per-player state under
 --   player_state.visuals and must be explicitly destroyed when no
@@ -24,9 +25,10 @@
 --       bot_entity = <LuaEntity or nil>,
 --       bot_mode   = <string> or nil, -- e.g. "follow", "wander"
 --       visuals    = {
---           bot_highlight = <LuaRenderObject or nil>,
---           lines         = <array of LuaRenderObject or nil>,
---           radius_circle = <LuaRenderObject or nil>
+--           bot_highlight   = <LuaRenderObject or nil>,
+--           lines           = <array of LuaRenderObject or nil>,
+--           radius_circle   = <LuaRenderObject or nil>,
+--           mapped_entities = <table<string, LuaRenderObject or nil>>
 --       },
 --       ...
 --   }
@@ -52,21 +54,20 @@ local visuals = {}
 ---------------------------------------------------
 -- FUNCTION: clear_bot_highlight(player_state)
 --
--- PURPOSE:
+-- Purpose:
 --   Removes any existing highlight rectangle for the player's bot.
 --
--- PARAMETERS:
+-- Parameters:
 --   player_state : table
 --       The per-player state table that contains:
 --         * player_state.visuals.bot_highlight — a LuaRenderObject or nil.
 --
--- BEHAVIOR:
+-- Behavior:
 --   * If a highlight exists and is still valid, it is explicitly
 --     destroyed via :destroy() to clean up the rendering object.
---   * The reference is then cleared (set to nil) so the next rendering
---     update knows that no highlight is currently active.
+--   * The reference is then cleared (set to nil).
 --
--- NOTES:
+-- Notes:
 --   * Rendering objects are NOT removed automatically when entities
 --     disappear; they must always be explicitly destroyed.
 --   * This function is safe to call even if no highlight exists.
@@ -87,22 +88,22 @@ end
 ---------------------------------------------------
 -- FUNCTION: clear_lines(player_state)
 --
--- PURPOSE:
+-- Purpose:
 --   Destroys and clears all line render objects associated with the
 --   player's bot visuals.
 --
--- PARAMETERS:
+-- Parameters:
 --   player_state : table
 --       The per-player state table that contains:
 --         * player_state.visuals.lines — an array of LuaRenderObject
 --           or nil.
 --
--- BEHAVIOR:
+-- Behavior:
 --   * Iterates over all stored line objects.
 --   * For each valid render object, calls :destroy().
 --   * Clears the array reference (sets it to nil) after cleanup.
 --
--- NOTES:
+-- Notes:
 --   * This does NOT clear the highlight rectangle or radius circle.
 --     Use visuals.clear_bot_highlight / visuals.clear_radius_circle
 --     for those.
@@ -129,20 +130,20 @@ end
 ---------------------------------------------------
 -- FUNCTION: clear_radius_circle(player_state)
 --
--- PURPOSE:
+-- Purpose:
 --   Destroys and clears the radius circle render object (if any)
 --   associated with the player's bot visuals.
 --
--- PARAMETERS:
+-- Parameters:
 --   player_state : table
 --       The per-player state table that contains:
 --         * player_state.visuals.radius_circle — a LuaRenderObject or nil.
 --
--- BEHAVIOR:
+-- Behavior:
 --   * If a radius circle exists and is valid, calls :destroy().
 --   * Clears the reference (sets it to nil) afterwards.
 --
--- NOTES:
+-- Notes:
 --   * Safe to call when no radius circle exists or when visuals is nil.
 ---------------------------------------------------
 function visuals.clear_radius_circle(player_state)
@@ -158,32 +159,61 @@ function visuals.clear_radius_circle(player_state)
     player_state.visuals.radius_circle = nil
 end
 
+---------------------------------------------------
+-- FUNCTION: clear_mapped_entities(player_state)
+--
+-- Purpose:
+--   Clears all mapping-related visuals and resets the mapped_entities
+--   tracking table for the player.
+--
+-- Parameters:
+--   player_state : table
+--       The per-player state containing:
+--         * player_state.visuals.mapped_entities — table of
+--           entity-key -> LuaRenderObject id mappings.
+--
+-- Behavior:
+--   * Calls rendering.clear(MOD_NAME) to remove all render objects
+--     owned by this mod.
+--   * Resets player_state.visuals.mapped_entities to an empty table.
+--
+-- Notes:
+--   * This is a coarse clear: it removes all render objects created
+--     by this mod, not only mapped-entity boxes for this player.
+--   * Intended for full visual reset (e.g. when destroying the bot).
+---------------------------------------------------
 function visuals.clear_mapped_entities(player_state)
-    ---------------------------------------------------------------
-    -- 1. Wipe ALL rendering objects created by this mod
-    ----------------------------------------------------------------
+    if not player_state then
+        return
+    end
+
+    if not player_state.visuals then
+        player_state.visuals = {}
+    end
+
+    -- Wipe all rendering objects created by this mod.
     pcall(rendering.clear, MOD_NAME)
 
-    ----------------------------------------------------------------
-    -- 2. Reset per-player mapping state
-    ----------------------------------------------------------------
+    -- Reset per-player mapping state.
     player_state.visuals.mapped_entities = {}
 end
 
 ---------------------------------------------------
 -- FUNCTION: clear_all(player_state)
 --
--- PURPOSE:
+-- Purpose:
 --   Convenience helper that clears all known render objects belonging
---   to the player's bot visuals (highlight, lines, radius circle).
+--   to the player's bot visuals (highlight, lines, radius circle,
+--   mapped entities).
 --
--- PARAMETERS:
+-- Parameters:
 --   player_state : table
 --
--- BEHAVIOR:
+-- Behavior:
 --   * Calls clear_lines(player_state).
 --   * Calls clear_bot_highlight(player_state).
 --   * Calls clear_radius_circle(player_state).
+--   * Calls clear_mapped_entities(player_state).
 ---------------------------------------------------
 function visuals.clear_all(player_state)
     if not player_state then
@@ -207,34 +237,35 @@ end
 ----------------------------------------------------------------------
 
 ---------------------------------------------------
--- FUNCTION: draw_radius_circle(player, player_state, bot, radius)
+-- FUNCTION: draw_radius_circle(player, player_state, bot_entity, radius, color)
 --
--- PURPOSE:
+-- Purpose:
 --   Draws a circle around the bot to visualize a radius (for example,
 --   a detection or survey radius used in game logic).
 --
--- PARAMETERS:
+-- Parameters:
 --   player       : LuaPlayer
 --       The player who will see this circle.
 --
 --   player_state : table
 --       The per-player state whose visuals table will track the circle.
 --
---   bot          : LuaEntity
+--   bot_entity   : LuaEntity
 --       The bot entity at the center of the circle.
 --
 --   radius       : number
 --       Circle radius in tiles. If nil or <= 0, no circle is drawn.
---   color        : table
---       Color to render the radius.
 --
--- BEHAVIOR:
+--   color        : table
+--       Color to render the radius (RGBA table).
+--
+-- Behavior:
 --   * Clears any existing radius circle via visuals.clear_radius_circle.
 --   * If bot is valid and radius is positive, draws a new circle
 --     anchored to the bot entity.
 --   * Stores the render reference in player_state.visuals.radius_circle.
 ---------------------------------------------------
-function visuals.draw_radius_circle(player, player_state, bot, radius, color)
+function visuals.draw_radius_circle(player, player_state, bot_entity, radius, color)
     if not (player_state and player_state.visuals) then
         return
     end
@@ -242,7 +273,7 @@ function visuals.draw_radius_circle(player, player_state, bot, radius, color)
     -- Destroy old circle if it exists.
     visuals.clear_radius_circle(player_state)
 
-    if not (bot and bot.valid) then
+    if not (bot_entity and bot_entity.valid) then
         return
     end
 
@@ -252,33 +283,31 @@ function visuals.draw_radius_circle(player, player_state, bot, radius, color)
     end
 
     -- Draw a new circle, anchored to the bot so it follows movement.
-    local id = rendering.draw_circle {
+    local circle = rendering.draw_circle {
         color = color,
         radius = radius,
         width = 1,
         filled = false,
-        target = bot, -- anchor so it follows the bot
-        surface = bot.surface,
+        target = bot_entity,
+        surface = bot_entity.surface,
         players = {player},
         draw_on_ground = true
     }
 
-    -- Store the numeric id so we can destroy it later.
-    player_state.visuals.radius_circle = id
+    -- Store the render object so we can destroy it later.
+    player_state.visuals.radius_circle = circle
 end
 
 ---------------------------------------------------
 -- FUNCTION: draw_bot_highlight(player, player_state)
 --
--- PURPOSE:
+-- Purpose:
 --   Draws (or updates) a visual rectangle around the player's bot in
---   the world. This helps indicate its position visually, especially
---   when the entity is not selectable or is invisible.
+--   the world. This helps indicate its position visually.
 --
--- PARAMETERS:
+-- Parameters:
 --   player : LuaPlayer
---       The player who will see the highlight. This is passed to the
---       rendering API so only this player sees the effect.
+--       The player who will see the highlight.
 --
 --   player_state : table
 --       The per-player state containing:
@@ -286,7 +315,7 @@ end
 --         * player_state.visuals.bot_highlight  — existing highlight
 --           render object or nil.
 --
--- BEHAVIOR:
+-- Behavior:
 --   1. Validates that a bot entity exists and is valid.
 --   2. Computes a rectangular bounding area around the bot.
 --   3. If an existing highlight exists:
@@ -295,11 +324,6 @@ end
 --          is created.
 --   4. If no highlight exists, a new rectangle is created with
 --      rendering.draw_rectangle and stored.
---
--- VISUAL DETAILS:
---   * "draw_on_ground = true" makes the rectangle appear below entities.
---   * "only_in_alt_mode = false" makes it visible at all times.
---   * "players = {player}" ensures only this player sees the highlight.
 ---------------------------------------------------
 function visuals.draw_bot_highlight(player, player_state)
     if not (player and player.valid and player_state and player_state.visuals) then
@@ -311,24 +335,18 @@ function visuals.draw_bot_highlight(player, player_state)
     ------------------------------------------------------------------
     local bot_entity = player_state.bot_entity
     if not (bot_entity and bot_entity.valid) then
-        -- No valid bot to draw around; do nothing.
         return
     end
 
     ------------------------------------------------------------------
     -- 2. Compute rectangle coordinates
     ------------------------------------------------------------------
-    -- Size controls how large the highlight appears around the bot.
     local size = 0.6
-
-    -- Bot world position.
     local pos = bot_entity.position
 
-    -- Horizontal center x-coordinate and baseline y-coordinate.
     local cx = pos.x
     local base_y = pos.y
 
-    -- Compute top-left and bottom-right corners of the rectangle.
     local left_top = {cx - size, base_y - size * 1.5}
     local right_bottom = {cx + size, base_y + size}
 
@@ -338,13 +356,10 @@ function visuals.draw_bot_highlight(player, player_state)
     local existing = player_state.visuals.bot_highlight
     if existing then
         if existing.valid then
-            -- A valid rectangle already exists; update its geometry
-            -- so it tracks the bot's new position.
             existing.left_top = left_top
             existing.right_bottom = right_bottom
             return
         else
-            -- The old rendering object reference is invalid, so clear it.
             player_state.visuals.bot_highlight = nil
         end
     end
@@ -353,77 +368,55 @@ function visuals.draw_bot_highlight(player, player_state)
     -- 4. Create a new highlight rectangle for this bot
     ------------------------------------------------------------------
     player_state.visuals.bot_highlight = rendering.draw_rectangle {
-        -- Rectangle color (semi-transparent dark greenish).
         color = {
             r = 0,
             g = 0.2,
             b = 0.2,
             a = 0.1
         },
-
-        -- Draw only the outline (not filled).
         filled = false,
-
-        -- Line thickness of the rectangle.
         width = 2,
-
-        -- Coordinates of the rectangle.
         left_top = left_top,
         right_bottom = right_bottom,
-
-        -- Draw on the bot’s surface layer.
         surface = bot_entity.surface,
-
-        -- Draw it on the ground layer.
         draw_on_ground = true,
-
-        -- Always visible (not limited to Alt-mode).
         only_in_alt_mode = false,
-
-        -- Only the specified player sees this highlight.
         players = {player}
     }
 end
 
 ---------------------------------------------------
--- FUNCTION: draw_lines(player, bot_entity, player_state, line_color)
+-- FUNCTION: draw_lines(player, player_state, bot_entity, line_color)
 --
--- PURPOSE:
---   Draws visual elements that connect the player to their bot:
---     * Ensures the bot highlight rectangle is up to date.
---     * Draws a line between the player and the bot whose color
---       depends on the bot mode.
+-- Purpose:
+--   Draws visual lines that connect the player to their bot.
 --
--- PARAMETERS:
+-- Parameters:
 --   player       : LuaPlayer
 --       The player who will see the visuals.
+--
+--   player_state : table
+--       The per-player state containing:
+--         * player_state.visuals.lines   — array of LuaRenderObject
+--           or nil, tracking previously drawn lines.
 --
 --   bot_entity   : LuaEntity
 --       The bot entity to visualize.
 --
---   player_state : table
---       The per-player state containing:
---         * player_state.bot_mode        — string indicating the
---           current behavior mode (e.g. "follow", "wander").
---         * player_state.visuals.lines   — array of LuaRenderObject
---           or nil, tracking previously drawn lines.
---
 --   line_color   : table|nil
---       Optional line color to draw line. If nil line is not drawn..
+--       Optional line color to draw the line. If nil, no line is drawn.
 --
--- BEHAVIOR:
+-- Behavior:
 --   1. Validates player, bot, and state.
 --   2. Ensures player_state.visuals and visuals.lines exist.
---   3. Draws/updates the bot highlight rectangle.
---   5. Draws a line from the player's position to the bot's position.
---   6. Stores the created render object in player_state.visuals.lines.
+--   3. Draws a line from the player's position to the bot's position.
+--   4. Stores the created render object in player_state.visuals.lines.
 --
--- NOTES:
+-- Notes:
 --   * The caller is responsible for clearing lines between ticks by
---     calling visuals.clear_lines(player_state). This prevents old
---     lines from accumulating.
+--     calling visuals.clear_lines(player_state) to prevent buildup.
 ---------------------------------------------------
-function visuals.draw_lines(player, bot_entity, player_state, line_color)
+function visuals.draw_lines(player, player_state, bot_entity, line_color)
     if not (player and player.valid and bot_entity and bot_entity.valid) then
         return
     end
@@ -461,27 +454,46 @@ function visuals.draw_lines(player, bot_entity, player_state, line_color)
             surface = bot_entity.surface,
             draw_on_ground = true,
             only_in_alt_mode = false,
-            players = {player} -- only this player sees the line
+            players = {player}
         }
-        -- Track this render object for later cleanup.
+
         player_state.visuals.lines[#player_state.visuals.lines + 1] = line
     end
 end
 
 ---------------------------------------------------
--- Green box around mapped entities
+-- FUNCTION: draw_mapped_entity_box(player, player_state, entity)
+--
+-- Purpose:
+--   Draws a green box around a mapped entity to mark it visually.
+--
+-- Parameters:
+--   player       : LuaPlayer
+--       Player who will see the box.
+--
+--   player_state : table
+--       Per-player state (visuals table is not modified here; the
+--       caller stores the returned render id/object).
+--
+--   entity       : LuaEntity
+--       Entity to highlight.
+--
+-- Returns:
+--   box_render   : LuaRenderObject|uint|nil
+--       Render object (or id) returned by rendering.draw_rectangle,
+--       or nil if no box could be drawn.
 ---------------------------------------------------
-function visuals.add_mapped_entity_box(player, player_state, bot_entity)
-    if not (bot_entity and bot_entity.valid) then
+function visuals.draw_mapped_entity_box(player, player_state, entity)
+    if not (entity and entity.valid) then
         return nil
     end
 
-    local box = bot_entity.selection_box or bot_entity.bounding_box
+    local box = entity.selection_box or entity.bounding_box
     if not box then
         return nil
     end
 
-    local id = rendering.draw_rectangle {
+    local box_render = rendering.draw_rectangle {
         color = {
             r = 0.3,
             g = 0.3,
@@ -492,12 +504,12 @@ function visuals.add_mapped_entity_box(player, player_state, bot_entity)
         filled = false,
         left_top = box.left_top,
         right_bottom = box.right_bottom,
-        surface = bot_entity.surface,
+        surface = entity.surface,
         players = {player},
         draw_on_ground = false
     }
 
-    return id
+    return box_render
 end
 
 ----------------------------------------------------------------------
