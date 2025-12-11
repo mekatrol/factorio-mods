@@ -517,6 +517,25 @@ local function follow_player(player, player_state, bot_entity)
 end
 
 ----------------------------------------------------------------------
+-- WANDER TARGET PICKER
+----------------------------------------------------------------------
+
+local function pick_new_wander_target(bot_pos)
+    -- Choose a random direction and a distance in [min_dist, max_dist]
+    local angle = math.random() * 2 * math.pi
+
+    local min_dist = WANDER_STEP_DISTANCE * 0.4
+    local max_dist = WANDER_STEP_DISTANCE
+
+    local dist = min_dist + (max_dist - min_dist) * math.random()
+
+    return {
+        x = bot_pos.x + math.cos(angle) * dist,
+        y = bot_pos.y + math.sin(angle) * dist
+    }
+end
+
+----------------------------------------------------------------------
 -- WANDER MODE
 ----------------------------------------------------------------------
 
@@ -533,18 +552,18 @@ local function wander_bot(player, player_state, bot_entity)
     local surface = bot_entity.surface
     local bot_pos = bot_entity.position
 
+    ------------------------------------------------------------------
+    -- 1. Ensure we have a wander target; pick one if not.
+    ------------------------------------------------------------------
     local target = player_state.wander_target_position
     if not target then
-        local dx = (math.random() * 2 - 1) * WANDER_STEP_DISTANCE
-        local dy = (math.random() * 2 - 1) * WANDER_STEP_DISTANCE
-
-        target = {
-            x = bot_pos.x + dx,
-            y = bot_pos.y + dy
-        }
+        target = pick_new_wander_target(bot_pos)
         player_state.wander_target_position = target
     end
 
+    ------------------------------------------------------------------
+    -- 2. Step towards the target.
+    ------------------------------------------------------------------
     move_bot_towards(player, bot_entity, target)
 
     local new_pos = bot_entity.position
@@ -552,11 +571,13 @@ local function wander_bot(player, player_state, bot_entity)
     local ddy = target.y - new_pos.y
     local dist_sq = ddx * ddx + ddy * ddy
     if dist_sq <= (BOT_STEP_DISTANCE * BOT_STEP_DISTANCE) then
+        -- Once we reach the target, clear it so a new one will be
+        -- chosen next tick.
         player_state.wander_target_position = nil
     end
 
     ------------------------------------------------------------------
-    -- Detection: check for nearby entities to trigger survey mode.
+    -- 3. Detection: check for nearby entities to trigger survey mode.
     ------------------------------------------------------------------
     local nearby = surface.find_entities_filtered {
         position = new_pos,
@@ -574,6 +595,7 @@ local function wander_bot(player, player_state, bot_entity)
     end
 
     if found_any then
+        -- Clear wander target; survey will drive behaviour now.
         player_state.wander_target_position = nil
         set_player_bot_mode(player, player_state, "survey")
     end
@@ -620,7 +642,7 @@ end
 local function upsert_mapped_entity(player, player_state, entity, tick)
     local key = get_entity_key(entity)
     if not key then
-        return
+        return false
     end
 
     local mapped_entities = player_state.survey_mapped_entities
@@ -643,18 +665,18 @@ local function upsert_mapped_entity(player, player_state, entity, tick)
         }
         mapped_entities[key] = info
 
+        -- Draw the highlight only when first discovered.
         local box_id = visuals.draw_mapped_entity_box(player, player_state, entity)
         player_state.visuals.mapped_entities[key] = box_id
     else
+        -- Already known: just update position/last_seen.
         info.position.x = entity.position.x
         info.position.y = entity.position.y
         info.last_seen_tick = tick
     end
 
-    -- If no new entities were found, return to wander mode.
-    if not is_new then
-        set_player_bot_mode(player, player_state, "wander")
-    end
+    -- Caller decides what to do with is_new.
+    return is_new
 end
 
 ----------------------------------------------------------------------
@@ -676,10 +698,21 @@ local function survey_location(player, player_state, bot_entity, tick)
         radius = SURVEY_RADIUS
     }
 
+    local found_new = false
+
     for _, entity in ipairs(found) do
         if entity ~= bot_entity and entity ~= player and is_static_mappable(entity) then
-            upsert_mapped_entity(player, player_state, entity, tick)
+            local is_new = upsert_mapped_entity(player, player_state, entity, tick)
+            if is_new then
+                found_new = true
+            end
         end
+    end
+
+    -- If we are in survey mode and did not discover anything new in
+    -- this pass, return to follow mode.
+    if not found_new then
+        set_player_bot_mode(player, player_state, "follow")
     end
 end
 
