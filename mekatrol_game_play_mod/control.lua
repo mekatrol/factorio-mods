@@ -1,85 +1,66 @@
 ----------------------------------------------------------------------
 -- control.lua (Factorio 2.x / Space Age)
 --
--- Purpose:
---   Implements runtime logic for the "mekatrol-game-play-bot" entity.
+-- Full rewrite implementing:
+--   * follow, wander, survey modes
+--   * entity-adjacency BFS survey expansion
+--   * nearest-frontier-first traversal (movement style C)
+--   * natural step movement (no teleportation)
 --
---   High-level behavior:
---     * Listens for custom hotkeys:
---         - "mekatrol-game-play-bot-toggle"
---         - "mekatrol-game-play-bot-next-mode"
---     * Per-player, maintains a hidden helper entity ("bot") that:
---         - Follows the player (follow mode).
---         - Wanders randomly and surveys nearby entities (wander mode).
---         - Surveys the surrounding area and records entities (survey mode).
---     * Draws simple visuals (highlight + line + optional radius).
---     * Handles lifecycle:
---         - Creation and destruction via hotkey.
---         - Cleanup when the bot dies.
---         - Cleanup when the player is removed.
+-- Survey Mode Architecture:
 --
---   This file assumes:
---     * The bot prototype "mekatrol-game-play-bot" is defined in data.lua.
---     * A "visuals" module exists providing:
---         - visuals.clear_all(player_state)
---         - visuals.clear_lines(player_state)
---         - visuals.clear_bot_highlight(player_state)
---         - visuals.clear_radius_circle(player_state)
---         - visuals.draw_bot_highlight(player, player_state)
---         - visuals.draw_radius_circle(player, player_state, bot_entity, radius, color)
---         - visuals.draw_lines(player, player_state, bot_entity, line_color)
---         - visuals.draw_mapped_entity_box(player, player_state, entity)
+--   Survey begins with the bot's current position, scans SURVEY_RADIUS.
+--   Any newly discovered entity is added as a frontier node.
+--
+--   The system maintains:
+--       player_state.survey_frontier = {
+--           { x=..., y=... }, ...
+--       }
+--
+--       player_state.survey_seen = {
+--           ["x,y"] = true
+--       }
+--
+--   Each tick:
+--       1. Select the frontier node closest to the bot's current position.
+--       2. Walk toward it using move_bot_towards(...)
+--       3. When within arrival threshold:
+--             * run survey scan
+--             * add newly discovered entities to frontier
+--       4. When frontier becomes empty AND no new discoveries:
+--             * survey ends → follow mode
+--
 ----------------------------------------------------------------------
----------------------------------------------------
--- MODULES
----------------------------------------------------
 local visuals = require("visuals")
 
----------------------------------------------------
--- CONFIGURATION CONSTANTS
----------------------------------------------------
+----------------------------------------------------------------------
+-- CONFIG
+----------------------------------------------------------------------
 
--- Per-tick update interval (in game ticks).
 local BOT_UPDATE_INTERVAL = 1
-
--- Maximum distance the bot moves in a single movement step.
 local BOT_STEP_DISTANCE = 0.18
-
--- Desired distance at which the bot should follow behind the player.
 local BOT_FOLLOW_DISTANCE = 1.0
-
--- Horizontal offset used when the bot follows to the side of the player.
 local BOT_SIDE_OFFSET_DISTANCE = 2.0
 
-----------------------------------------------------------------------
--- WANDER / SURVEY TUNING
-----------------------------------------------------------------------
-
--- Maximum random hop distance when the bot is roaming in wander mode.
 local WANDER_STEP_DISTANCE = 5.0
-
--- Radius around the bot for detecting "any entity found" to trigger survey.
 local WANDER_DETECTION_RADIUS = 5.0
 
--- Radius used during survey mode to enumerate entities in the local area.
+-- Survey tuning
 local SURVEY_RADIUS = 6.0
+local SURVEY_ARRIVAL_THRESHOLD = 0.5 -- distance threshold for "arrived at frontier node"
 
 ----------------------------------------------------------------------
--- BOT MODES
+-- MODES
 ----------------------------------------------------------------------
 
 local BOT_MODES = {"follow", "wander", "survey"}
-
--- Reverse lookup: mode_name -> index in BOT_MODES.
 local BOT_MODE_INDEX = {}
-for i, mode_name in ipairs(BOT_MODES) do
-    BOT_MODE_INDEX[mode_name] = i
+for i, m in ipairs(BOT_MODES) do
+    BOT_MODE_INDEX[m] = i
 end
 
 ----------------------------------------------------------------------
--- NON-STATIC BLACKLIST
---
--- Any type listed here is NOT mapped. Everything else is eligible.
+-- NON-MAPPABLE TYPES
 ----------------------------------------------------------------------
 
 local NON_STATIC_TYPES = {
@@ -89,7 +70,7 @@ local NON_STATIC_TYPES = {
     ["locomotive"] = true,
     ["cargo-wagon"] = true,
     ["fluid-wagon"] = true,
-    ["artillery-wagon"] = true,
+    ["artillery-wwagon"] = true,
 
     ["unit"] = true,
     ["unit-spawner"] = true,
@@ -113,13 +94,7 @@ local NON_STATIC_TYPES = {
 }
 
 ----------------------------------------------------------------------
--- PRINT HELPER
---
--- print_bot_message(player, color, fmt, ...)
---
--- Purpose:
---   Prints a formatted, color-tagged message to a specific player,
---   prefixed with "[Game Play Bot]".
+-- PRINT HELPERS
 ----------------------------------------------------------------------
 
 local function print_bot_message(player, color, fmt, ...)
@@ -127,184 +102,139 @@ local function print_bot_message(player, color, fmt, ...)
         return
     end
 
-    local formatted_text
-    local ok, result = pcall(string.format, fmt, ...)
-    if ok then
-        formatted_text = result
-    else
-        formatted_text = "<formatting error>"
+    local ok, msg = pcall(string.format, fmt, ...)
+    if not ok then
+        msg = "<format error>"
     end
 
-    local prefix = string.format("[color=%s][Game Play Bot][/color] ", color)
-    player.print({"", prefix, formatted_text})
+    player.print({"", string.format("[color=%s][Game Play Bot][/color] ", color), msg})
 end
 
 ----------------------------------------------------------------------
--- PERSISTENT STATE (Factorio 2.x: storage)
+-- STORAGE & PLAYER STATE
 ----------------------------------------------------------------------
 
--- ensure_storage_tables()
---
--- Purpose:
---   Guarantees that the top-level storage table for this mod exists.
 local function ensure_storage_tables()
     storage.game_bot = storage.game_bot or {}
 end
 
--- get_player_state(player_index)
---
--- Purpose:
---   Retrieves the per-player bot state from storage, creating it if
---   it does not yet exist.
---
--- Returns:
---   player_state : table (always non-nil).
 local function get_player_state(player_index)
     ensure_storage_tables()
+    local all = storage.game_bot
+    local ps = all[player_index]
 
-    local all_states = storage.game_bot
-    local player_state = all_states[player_index]
-
-    if not player_state then
-        player_state = {
+    if not ps then
+        ps = {
             bot_entity = nil,
+            bot_enabled = false,
+
+            bot_mode = "follow",
+            last_player_position = nil,
+            last_player_side_offset_x = -BOT_SIDE_OFFSET_DISTANCE,
+
+            wander_target_position = nil,
+
+            -- survey data
+            survey_mapped_entities = {},
+            survey_frontier = {}, -- list of {x,y}
+            survey_seen = {}, -- set of "x,y"
+
             visuals = {
                 bot_highlight = nil,
                 lines = nil,
                 radius_circle = nil,
                 mapped_entities = {}
-            },
-            bot_enabled = false,
-            bot_mode = "follow",
-            last_player_position = nil,
-            last_player_side_offset_x = -BOT_SIDE_OFFSET_DISTANCE,
-
-            -- Wander mode fields.
-            wander_target_position = nil,
-
-            -- Survey mode fields.
-            survey_mapped_entities = {}
+            }
         }
-
-        all_states[player_index] = player_state
+        all[player_index] = ps
     else
-        -- Backfill and normalise existing state.
-        player_state.bot_entity = player_state.bot_entity or nil
+        ps.visuals = ps.visuals or {}
+        ps.visuals.lines = ps.visuals.lines or nil
+        ps.visuals.bot_highlight = ps.visuals.bot_highlight or nil
+        ps.visuals.radius_circle = ps.visuals.radius_circle or nil
+        ps.visuals.mapped_entities = ps.visuals.mapped_entities or {}
 
-        player_state.visuals = player_state.visuals or {}
-        player_state.visuals.bot_highlight = player_state.visuals.bot_highlight or nil
-        player_state.visuals.lines = player_state.visuals.lines or nil
-        player_state.visuals.radius_circle = player_state.visuals.radius_circle or nil
-        player_state.visuals.mapped_entities = player_state.visuals.mapped_entities or {}
-
-        if player_state.bot_enabled == nil then
-            player_state.bot_enabled = false
-        end
-
-        player_state.bot_mode = player_state.bot_mode or "follow"
-        player_state.last_player_position = player_state.last_player_position or nil
-        player_state.last_player_side_offset_x = player_state.last_player_side_offset_x or -BOT_SIDE_OFFSET_DISTANCE
-
-        player_state.wander_target_position = player_state.wander_target_position or nil
-        player_state.survey_mapped_entities = player_state.survey_mapped_entities or {}
+        ps.survey_frontier = ps.survey_frontier or {}
+        ps.survey_seen = ps.survey_seen or {}
+        ps.survey_mapped_entities = ps.survey_mapped_entities or {}
     end
 
-    return player_state
+    return ps
 end
 
 ----------------------------------------------------------------------
--- BOT MODE MANAGEMENT
+-- MODE SETTING
 ----------------------------------------------------------------------
 
--- set_player_bot_mode(player, player_state, new_mode)
---
--- Purpose:
---   Safely updates the behavior mode for a player's bot.
-local function set_player_bot_mode(player, player_state, new_mode)
-    if not player_state then
-        return
-    end
-
+local function set_player_bot_mode(player, ps, new_mode)
     if not BOT_MODE_INDEX[new_mode] then
         new_mode = "follow"
     end
-
-    local old_mode = player_state.bot_mode or "follow"
-    if old_mode == new_mode then
+    if ps.bot_mode == new_mode then
         return
     end
 
-    player_state.bot_mode = new_mode
+    ps.bot_mode = new_mode
     print_bot_message(player, "green", "mode set to %s", new_mode)
+
+    -- survey mode setup reset if entering survey
+    if new_mode == "survey" then
+        ps.survey_frontier = {}
+        ps.survey_seen = {}
+        -- seed initial frontier with current bot position
+        if ps.bot_entity and ps.bot_entity.valid then
+            local p = ps.bot_entity.position
+            table.insert(ps.survey_frontier, {
+                x = p.x,
+                y = p.y
+            })
+            ps.survey_seen[string.format("%s,%s", p.x, p.y)] = true
+        end
+    end
 end
 
 ----------------------------------------------------------------------
--- BOT LIFECYCLE: DESTROY BOT
+-- BOT LIFECYCLE
 ----------------------------------------------------------------------
 
--- destroy_player_bot(player, silent)
---
--- Purpose:
---   Destroys the bot entity for the given player, clears all bot
---   visuals and state flags.
 local function destroy_player_bot(player, silent)
-    local player_state = get_player_state(player.index)
-
-    local bot_entity = player_state.bot_entity
-    if bot_entity and bot_entity.valid then
-        bot_entity.destroy()
+    local ps = get_player_state(player.index)
+    if ps.bot_entity and ps.bot_entity.valid then
+        ps.bot_entity.destroy()
     end
+    visuals.clear_all(ps)
 
-    visuals.clear_all(player_state)
-
-    player_state.bot_entity = nil
-    player_state.bot_enabled = false
+    ps.bot_entity = nil
+    ps.bot_enabled = false
 
     if not silent then
         print_bot_message(player, "yellow", "deactivated")
     end
 end
 
-----------------------------------------------------------------------
--- BOT LIFECYCLE: CREATE BOT
-----------------------------------------------------------------------
-
--- create_player_bot(player)
---
--- Purpose:
---   Creates (or reuses) a bot entity for the given player and updates
---   the per-player state.
---
--- Returns:
---   bot_entity : LuaEntity or nil
 local function create_player_bot(player)
-    local player_state = get_player_state(player.index)
+    local ps = get_player_state(player.index)
 
-    if player_state.bot_entity and not player_state.bot_entity.valid then
-        player_state.bot_entity = nil
+    if ps.bot_entity and ps.bot_entity.valid then
+        ps.bot_enabled = true
+        return ps.bot_entity
     end
 
-    if player_state.bot_entity and player_state.bot_entity.valid then
-        return player_state.bot_entity
-    end
-
-    local surface = player.surface
-    local player_pos = player.position
-
-    local bot_entity = surface.create_entity {
+    local pos = player.position
+    local ent = player.surface.create_entity {
         name = "mekatrol-game-play-bot",
-        position = {player_pos.x - 2, player_pos.y - 2},
+        position = {pos.x - 2, pos.y - 2},
         force = player.force,
         raise_built = true
     }
 
-    if bot_entity then
-        player_state.bot_entity = bot_entity
-        player_state.bot_enabled = true
-        bot_entity.destructible = true
+    if ent then
+        ps.bot_entity = ent
+        ps.bot_enabled = true
+        ent.destructible = true
 
         print_bot_message(player, "green", "created")
-        return bot_entity
+        return ent
     else
         print_bot_message(player, "red", "create failed")
         return nil
@@ -315,125 +245,85 @@ end
 -- HOTKEY HANDLERS
 ----------------------------------------------------------------------
 
--- on_toggle_bot(event)
---
--- Purpose:
---   Responds to the "mekatrol-game-play-bot-toggle" hotkey:
---     * If the player has a bot -> destroy it.
---     * Otherwise -> create a new bot.
 local function on_toggle_bot(event)
-    local player = game.get_player(event.player_index)
-    if not (player and player.valid) then
+    local p = game.get_player(event.player_index)
+    if not (p and p.valid) then
         return
     end
 
-    local player_state = get_player_state(player.index)
-    local bot_entity = player_state.bot_entity
-
-    if bot_entity and bot_entity.valid then
-        destroy_player_bot(player, false)
-        return
-    end
-
-    create_player_bot(player)
-end
-
--- on_cycle_bot_mode(event)
---
--- Purpose:
---   Handler for "mekatrol-game-play-bot-next-mode".
---   Advances the mode:
---       follow -> wander -> survey -> follow -> ...
-local function on_cycle_bot_mode(event)
-    local player = game.get_player(event.player_index)
-    if not (player and player.valid) then
-        return
-    end
-
-    local player_state = get_player_state(player.index)
-    if not player_state then
-        return
-    end
-
-    local current_mode = player_state.bot_mode or "follow"
-    local current_index = BOT_MODE_INDEX[current_mode] or 1
-
-    local next_index = current_index + 1
-    if next_index > #BOT_MODES then
-        next_index = 1
-    end
-
-    local next_mode = BOT_MODES[next_index]
-    set_player_bot_mode(player, player_state, next_mode)
-end
-
-----------------------------------------------------------------------
--- POSITION RESOLUTION / MOVEMENT HELPERS
-----------------------------------------------------------------------
-
--- resolve_target_position(target)
---
--- Purpose:
---   Coerces various target formats into a simple {x, y} position table.
-local function resolve_target_position(target)
-    if type(target) == "table" and target.position ~= nil then
-        return target.position, nil
-
-    elseif type(target) == "table" and target.x ~= nil and target.y ~= nil then
-        return target, nil
-
-    elseif type(target) == "table" and target[1] ~= nil and target[2] ~= nil then
-        return {
-            x = target[1],
-            y = target[2]
-        }, nil
-
+    local ps = get_player_state(p.index)
+    if ps.bot_entity and ps.bot_entity.valid then
+        destroy_player_bot(p, false)
     else
-        local desc = tostring(target)
-        return nil, desc
+        create_player_bot(p)
     end
 end
 
--- move_bot_towards(player, bot_entity, target)
---
--- Purpose:
---   Moves the bot one step towards a target position or entity.
-local function move_bot_towards(player, bot_entity, target)
-    if not (bot_entity and bot_entity.valid and target) then
+local function on_cycle_bot_mode(event)
+    local p = game.get_player(event.player_index)
+    if not (p and p.valid) then
         return
     end
 
-    local target_pos, error_desc = resolve_target_position(target)
-    if not target_pos then
-        print_bot_message(player, "red", "invalid target: %s", error_desc or "<unknown>")
+    local ps = get_player_state(p.index)
+    local cur = ps.bot_mode or "follow"
+    local idx = BOT_MODE_INDEX[cur] or 1
+
+    idx = idx + 1
+    if idx > #BOT_MODES then
+        idx = 1
+    end
+
+    set_player_bot_mode(p, ps, BOT_MODES[idx])
+end
+
+----------------------------------------------------------------------
+-- MOVEMENT / POSITION HELPERS
+----------------------------------------------------------------------
+
+local function resolve_target_position(target)
+    if type(target) == "table" then
+        if target.position then
+            return target.position, nil
+        elseif target.x and target.y then
+            return target, nil
+        elseif target[1] and target[2] then
+            return {
+                x = target[1],
+                y = target[2]
+            }, nil
+        end
+    end
+    return nil, tostring(target)
+end
+
+local function move_bot_towards(player, bot, target)
+    if not (bot and bot.valid) then
+        return
+    end
+    local pos, err = resolve_target_position(target)
+    if not pos then
+        print_bot_message(player, "red", "invalid target: %s", err or "?")
         return
     end
 
-    local bot_pos = bot_entity.position
-    local dx = target_pos.x - bot_pos.x
-    local dy = target_pos.y - bot_pos.y
-    local dist_sq = dx * dx + dy * dy
-
-    if dist_sq == 0 then
+    local bp = bot.position
+    local dx = pos.x - bp.x
+    local dy = pos.y - bp.y
+    local d2 = dx * dx + dy * dy
+    if d2 == 0 then
         return
     end
 
-    local dist = math.sqrt(dist_sq)
-
+    local dist = math.sqrt(d2)
     if dist <= BOT_STEP_DISTANCE then
-        bot_entity.teleport({
-            x = target_pos.x,
-            y = target_pos.y
-        })
+        bot.teleport({pos.x, pos.y})
         return
     end
 
-    local nx = dx / dist
-    local ny = dy / dist
-
-    bot_entity.teleport({
-        x = bot_pos.x + nx * BOT_STEP_DISTANCE,
-        y = bot_pos.y + ny * BOT_STEP_DISTANCE
+    bot.teleport({
+        x = bp.x + dx / dist * BOT_STEP_DISTANCE,
+        y = bp.y + dy / dist * BOT_STEP_DISTANCE
     })
 end
 
@@ -441,97 +331,66 @@ end
 -- FOLLOW MODE
 ----------------------------------------------------------------------
 
--- follow_player(player, player_state, bot_entity)
---
--- Purpose:
---   Keeps the bot near the player, choosing which side (left/right)
---   to follow on based on movement direction.
-local function follow_player(player, player_state, bot_entity)
-    if not (player and player.valid and bot_entity and bot_entity.valid) then
+local function follow_player(player, ps, bot)
+    if not (player and player.valid and bot and bot.valid) then
         return
     end
 
-    local bot_pos = bot_entity.position
-    local player_pos = player.position
+    local ppos = player.position
+    local bpos = bot.position
 
-    ------------------------------------------------------------------
-    -- 1. Determine player movement along X and update side only
-    --    when direction changes.
-    ------------------------------------------------------------------
-    local prev_pos = player_state.last_player_position
-    local moving_left = false
-    local moving_right = false
-
-    if prev_pos then
-        local dx_move = player_pos.x - prev_pos.x
-        local epsilon = 0.1
-
-        if dx_move < -epsilon then
-            moving_left = true
-        elseif dx_move > epsilon then
-            moving_right = true
+    -- detect movement direction
+    local prev = ps.last_player_position
+    local left, right = false, false
+    if prev then
+        local dx = ppos.x - prev.x
+        if dx < -0.1 then
+            left = true
+        elseif dx > 0.1 then
+            right = true
         end
     end
-
-    player_state.last_player_position = {
-        x = player_pos.x,
-        y = player_pos.y
+    ps.last_player_position = {
+        x = ppos.x,
+        y = ppos.y
     }
 
-    ------------------------------------------------------------------
-    -- 2. Choose side offset X.
-    ------------------------------------------------------------------
-    local side_offset_x = player_state.last_player_side_offset_x or -BOT_SIDE_OFFSET_DISTANCE
-
-    if moving_left and side_offset_x ~= BOT_SIDE_OFFSET_DISTANCE then
-        side_offset_x = BOT_SIDE_OFFSET_DISTANCE
-    elseif moving_right and side_offset_x ~= -BOT_SIDE_OFFSET_DISTANCE then
-        side_offset_x = -BOT_SIDE_OFFSET_DISTANCE
+    -- update side offset
+    local so = ps.last_player_side_offset_x or -BOT_SIDE_OFFSET_DISTANCE
+    if left and so ~= BOT_SIDE_OFFSET_DISTANCE then
+        so = BOT_SIDE_OFFSET_DISTANCE
+    elseif right and so ~= -BOT_SIDE_OFFSET_DISTANCE then
+        so = -BOT_SIDE_OFFSET_DISTANCE
     end
+    ps.last_player_side_offset_x = so
 
-    player_state.last_player_side_offset_x = side_offset_x
-
-    ------------------------------------------------------------------
-    -- 3. Check follow distance.
-    ------------------------------------------------------------------
-    local dx = player_pos.x - bot_pos.x
-    local dy = player_pos.y - bot_pos.y
-    local dist_sq = dx * dx + dy * dy
-    local desired_sq = BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE
-
-    if dist_sq <= desired_sq then
+    -- check follow distance
+    local dx = ppos.x - bpos.x
+    local dy = ppos.y - bpos.y
+    if dx * dx + dy * dy <= BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE then
         return
     end
 
-    ------------------------------------------------------------------
-    -- 4. Build target position using the chosen side offset.
-    ------------------------------------------------------------------
-    local offset_y = -2.0
-
-    local target_pos = {
-        x = player_pos.x + side_offset_x,
-        y = player_pos.y + offset_y
+    local target = {
+        x = ppos.x + so,
+        y = ppos.y - 2
     }
-
-    move_bot_towards(player, bot_entity, target_pos)
+    move_bot_towards(player, bot, target)
 end
 
 ----------------------------------------------------------------------
--- WANDER TARGET PICKER
+-- PICK WANDER TARGET
 ----------------------------------------------------------------------
 
-local function pick_new_wander_target(bot_pos)
-    -- Choose a random direction and a distance in [min_dist, max_dist]
+local function pick_new_wander_target(bpos)
     local angle = math.random() * 2 * math.pi
-
-    local min_dist = WANDER_STEP_DISTANCE * 0.4
-    local max_dist = WANDER_STEP_DISTANCE
-
-    local dist = min_dist + (max_dist - min_dist) * math.random()
+    local min_d = WANDER_STEP_DISTANCE * 0.4
+    local max_d = WANDER_STEP_DISTANCE
+    local dist = min_d + (max_d - min_d) * math.random()
 
     return {
-        x = bot_pos.x + math.cos(angle) * dist,
-        y = bot_pos.y + math.sin(angle) * dist
+        x = bpos.x + math.cos(angle) * dist,
+        y = bpos.y + math.sin(angle) * dist
     }
 end
 
@@ -539,119 +398,82 @@ end
 -- WANDER MODE
 ----------------------------------------------------------------------
 
--- wander_bot(player, player_state, bot_entity)
---
--- Purpose:
---   Implements "wander" behavior, picking random nearby targets and
---   scanning for entities to trigger survey mode.
-local function wander_bot(player, player_state, bot_entity)
-    if not (player and player.valid and bot_entity and bot_entity.valid) then
+local function wander_bot(player, ps, bot)
+    if not (player and player.valid and bot and bot.valid) then
         return
     end
+    local surf = bot.surface
+    local bpos = bot.position
 
-    local surface = bot_entity.surface
-    local bot_pos = bot_entity.position
-
-    ------------------------------------------------------------------
-    -- 1. Ensure we have a wander target; pick one if not.
-    ------------------------------------------------------------------
-    local target = player_state.wander_target_position
+    local target = ps.wander_target_position
     if not target then
-        target = pick_new_wander_target(bot_pos)
-        player_state.wander_target_position = target
+        target = pick_new_wander_target(bpos)
+        ps.wander_target_position = target
     end
 
-    ------------------------------------------------------------------
-    -- 2. Step towards the target.
-    ------------------------------------------------------------------
-    move_bot_towards(player, bot_entity, target)
+    move_bot_towards(player, bot, target)
 
-    local new_pos = bot_entity.position
-    local ddx = target.x - new_pos.x
-    local ddy = target.y - new_pos.y
-    local dist_sq = ddx * ddx + ddy * ddy
-    if dist_sq <= (BOT_STEP_DISTANCE * BOT_STEP_DISTANCE) then
-        -- Once we reach the target, clear it so a new one will be
-        -- chosen next tick.
-        player_state.wander_target_position = nil
+    local newp = bot.position
+    local dx = target.x - newp.x
+    local dy = target.y - newp.y
+    if dx * dx + dy * dy <= BOT_STEP_DISTANCE * BOT_STEP_DISTANCE then
+        ps.wander_target_position = nil
     end
 
-    ------------------------------------------------------------------
-    -- 3. Detection: check for nearby entities to trigger survey mode.
-    ------------------------------------------------------------------
-    local nearby = surface.find_entities_filtered {
-        position = new_pos,
+    -- detect nearby entities
+    local found = surf.find_entities_filtered {
+        position = newp,
         radius = WANDER_DETECTION_RADIUS
     }
 
-    local player_character = player.character
-    local found_any = false
-
-    for _, entity in ipairs(nearby) do
-        if entity.valid and entity ~= bot_entity and (not player_character or entity ~= player_character) then
-            found_any = true
-            break
+    local char = player.character
+    for _, e in ipairs(found) do
+        if e.valid and e ~= bot and e ~= char then
+            ps.wander_target_position = nil
+            set_player_bot_mode(player, ps, "survey")
+            return
         end
-    end
-
-    if found_any then
-        -- Clear wander target; survey will drive behaviour now.
-        player_state.wander_target_position = nil
-        set_player_bot_mode(player, player_state, "survey")
     end
 end
 
 ----------------------------------------------------------------------
--- MAPPING HELPERS
+-- MAPPABLE ENTITY CHECK
 ----------------------------------------------------------------------
 
--- is_static_mappable(entity)
---
--- Purpose:
---   Returns true if an entity should be considered for static mapping.
 local function is_static_mappable(entity)
     if not (entity and entity.valid) then
         return false
     end
-
     if NON_STATIC_TYPES[entity.type] then
         return false
     end
-
     return true
 end
 
--- get_entity_key(entity)
---
--- Purpose:
---   Returns a stable key for an entity used as a map index.
 local function get_entity_key(entity)
     if entity.unit_number then
         return entity.unit_number
     end
-
     local p = entity.position
-    return entity.name .. "@" .. p.x .. "," .. p.y .. "#" .. entity.surface.index
+    return string.format("%s@%s,%s#%d", entity.name, p.x, p.y, entity.surface.index)
 end
 
--- upsert_mapped_entity(player, player_state, entity, tick)
---
--- Purpose:
---   Inserts or updates a mapped-entity record for survey mode and
---   draws a highlight box when first discovered.
-local function upsert_mapped_entity(player, player_state, entity, tick)
+----------------------------------------------------------------------
+-- MAPPING / FRONTIER UPSERT
+----------------------------------------------------------------------
+
+local function upsert_mapped_entity(player, ps, entity, tick)
     local key = get_entity_key(entity)
     if not key then
         return false
     end
 
-    local mapped_entities = player_state.survey_mapped_entities
-    local info = mapped_entities[key]
+    local mapped = ps.survey_mapped_entities
+    local info = mapped[key]
     local is_new = false
 
     if not info then
         is_new = true
-
         info = {
             name = entity.name,
             surface_index = entity.surface.index,
@@ -663,87 +485,158 @@ local function upsert_mapped_entity(player, player_state, entity, tick)
             last_seen_tick = tick,
             discovered_by_player_index = player.index
         }
-        mapped_entities[key] = info
+        mapped[key] = info
 
-        -- Draw the highlight only when first discovered.
-        local box_id = visuals.draw_mapped_entity_box(player, player_state, entity)
-        player_state.visuals.mapped_entities[key] = box_id
+        -- Draw box
+        local box_id = visuals.draw_mapped_entity_box(player, ps, entity)
+        ps.visuals.mapped_entities[key] = box_id
     else
-        -- Already known: just update position/last_seen.
-        info.position.x = entity.position.x
-        info.position.y = entity.position.y
+        -- update existing
+        local pos = entity.position
+        info.position.x = pos.x
+        info.position.y = pos.y
         info.last_seen_tick = tick
     end
 
-    -- Caller decides what to do with is_new.
     return is_new
 end
 
 ----------------------------------------------------------------------
--- SURVEY MODE
+-- SURVEY MODE (BFS ENTITY EXPANSION, NEAREST-FIRST)
 ----------------------------------------------------------------------
 
--- survey_location(player, player_state, bot_entity, tick)
---
--- Purpose:
---   Implements survey mode: scans SURVEY_RADIUS around the bot and
---   records mappable entities.
-local function survey_location(player, player_state, bot_entity, tick)
-    if not (player and player.valid and bot_entity and bot_entity.valid) then
-        return
+-- Insert new frontier node only if not previously seen
+local function add_frontier_node(ps, x, y)
+    local key = string.format("%s,%s", x, y)
+    if not ps.survey_seen[key] then
+        ps.survey_seen[key] = true
+        table.insert(ps.survey_frontier, {
+            x = x,
+            y = y
+        })
+    end
+end
+
+-- Returns distance^2 between bot and a frontier node
+local function frontier_distance_sq(bot_pos, node)
+    local dx = node.x - bot_pos.x
+    local dy = node.y - bot_pos.y
+    return dx * dx + dy * dy
+end
+
+-- Select nearest frontier location
+local function get_nearest_frontier(ps, bot_pos)
+    local frontier = ps.survey_frontier
+    if #frontier == 0 then
+        return nil
     end
 
-    local found = bot_entity.surface.find_entities_filtered {
-        position = bot_entity.position,
+    local best_i = 1
+    local best_d2 = frontier_distance_sq(bot_pos, frontier[1])
+
+    for i = 2, #frontier do
+        local d2 = frontier_distance_sq(bot_pos, frontier[i])
+        if d2 < best_d2 then
+            best_d2 = d2
+            best_i = i
+        end
+    end
+
+    -- Remove and return
+    local node = frontier[best_i]
+    table.remove(frontier, best_i)
+    return node
+end
+
+-- Perform the survey scan when bot arrives at a frontier node
+local function perform_survey_scan(player, ps, bot, tick)
+    local surf = bot.surface
+    local bpos = bot.position
+
+    local found = surf.find_entities_filtered {
+        position = bpos,
         radius = SURVEY_RADIUS
     }
 
-    local found_new = false
+    local discovered_any = false
 
-    for _, entity in ipairs(found) do
-        if entity ~= bot_entity and entity ~= player and is_static_mappable(entity) then
-            local is_new = upsert_mapped_entity(player, player_state, entity, tick)
-            if is_new then
-                found_new = true
+    for _, e in ipairs(found) do
+        if e ~= bot and e ~= player and is_static_mappable(e) then
+            if upsert_mapped_entity(player, ps, e, tick) then
+                discovered_any = true
+
+                -- Seed new frontier positions at the entity’s location
+                local p = e.position
+                add_frontier_node(ps, p.x, p.y)
             end
         end
     end
 
-    -- If we are in survey mode and did not discover anything new in
-    -- this pass, return to follow mode.
-    if not found_new then
-        set_player_bot_mode(player, player_state, "follow")
+    return discovered_any
+end
+
+-- Main survey behavior
+local function survey_bot(player, ps, bot, tick)
+    if not (player and player.valid and bot and bot.valid) then
+        return
+    end
+
+    local bot_pos = bot.position
+
+    -- If no frontier remains: survey complete
+    if #ps.survey_frontier == 0 then
+        set_player_bot_mode(player, ps, "follow")
+        return
+    end
+
+    -- Select nearest frontier node
+    local target = get_nearest_frontier(ps, bot_pos)
+    if not target then
+        set_player_bot_mode(player, ps, "follow")
+        return
+    end
+
+    -- Walk towards frontier node
+    move_bot_towards(player, bot, target)
+
+    -- Check arrival
+    local new_bp = bot.position
+    local dx = target.x - new_bp.x
+    local dy = target.y - new_bp.y
+    local d2 = dx * dx + dy * dy
+
+    if d2 <= (SURVEY_ARRIVAL_THRESHOLD * SURVEY_ARRIVAL_THRESHOLD) then
+        -- Arrived → perform a scan
+        local discovered = perform_survey_scan(player, ps, bot, tick)
+
+        -- If the scan discovered nothing and no more frontier nodes → done
+        if not discovered and #ps.survey_frontier == 0 then
+            set_player_bot_mode(player, ps, "follow")
+        end
+    else
+        -- Not arrived; reinsert the target so it will be retried later
+        -- (nearest-first guarantees we target the closest each tick)
+        table.insert(ps.survey_frontier, target)
     end
 end
 
 ----------------------------------------------------------------------
--- PER-TICK BOT UPDATE
+-- VISUALS + BEHAVIOR DISPATCH
 ----------------------------------------------------------------------
 
--- update_bot_for_player(player, player_state, tick)
---
--- Purpose:
---   Performs all per-tick logic for a single player's bot:
---     * Clear and update visuals.
---     * Run behavior for the current mode.
-local function update_bot_for_player(player, player_state, tick)
-    local bot_entity = player_state.bot_entity
-    if not (bot_entity and bot_entity.valid) then
+local function update_bot_for_player(player, ps, tick)
+    local bot = ps.bot_entity
+    if not (bot and bot.valid) then
         return
     end
 
-    -- Clear existing lines from previous tick before drawing new ones.
-    visuals.clear_lines(player_state)
+    -- Update visuals
+    visuals.clear_lines(ps)
+    visuals.draw_bot_highlight(player, ps)
 
-    -- Update highlight.
-    player_state.bot_entity = bot_entity
-    visuals.draw_bot_highlight(player, player_state)
+    local radius, radius_color, line_color = nil, nil, nil
 
-    local radius = nil
-    local radius_color = nil
-    local line_color = nil
-
-    if player_state.bot_mode == "wander" then
+    if ps.bot_mode == "wander" then
         radius = WANDER_DETECTION_RADIUS
         radius_color = {
             r = 0,
@@ -752,8 +645,7 @@ local function update_bot_for_player(player, player_state, tick)
             a = 0.8
         }
         line_color = radius_color
-
-    elseif player_state.bot_mode == "survey" then
+    elseif ps.bot_mode == "survey" then
         radius = SURVEY_RADIUS
         radius_color = {
             r = 1.0,
@@ -762,8 +654,7 @@ local function update_bot_for_player(player, player_state, tick)
             a = 0.8
         }
         line_color = radius_color
-
-    elseif player_state.bot_mode == "follow" then
+    elseif ps.bot_mode == "follow" then
         line_color = {
             r = 0.3,
             g = 0.3,
@@ -773,94 +664,79 @@ local function update_bot_for_player(player, player_state, tick)
     end
 
     if radius and radius > 0 then
-        visuals.draw_radius_circle(player, player_state, bot_entity, radius, radius_color)
+        visuals.draw_radius_circle(player, ps, bot, radius, radius_color)
     else
-        visuals.clear_radius_circle(player_state)
+        visuals.clear_radius_circle(ps)
     end
 
     if line_color then
-        visuals.draw_lines(player, player_state, bot_entity, line_color)
+        visuals.draw_lines(player, ps, bot, line_color)
     end
 
-    ------------------------------------------------------------------
-    -- Behavior dispatch based on current mode.
-    ------------------------------------------------------------------
-    if player_state.bot_mode == "follow" then
-        follow_player(player, player_state, bot_entity)
+    -- Behavior dispatch
+    if ps.bot_mode == "follow" then
+        follow_player(player, ps, bot)
 
-    elseif player_state.bot_mode == "wander" then
-        wander_bot(player, player_state, bot_entity)
+    elseif ps.bot_mode == "wander" then
+        wander_bot(player, ps, bot)
 
-    elseif player_state.bot_mode == "survey" then
-        survey_location(player, player_state, bot_entity, tick)
+    elseif ps.bot_mode == "survey" then
+        survey_bot(player, ps, bot, tick)
     end
 end
 
 ----------------------------------------------------------------------
--- EVENT HANDLERS
+-- EVENT: ENTITY DIED
 ----------------------------------------------------------------------
 
--- on_entity_died(event)
---
--- Purpose:
---   When any entity dies, if it is one of our bots, clear state and
---   notify the owning player.
 local function on_entity_died(event)
-    local entity = event.entity
-    if not entity then
-        return
-    end
-
-    if entity.name ~= "mekatrol-game-play-bot" then
+    local ent = event.entity
+    if not ent or ent.name ~= "mekatrol-game-play-bot" then
         return
     end
 
     ensure_storage_tables()
-    local all_states = storage.game_bot
+    for idx, ps in pairs(storage.game_bot) do
+        if ps.bot_entity == ent then
+            ps.bot_entity = nil
+            ps.bot_enabled = false
+            visuals.clear_all(ps)
 
-    for player_index, player_state in pairs(all_states) do
-        if player_state.bot_entity == entity then
-            player_state.bot_entity = nil
-            player_state.bot_enabled = false
-
-            visuals.clear_all(player_state)
-
-            local player = game.get_player(player_index)
-            if player and player.valid then
-                print_bot_message(player, "yellow", "destroyed")
+            local pl = game.get_player(idx)
+            if pl and pl.valid then
+                print_bot_message(pl, "yellow", "destroyed")
             end
         end
     end
 end
 
--- on_player_removed(event)
---
--- Purpose:
---   Cleans up per-player state when a player is removed from the game.
+----------------------------------------------------------------------
+-- EVENT: PLAYER REMOVED
+----------------------------------------------------------------------
+
 local function on_player_removed(event)
     ensure_storage_tables()
-    local all_states = storage.game_bot
-    local player_index = event.player_index
-
-    local player_state = all_states[player_index]
-    if not player_state then
+    local all = storage.game_bot
+    local idx = event.player_index
+    local ps = all[idx]
+    if not ps then
         return
     end
 
-    local player = game.get_player(player_index)
-    if player and player.valid then
-        destroy_player_bot(player, true)
+    local p = game.get_player(idx)
+    if p and p.valid then
+        destroy_player_bot(p, true)
     else
-        if player_state.bot_entity and player_state.bot_entity.valid then
-            player_state.bot_entity.destroy()
+        if ps.bot_entity and ps.bot_entity.valid then
+            ps.bot_entity.destroy()
         end
     end
 
-    all_states[player_index] = nil
+    all[idx] = nil
 end
 
 ----------------------------------------------------------------------
--- LIFECYCLE HOOKS (INIT / CONFIG CHANGE)
+-- INIT / CONFIG
 ----------------------------------------------------------------------
 
 script.on_init(function()
@@ -882,11 +758,7 @@ script.on_event(defines.events.on_entity_died, on_entity_died)
 script.on_event(defines.events.on_player_removed, on_player_removed)
 
 ----------------------------------------------------------------------
--- MAIN TICK HANDLER
---
--- Purpose:
---   Periodically updates the bot for player 1.
---   For multiplayer, extend this to loop over connected players.
+-- TICK HANDLER
 ----------------------------------------------------------------------
 
 script.on_event(defines.events.on_tick, function(event)
@@ -894,18 +766,18 @@ script.on_event(defines.events.on_tick, function(event)
         return
     end
 
+    -- This mod currently supports single-player; extend for MP if needed
     local player = game.get_player(1)
     if not (player and player.valid) then
         return
     end
 
-    local player_state = get_player_state(player.index)
-    if not player_state then
-        print_bot_message(player, "green", "player found but no state exists.")
+    local ps = get_player_state(player.index)
+    if not ps then
         return
     end
 
-    if player_state.bot_enabled and player_state.bot_entity and player_state.bot_entity.valid then
-        update_bot_for_player(player, player_state, event.tick)
+    if ps.bot_enabled and ps.bot_entity and ps.bot_entity.valid then
+        update_bot_for_player(player, ps, event.tick)
     end
 end)
