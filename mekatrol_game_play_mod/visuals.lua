@@ -32,6 +32,9 @@
 --   }
 --
 ----------------------------------------------------------------------
+-- Must match "name" in info.json
+local MOD_NAME = "mekatrol_game_play_mod"
+
 ---------------------------------------------------
 -- MODULE TABLE
 ---------------------------------------------------
@@ -155,6 +158,18 @@ function visuals.clear_radius_circle(player_state)
     player_state.visuals.radius_circle = nil
 end
 
+function visuals.clear_mapped_entities(player_state)
+    ---------------------------------------------------------------
+    -- 1. Wipe ALL rendering objects created by this mod
+    ----------------------------------------------------------------
+    pcall(rendering.clear, MOD_NAME)
+
+    ----------------------------------------------------------------
+    -- 2. Reset per-player mapping state
+    ----------------------------------------------------------------
+    player_state.visuals.mapped_entities = {}
+end
+
 ---------------------------------------------------
 -- FUNCTION: clear_all(player_state)
 --
@@ -178,6 +193,7 @@ function visuals.clear_all(player_state)
     visuals.clear_lines(player_state)
     visuals.clear_bot_highlight(player_state)
     visuals.clear_radius_circle(player_state)
+    visuals.clear_mapped_entities(player_state)
 end
 
 ----------------------------------------------------------------------
@@ -450,6 +466,38 @@ function visuals.draw_lines(player, bot_entity, player_state, line_color)
         -- Track this render object for later cleanup.
         player_state.visuals.lines[#player_state.visuals.lines + 1] = line
     end
+end
+
+---------------------------------------------------
+-- Green box around mapped entities
+---------------------------------------------------
+function visuals.add_mapped_entity_box(player, player_state, bot_entity)
+    if not (bot_entity and bot_entity.valid) then
+        return nil
+    end
+
+    local box = bot_entity.selection_box or bot_entity.bounding_box
+    if not box then
+        return nil
+    end
+
+    local id = rendering.draw_rectangle {
+        color = {
+            r = 0.3,
+            g = 0.3,
+            b = 0.3,
+            a = 0.35
+        },
+        width = 1,
+        filled = false,
+        left_top = box.left_top,
+        right_bottom = box.right_bottom,
+        surface = bot_entity.surface,
+        players = {player},
+        draw_on_ground = false
+    }
+
+    return id
 end
 
 ----------------------------------------------------------------------
