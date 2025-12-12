@@ -85,6 +85,44 @@ function visuals.clear_bot_highlight(player_state)
     player_state.visuals.bot_highlight = nil
 end
 
+function visuals.clear_survey_frontier(player_state)
+    if not (player_state and player_state.visuals) then
+        return
+    end
+
+    local frontier = player_state.visuals.survey_frontier
+    if not frontier then
+        return
+    end
+
+    for _, frontier_obj in pairs(frontier) do
+        if frontier_obj and frontier_obj.valid then
+            frontier_obj:destroy()
+        end
+    end
+
+    player_state.visuals.survey_frontier = {}
+end
+
+function visuals.clear_survey_done(player_state)
+    if not (player_state and player_state.visuals) then
+        return
+    end
+
+    local done = player_state.visuals.survey_done
+    if not done then
+        return
+    end
+
+    for _, done_obj in pairs(done) do
+        if done_obj and done_obj.valid then
+            done_obj:destroy()
+        end
+    end
+
+    player_state.visuals.survey_done = {}
+end
+
 ---------------------------------------------------
 -- FUNCTION: clear_lines(player_state)
 --
@@ -124,7 +162,7 @@ function visuals.clear_lines(player_state)
         end
     end
 
-    player_state.visuals.lines = nil
+    player_state.visuals.lines = {}
 end
 
 ---------------------------------------------------
@@ -224,6 +262,8 @@ function visuals.clear_all(player_state)
     visuals.clear_bot_highlight(player_state)
     visuals.clear_radius_circle(player_state)
     visuals.clear_mapped_entities(player_state)
+    visuals.clear_survey_frontier(player_state)
+    visuals.clear_survey_done(player_state)
 end
 
 ----------------------------------------------------------------------
@@ -458,6 +498,86 @@ function visuals.draw_lines(player, player_state, bot_entity, target_pos, line_c
         }
 
         player_state.visuals.lines[#player_state.visuals.lines + 1] = line
+    end
+end
+
+function visuals.draw_survey_frontier(player, player_state, bot_entity)
+    if not (player and player.valid and bot_entity and bot_entity.valid) then
+        return
+    end
+
+    if not player_state then
+        return
+    end
+
+    local survey_frontier = player_state.survey_frontier
+    if #survey_frontier == 0 then
+        return
+    end
+
+    ------------------------------------------------------------------
+    -- Draw each frontier location
+    ------------------------------------------------------------------
+    local color = {
+        r = 1.0,
+        g = 0.1,
+        b = 0.1,
+        a = 1.0
+    }
+
+    for _, f in ipairs(survey_frontier) do
+        local frontier = rendering.draw_circle {
+            color = color,
+            radius = 0.15,
+            filled = true,
+            target = f,
+            surface = bot_entity.surface,
+            draw_on_ground = true,
+            only_in_alt_mode = false,
+            players = {player}
+        }
+
+        player_state.visuals.survey_frontier[#player_state.visuals.survey_frontier + 1] = frontier
+    end
+end
+
+function visuals.draw_survey_done(player, player_state, bot_entity)
+    if not (player and player.valid and bot_entity and bot_entity.valid) then
+        return
+    end
+
+    if not player_state then
+        return
+    end
+
+    local survey_done = player_state.survey_done
+    if #survey_done == 0 then
+        return
+    end
+
+    ------------------------------------------------------------------
+    -- Draw each survey done location
+    ------------------------------------------------------------------
+    local color = {
+        r = 0.1,
+        g = 1.0,
+        b = 0.1,
+        a = 1.0
+    }
+
+    for _, f in ipairs(survey_done) do
+        local done = rendering.draw_circle {
+            color = color,
+            radius = 0.15,
+            filled = true,
+            target = f,
+            surface = bot_entity.surface,
+            draw_on_ground = true,
+            only_in_alt_mode = false,
+            players = {player}
+        }
+
+        player_state.visuals.survey_done[#player_state.visuals.survey_done + 1] = done
     end
 end
 
