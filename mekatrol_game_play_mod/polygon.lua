@@ -25,10 +25,18 @@ local function cross(o, a, b)
     return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
 end
 
+local function dot(ax, ay, bx, by)
+    return ax * bx + ay * by
+end
+
 local function dist2(a, b)
     local dx = a.x - b.x
     local dy = a.y - b.y
     return dx * dx + dy * dy
+end
+
+local function len2(x, y)
+    return x * x + y * y
 end
 
 local function points_equal(a, b)

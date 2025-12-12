@@ -6,7 +6,7 @@ local config = {}
 
 config.bot = {
     update_interval = 1,
-    update_hull_interval = 1000,
+    update_hull_interval = 100,
 
     movement = {
         step_distance = 0.18,

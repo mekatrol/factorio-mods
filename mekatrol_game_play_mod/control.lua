@@ -22,7 +22,6 @@ local visuals = require("visuals")
 local BOT = config.bot
 local MODES = config.modes
 local NON_STATIC_TYPES = config.non_static_types
-local mapped_entities_hull = nil
 
 ----------------------------------------------------------------------
 -- Print helpers
@@ -73,6 +72,11 @@ local function get_player_state(player_index)
             survey_done = {}, -- positions already surveyed
             survey_seen = {}, -- Set: "x,y" (quantized) -> true.
 
+            hull = nil,
+            hull_points_count = 0,
+            hull_tick = 0,
+            hull_quantized_count = 0,
+
             visuals = {
                 bot_highlight = nil,
                 lines = nil,
@@ -91,6 +95,11 @@ local function get_player_state(player_index)
         ps.survey_seen = ps.survey_seen or {}
         ps.survey_mapped_entities = ps.survey_mapped_entities or {}
         ps.survey_mapped_positions = ps.survey_mapped_positions or {}
+
+        ps.hull = ps.hull or nil
+        ps.hull_points_count = ps.hull_points_count or 0
+        ps.hull_tick = ps.hull_tick or 0
+        ps.hull_quantized_count = ps.hull_quantized_count or 0
 
         ps.visuals = ps.visuals or {}
         ps.visuals.lines = ps.visuals.lines or nil
@@ -420,15 +429,35 @@ end
 
 local function get_mapped_entity_points(ps)
     local points = {}
+    local seen = {}
+
+    -- Hull quantization. 1.0 is usually best for performance + stability.
+    local q = 1.0
 
     for _, info in pairs(ps.survey_mapped_entities) do
-        points[#points + 1] = {
-            x = info.position.x,
-            y = info.position.y
-        }
+        local x = quantize(info.position.x, q)
+        local y = quantize(info.position.y, q)
+
+        -- Stable key for dedupe (integers when q=1.0, halves when q=0.5)
+        local key
+        if q == 1.0 then
+            key = string.format("%d,%d", x, y)
+        elseif q == 0.5 then
+            key = string.format("%.1f,%.1f", x, y)
+        else
+            key = string.format("%.2f,%.2f", x, y)
+        end
+
+        if not seen[key] then
+            seen[key] = true
+            points[#points + 1] = {
+                x = x,
+                y = y
+            }
+        end
     end
 
-    return points
+    return points, #points
 end
 
 ----------------------------------------------------------------------
@@ -778,27 +807,30 @@ local function update_bot_for_player(player, ps, tick)
         survey_bot(player, ps, bot, tick)
     end
 
-    if tick % BOT.update_hull_interval ~= 0 then
-        local points = get_mapped_entity_points(ps)
+    if tick % BOT.update_hull_interval == 0 then
+        local points, qcount = get_mapped_entity_points(ps)
 
-        if #points >= 3 then
-            local hull = polygon.convex_hull(points)
+        if qcount >= 3 then
+            local changed = (qcount ~= (ps.hull_quantized_count or 0))
+            local stale = (tick - (ps.hull_tick or 0)) > 60 * 2
 
-            -- Tune k:
-            --   k = 3..6  : more concave (fits tighter, can be noisier)
-            --   k = 8..15 : smoother (approaches convex hull)
-            -- local hull = polygon.concave_hull(points, 6)
-
-            mapped_entities_hull = hull
+            if changed and stale then
+                ps.hull = polygon.concave_hull(points, 8, {
+                    max_k = 12
+                })
+                ps.hull_quantized_count = qcount
+                ps.hull_tick = tick
+            end
         end
     end
 
-    if mapped_entities_hull then
-        -- mapped_entities_hull is an ordered CCW polygon
+    local hull = ps.hull
+    if hull then
+        -- hull is an ordered CCW polygon
         -- { {x,y}, {x,y}, ... }
-        for i = 1, #mapped_entities_hull do
-            local a = mapped_entities_hull[i]
-            local b = mapped_entities_hull[i % #mapped_entities_hull + 1]
+        for i = 1, #hull do
+            local a = hull[i]
+            local b = hull[i % #hull + 1]
 
             visuals.draw_line(player, ps, a, b, {
                 r = 1,
