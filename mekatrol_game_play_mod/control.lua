@@ -337,9 +337,9 @@ local function wander_bot(player, ps, bot)
 
     move_bot_towards(player, bot, target)
 
-    local bot_pos = bot.position
-    local dx = target.x - bot_pos.x
-    local dy = target.y - bot_pos.y
+    local bpos = bot.position
+    local dx = target.x - bpos.x
+    local dy = target.y - bpos.y
     local step = BOT.movement.step_distance
 
     if dx * dx + dy * dy > step * step then
@@ -352,7 +352,7 @@ local function wander_bot(player, ps, bot)
 
     -- Detect nearby entities
     local found = surf.find_entities_filtered {
-        position = bot_pos,
+        position = bpos,
         radius = BOT.wander.detection_radius
     }
 
@@ -501,33 +501,36 @@ local function survey_bot(player, ps, bot, tick)
         return
     end
 
-    if #ps.survey_frontier == 0 then
-        set_player_bot_mode(player, ps, "follow")
-        return
-    end
-
     local target = get_nearest_frontier(ps, bot.position)
     if not target then
+        -- If there are more frontiers then switch back to follow mode
         set_player_bot_mode(player, ps, "follow")
         return
     end
 
+    -- Target the frontier position
     ps.bot_target_position = target
 
+    -- Move toward the target
     move_bot_towards(player, bot, target)
 
-    local new_bp = bot.position
-    local dx = target.x - new_bp.x
-    local dy = target.y - new_bp.y
+    local bpos = bot.position
+    local dx = target.x - bpos.x
+    local dy = target.y - bpos.y
     local d2 = dx * dx + dy * dy
 
     local thr = BOT.survey.arrival_threshold
+
     if d2 <= (thr * thr) then
+        -- Bot has arrived at survey location
         local discovered = perform_survey_scan(player, ps, bot, tick)
+
+        -- If nothing discovered and no more frontiersthen return to follow moe
         if not discovered and #ps.survey_frontier == 0 then
             set_player_bot_mode(player, ps, "follow")
         end
     else
+        -- Add frontier as queued frontier
         table.insert(ps.survey_frontier, target)
     end
 end
