@@ -15,12 +15,14 @@
 -- - Comments use consistent casing and are intentionally verbose.
 ----------------------------------------------------------------------
 local config = require("configuration")
+local polygon = require("polygon")
 local visuals = require("visuals")
 
 -- Config aliases.
 local BOT = config.bot
 local MODES = config.modes
 local NON_STATIC_TYPES = config.non_static_types
+local mapped_entities_hull = nil
 
 ----------------------------------------------------------------------
 -- Print helpers
@@ -416,6 +418,19 @@ local function upsert_mapped_entity(player, ps, entity, tick)
     return is_new
 end
 
+local function get_mapped_entity_points(ps)
+    local points = {}
+
+    for _, info in pairs(ps.survey_mapped_entities) do
+        points[#points + 1] = {
+            x = info.position.x,
+            y = info.position.y
+        }
+    end
+
+    return points
+end
+
 ----------------------------------------------------------------------
 -- Mode setting
 ----------------------------------------------------------------------
@@ -761,6 +776,37 @@ local function update_bot_for_player(player, ps, tick)
         wander_bot(player, ps, bot)
     elseif ps.bot_mode == "survey" then
         survey_bot(player, ps, bot, tick)
+    end
+
+    if tick % BOT.update_hull_interval ~= 0 then
+        local points = get_mapped_entity_points(ps)
+
+        if #points >= 3 then
+            local hull = polygon.convex_hull(points)
+
+            -- Tune k:
+            --   k = 3..6  : more concave (fits tighter, can be noisier)
+            --   k = 8..15 : smoother (approaches convex hull)
+            -- local hull = polygon.concave_hull(points, 6)
+
+            mapped_entities_hull = hull
+        end
+    end
+
+    if mapped_entities_hull then
+        -- mapped_entities_hull is an ordered CCW polygon
+        -- { {x,y}, {x,y}, ... }
+        for i = 1, #mapped_entities_hull do
+            local a = mapped_entities_hull[i]
+            local b = mapped_entities_hull[i % #mapped_entities_hull + 1]
+
+            visuals.draw_line(player, ps, a, b, {
+                r = 1,
+                g = 0,
+                b = 0,
+                a = 0.8
+            })
+        end
     end
 
     visuals.draw_survey_frontier(player, ps, bot)

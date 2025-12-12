@@ -42,6 +42,11 @@ local MOD_NAME = "mekatrol_game_play_mod"
 ---------------------------------------------------
 local visuals = {}
 
+local function ensure_lines_table(ps)
+    ps.visuals = ps.visuals or {}
+    ps.visuals.lines = ps.visuals.lines or {}
+end
+
 ----------------------------------------------------------------------
 -- CLEAR HELPERS
 --
@@ -423,6 +428,33 @@ function visuals.draw_bot_highlight(player, player_state)
         only_in_alt_mode = false,
         players = {player}
     }
+end
+
+function visuals.draw_line(player, ps, a, b, color, width)
+    if not (player and player.valid) then
+        return nil
+    end
+
+    ensure_lines_table(ps)
+
+    local id = rendering.draw_line {
+        surface = player.surface,
+        from = {a.x, a.y},
+        to = {b.x, b.y},
+        color = color or {
+            r = 1,
+            g = 1,
+            b = 1,
+            a = 1
+        },
+        width = width or 2,
+        time_to_live = 2 * 60, -- adjust if you want persistent
+        players = {player.index},
+        draw_on_ground = true
+    }
+
+    ps.visuals.lines[#ps.visuals.lines + 1] = id
+    return id
 end
 
 ---------------------------------------------------
