@@ -40,6 +40,15 @@ local function print_bot_message(player, color, fmt, ...)
     player.print({"", string.format("[color=%s][Game Play Bot][/color] ", color), msg})
 end
 
+-- Simple, fast, order-independent hash combiner
+-- Uses 32-bit arithmetic semantics via Lua numbers
+local function hash_combine(h, v)
+    -- constants chosen for good avalanche without bitops
+    h = h + v * 0x9e3779b1
+    h = h - math.floor(h / 0x100000000) * 0x100000000 -- wrap to 32-bit
+    return h
+end
+
 ----------------------------------------------------------------------
 -- Storage and player state
 ----------------------------------------------------------------------
@@ -76,6 +85,7 @@ local function get_player_state(player_index)
             hull_points_count = 0,
             hull_tick = 0,
             hull_quantized_count = 0,
+            hull_quantized_hash = 0,
 
             visuals = {
                 bot_highlight = nil,
@@ -100,6 +110,7 @@ local function get_player_state(player_index)
         ps.hull_points_count = ps.hull_points_count or 0
         ps.hull_tick = ps.hull_tick or 0
         ps.hull_quantized_count = ps.hull_quantized_count or 0
+        ps.hull_quantized_hash = ps.hull_quantized_hash or 0
 
         ps.visuals = ps.visuals or {}
         ps.visuals.lines = ps.visuals.lines or nil
@@ -431,33 +442,36 @@ local function get_mapped_entity_points(ps)
     local points = {}
     local seen = {}
 
-    -- Hull quantization. 1.0 is usually best for performance + stability.
-    local q = 1.0
+    local q = 1.0 -- hull quantization (recommended)
+    local hash = 0
+    local count = 0
 
     for _, info in pairs(ps.survey_mapped_entities) do
         local x = quantize(info.position.x, q)
         local y = quantize(info.position.y, q)
 
-        -- Stable key for dedupe (integers when q=1.0, halves when q=0.5)
-        local key
-        if q == 1.0 then
-            key = string.format("%d,%d", x, y)
-        elseif q == 0.5 then
-            key = string.format("%.1f,%.1f", x, y)
-        else
-            key = string.format("%.2f,%.2f", x, y)
-        end
+        -- Stable integer grid coordinates when q = 1.0
+        local ix = x
+        local iy = y
 
+        local key = ix .. "," .. iy
         if not seen[key] then
             seen[key] = true
+
             points[#points + 1] = {
-                x = x,
-                y = y
+                x = ix,
+                y = iy
             }
+            count = count + 1
+
+            -- Hash the coordinate pair (order-independent)
+            -- Use different primes to mix x/y
+            local v = ix * 73856093 + iy * 19349663
+            hash = hash_combine(hash, v)
         end
     end
 
-    return points, #points
+    return points, count, hash
 end
 
 ----------------------------------------------------------------------
@@ -808,17 +822,20 @@ local function update_bot_for_player(player, ps, tick)
     end
 
     if tick % BOT.update_hull_interval == 0 then
-        local points, qcount = get_mapped_entity_points(ps)
+        local points, qcount, qhash = get_mapped_entity_points(ps)
 
         if qcount >= 3 then
-            local changed = (qcount ~= (ps.hull_quantized_count or 0))
+            local changed = (qcount ~= ps.hull_quantized_count) or (qhash ~= ps.hull_quantized_hash)
+
             local stale = (tick - (ps.hull_tick or 0)) > 60 * 2
 
             if changed and stale then
                 ps.hull = polygon.concave_hull(points, 8, {
                     max_k = 12
                 })
+
                 ps.hull_quantized_count = qcount
+                ps.hull_quantized_hash = qhash
                 ps.hull_tick = tick
             end
         end
