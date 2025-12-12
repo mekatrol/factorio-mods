@@ -444,6 +444,20 @@ local function add_frontier_node(ps, x, y)
     end
 end
 
+local function add_frontier_on_radius_edge(ps, bot_pos, point_pos, radius)
+    local dx = point_pos.x - bot_pos.x
+    local dy = point_pos.y - bot_pos.y
+    local d2 = dx * dx + dy * dy
+    if d2 <= 0 then
+        return
+    end
+
+    local d = math.sqrt(d2)
+    local scale = radius / d
+
+    add_frontier_node(ps, bot_pos.x + dx * scale, bot_pos.y + dy * scale)
+end
+
 local function frontier_distance_sq(bot_pos, node)
     local dx = node.x - bot_pos.x
     local dy = node.y - bot_pos.y
@@ -487,8 +501,9 @@ local function perform_survey_scan(player, ps, bot, tick)
         if e ~= bot and e ~= player and is_static_mappable(e) then
             if upsert_mapped_entity(player, ps, e, tick) then
                 discovered_any = true
-                local p = e.position
-                add_frontier_node(ps, p.x, p.y)
+
+                -- frontier becomes the *edge* of the survey radius, in the direction of the entity
+                add_frontier_on_radius_edge(ps, bpos, e.position, BOT.survey.radius)
             end
         end
     end
@@ -529,9 +544,6 @@ local function survey_bot(player, ps, bot, tick)
         if not discovered and #ps.survey_frontier == 0 then
             set_player_bot_mode(player, ps, "follow")
         end
-    else
-        -- Add frontier as queued frontier
-        table.insert(ps.survey_frontier, target)
     end
 end
 
