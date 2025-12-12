@@ -1,97 +1,13 @@
 ----------------------------------------------------------------------
 -- control.lua (Factorio 2.x / Space Age)
---
--- Full rewrite implementing:
---   * follow, wander, survey modes
---   * entity-adjacency BFS survey expansion
---   * nearest-frontier-first traversal (movement style C)
---   * natural step movement (no teleportation)
---
--- Survey Mode Architecture:
---
---   Survey begins with the bot's current position, scans SURVEY_RADIUS.
---   Any newly discovered entity is added as a frontier node.
---
---   The system maintains:
---       player_state.survey_frontier = {
---           { x=..., y=... }, ...
---       }
---
---       player_state.survey_seen = {
---           ["x,y"] = true
---       }
---
---   Each tick:
---       1. Select the frontier node closest to the bot's current position.
---       2. Walk toward it using move_bot_towards(...)
---       3. When within arrival threshold:
---             * run survey scan
---             * add newly discovered entities to frontier
---       4. When frontier becomes empty AND no new discoveries:
---             * survey ends → follow mode
---
 ----------------------------------------------------------------------
+local config = require("configuration")
 local visuals = require("visuals")
 
-----------------------------------------------------------------------
--- CONFIG
-----------------------------------------------------------------------
-
-local BOT_UPDATE_INTERVAL = 1
-local BOT_STEP_DISTANCE = 0.18
-local BOT_FOLLOW_DISTANCE = 1.0
-local BOT_SIDE_OFFSET_DISTANCE = 2.0
-
-local WANDER_STEP_DISTANCE = 5.0
-local WANDER_DETECTION_RADIUS = 5.0
-
--- Survey tuning
-local SURVEY_RADIUS = 6.0
-local SURVEY_ARRIVAL_THRESHOLD = 0.5 -- distance threshold for "arrived at frontier node"
-
-----------------------------------------------------------------------
--- MODES
-----------------------------------------------------------------------
-
-local BOT_MODES = {"follow", "wander", "survey"}
-local BOT_MODE_INDEX = {}
-for i, m in ipairs(BOT_MODES) do
-    BOT_MODE_INDEX[m] = i
-end
-
-----------------------------------------------------------------------
--- NON-MAPPABLE TYPES
-----------------------------------------------------------------------
-
-local NON_STATIC_TYPES = {
-    ["character"] = true,
-    ["car"] = true,
-    ["spider-vehicle"] = true,
-    ["locomotive"] = true,
-    ["cargo-wagon"] = true,
-    ["fluid-wagon"] = true,
-    ["artillery-wwagon"] = true,
-
-    ["unit"] = true,
-    ["unit-spawner"] = true,
-
-    ["corpse"] = true,
-    ["character-corpse"] = true,
-
-    ["fish"] = true,
-
-    ["combat-robot"] = true,
-    ["construction-robot"] = true,
-    ["logistic-robot"] = true,
-
-    ["projectile"] = true,
-    ["beam"] = true,
-    ["flying-text"] = true,
-    ["smoke"] = true,
-    ["fire"] = true,
-    ["stream"] = true,
-    ["decorative"] = true
-}
+-- Config aliases (short, readable)
+local BOT = config.bot
+local MODES = config.modes
+local NON_STATIC_TYPES = config.non_static_types
 
 ----------------------------------------------------------------------
 -- PRINT HELPERS
@@ -130,9 +46,9 @@ local function get_player_state(player_index)
 
             bot_mode = "follow",
             last_player_position = nil,
-            last_player_side_offset_x = -BOT_SIDE_OFFSET_DISTANCE,
+            last_player_side_offset_x = -BOT.movement.side_offset_distance,
 
-            wander_target_position = nil,
+            bot_target_position = nil,
 
             -- survey data
             survey_mapped_entities = {},
@@ -167,9 +83,10 @@ end
 ----------------------------------------------------------------------
 
 local function set_player_bot_mode(player, ps, new_mode)
-    if not BOT_MODE_INDEX[new_mode] then
+    if not MODES.index[new_mode] then
         new_mode = "follow"
     end
+
     if ps.bot_mode == new_mode then
         return
     end
@@ -177,8 +94,10 @@ local function set_player_bot_mode(player, ps, new_mode)
     ps.bot_mode = new_mode
     print_bot_message(player, "green", "mode set to %s", new_mode)
 
-    -- survey mode setup reset if entering survey
-    if new_mode == "survey" then
+    if new_mode == "follow" then
+        ps.bot_target_position = player.position
+    elseif new_mode == "survey" then
+        -- survey mode setup reset if entering survey
         ps.survey_frontier = {}
         ps.survey_seen = {}
         -- seed initial frontier with current bot position
@@ -267,14 +186,14 @@ local function on_cycle_bot_mode(event)
 
     local ps = get_player_state(p.index)
     local cur = ps.bot_mode or "follow"
-    local idx = BOT_MODE_INDEX[cur] or 1
+    local idx = MODES.index[cur] or 1
 
     idx = idx + 1
-    if idx > #BOT_MODES then
+    if idx > #MODES.list then
         idx = 1
     end
 
-    set_player_bot_mode(p, ps, BOT_MODES[idx])
+    set_player_bot_mode(p, ps, MODES.list[idx])
 end
 
 ----------------------------------------------------------------------
@@ -307,6 +226,8 @@ local function move_bot_towards(player, bot, target)
         return
     end
 
+    local step = BOT.movement.step_distance
+
     local bp = bot.position
     local dx = pos.x - bp.x
     local dy = pos.y - bp.y
@@ -316,14 +237,14 @@ local function move_bot_towards(player, bot, target)
     end
 
     local dist = math.sqrt(d2)
-    if dist <= BOT_STEP_DISTANCE then
+    if dist <= step then
         bot.teleport({pos.x, pos.y})
         return
     end
 
     bot.teleport({
-        x = bp.x + dx / dist * BOT_STEP_DISTANCE,
-        y = bp.y + dy / dist * BOT_STEP_DISTANCE
+        x = bp.x + dx / dist * step,
+        y = bp.y + dy / dist * step
     })
 end
 
@@ -356,18 +277,20 @@ local function follow_player(player, ps, bot)
     }
 
     -- update side offset
-    local so = ps.last_player_side_offset_x or -BOT_SIDE_OFFSET_DISTANCE
-    if left and so ~= BOT_SIDE_OFFSET_DISTANCE then
-        so = BOT_SIDE_OFFSET_DISTANCE
-    elseif right and so ~= -BOT_SIDE_OFFSET_DISTANCE then
-        so = -BOT_SIDE_OFFSET_DISTANCE
+    local side = BOT.movement.side_offset_distance
+    local so = ps.last_player_side_offset_x or -side
+    if left and so ~= side then
+        so = side
+    elseif right and so ~= -side then
+        so = -side
     end
     ps.last_player_side_offset_x = so
 
     -- check follow distance
+    local follow = BOT.movement.follow_distance
     local dx = ppos.x - bpos.x
     local dy = ppos.y - bpos.y
-    if dx * dx + dy * dy <= BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE then
+    if dx * dx + dy * dy <= follow * follow then
         return
     end
 
@@ -384,8 +307,9 @@ end
 
 local function pick_new_wander_target(bpos)
     local angle = math.random() * 2 * math.pi
-    local min_d = WANDER_STEP_DISTANCE * 0.4
-    local max_d = WANDER_STEP_DISTANCE
+    local step = BOT.wander.step_distance
+    local min_d = step * 0.4
+    local max_d = step
     local dist = min_d + (max_d - min_d) * math.random()
 
     return {
@@ -402,34 +326,40 @@ local function wander_bot(player, ps, bot)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
-    local surf = bot.surface
-    local bpos = bot.position
 
-    local target = ps.wander_target_position
+    local surf = bot.surface
+    local target = ps.bot_target_position
+
     if not target then
-        target = pick_new_wander_target(bpos)
-        ps.wander_target_position = target
+        target = pick_new_wander_target(bot.position)
+        ps.bot_target_position = target
     end
 
     move_bot_towards(player, bot, target)
 
-    local newp = bot.position
-    local dx = target.x - newp.x
-    local dy = target.y - newp.y
-    if dx * dx + dy * dy <= BOT_STEP_DISTANCE * BOT_STEP_DISTANCE then
-        ps.wander_target_position = nil
+    local bot_pos = bot.position
+    local dx = target.x - bot_pos.x
+    local dy = target.y - bot_pos.y
+    local step = BOT.movement.step_distance
+
+    if dx * dx + dy * dy > step * step then
+        -- Not yet reached target position
+        return
     end
 
-    -- detect nearby entities
+    -- Target reached, we need to pick a new target next iteration
+    ps.bot_target_position = nil
+
+    -- Detect nearby entities
     local found = surf.find_entities_filtered {
-        position = newp,
-        radius = WANDER_DETECTION_RADIUS
+        position = bot_pos,
+        radius = BOT.wander.detection_radius
     }
 
     local char = player.character
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char then
-            ps.wander_target_position = nil
+            -- An entity was found, switch to survey mode
             set_player_bot_mode(player, ps, "survey")
             return
         end
@@ -487,11 +417,9 @@ local function upsert_mapped_entity(player, ps, entity, tick)
         }
         mapped[key] = info
 
-        -- Draw box
         local box_id = visuals.draw_mapped_entity_box(player, ps, entity)
         ps.visuals.mapped_entities[key] = box_id
     else
-        -- update existing
         local pos = entity.position
         info.position.x = pos.x
         info.position.y = pos.y
@@ -502,10 +430,9 @@ local function upsert_mapped_entity(player, ps, entity, tick)
 end
 
 ----------------------------------------------------------------------
--- SURVEY MODE (BFS ENTITY EXPANSION, NEAREST-FIRST)
+-- SURVEY MODE
 ----------------------------------------------------------------------
 
--- Insert new frontier node only if not previously seen
 local function add_frontier_node(ps, x, y)
     local key = string.format("%s,%s", x, y)
     if not ps.survey_seen[key] then
@@ -517,14 +444,12 @@ local function add_frontier_node(ps, x, y)
     end
 end
 
--- Returns distance^2 between bot and a frontier node
 local function frontier_distance_sq(bot_pos, node)
     local dx = node.x - bot_pos.x
     local dy = node.y - bot_pos.y
     return dx * dx + dy * dy
 end
 
--- Select nearest frontier location
 local function get_nearest_frontier(ps, bot_pos)
     local frontier = ps.survey_frontier
     if #frontier == 0 then
@@ -542,20 +467,18 @@ local function get_nearest_frontier(ps, bot_pos)
         end
     end
 
-    -- Remove and return
     local node = frontier[best_i]
     table.remove(frontier, best_i)
     return node
 end
 
--- Perform the survey scan when bot arrives at a frontier node
 local function perform_survey_scan(player, ps, bot, tick)
     local surf = bot.surface
     local bpos = bot.position
 
     local found = surf.find_entities_filtered {
         position = bpos,
-        radius = SURVEY_RADIUS
+        radius = BOT.survey.radius
     }
 
     local discovered_any = false
@@ -564,8 +487,6 @@ local function perform_survey_scan(player, ps, bot, tick)
         if e ~= bot and e ~= player and is_static_mappable(e) then
             if upsert_mapped_entity(player, ps, e, tick) then
                 discovered_any = true
-
-                -- Seed new frontier positions at the entity’s location
                 local p = e.position
                 add_frontier_node(ps, p.x, p.y)
             end
@@ -575,47 +496,38 @@ local function perform_survey_scan(player, ps, bot, tick)
     return discovered_any
 end
 
--- Main survey behavior
 local function survey_bot(player, ps, bot, tick)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
 
-    local bot_pos = bot.position
-
-    -- If no frontier remains: survey complete
     if #ps.survey_frontier == 0 then
         set_player_bot_mode(player, ps, "follow")
         return
     end
 
-    -- Select nearest frontier node
-    local target = get_nearest_frontier(ps, bot_pos)
+    local target = get_nearest_frontier(ps, bot.position)
     if not target then
         set_player_bot_mode(player, ps, "follow")
         return
     end
 
-    -- Walk towards frontier node
+    ps.bot_target_position = target
+
     move_bot_towards(player, bot, target)
 
-    -- Check arrival
     local new_bp = bot.position
     local dx = target.x - new_bp.x
     local dy = target.y - new_bp.y
     local d2 = dx * dx + dy * dy
 
-    if d2 <= (SURVEY_ARRIVAL_THRESHOLD * SURVEY_ARRIVAL_THRESHOLD) then
-        -- Arrived → perform a scan
+    local thr = BOT.survey.arrival_threshold
+    if d2 <= (thr * thr) then
         local discovered = perform_survey_scan(player, ps, bot, tick)
-
-        -- If the scan discovered nothing and no more frontier nodes → done
         if not discovered and #ps.survey_frontier == 0 then
             set_player_bot_mode(player, ps, "follow")
         end
     else
-        -- Not arrived; reinsert the target so it will be retried later
-        -- (nearest-first guarantees we target the closest each tick)
         table.insert(ps.survey_frontier, target)
     end
 end
@@ -630,14 +542,24 @@ local function update_bot_for_player(player, ps, tick)
         return
     end
 
-    -- Update visuals
     visuals.clear_lines(ps)
     visuals.draw_bot_highlight(player, ps)
 
     local radius, radius_color, line_color = nil, nil, nil
 
+    -- Set target or default to player position
+    local target = ps.bot_target_position or player.position
+
+    -- Set default line color
+    local line_color = {
+        r = 0.3,
+        g = 0.3,
+        b = 0.3,
+        a = 0.1
+    }
+
     if ps.bot_mode == "wander" then
-        radius = WANDER_DETECTION_RADIUS
+        radius = BOT.wander.detection_radius
         radius_color = {
             r = 0,
             g = 0.6,
@@ -645,8 +567,9 @@ local function update_bot_for_player(player, ps, tick)
             a = 0.8
         }
         line_color = radius_color
+
     elseif ps.bot_mode == "survey" then
-        radius = SURVEY_RADIUS
+        radius = BOT.survey.radius
         radius_color = {
             r = 1.0,
             g = 0.95,
@@ -654,13 +577,6 @@ local function update_bot_for_player(player, ps, tick)
             a = 0.8
         }
         line_color = radius_color
-    elseif ps.bot_mode == "follow" then
-        line_color = {
-            r = 0.3,
-            g = 0.3,
-            b = 0.3,
-            a = 0.1
-        }
     end
 
     if radius and radius > 0 then
@@ -669,17 +585,14 @@ local function update_bot_for_player(player, ps, tick)
         visuals.clear_radius_circle(ps)
     end
 
-    if line_color then
-        visuals.draw_lines(player, ps, bot, line_color)
+    if target and line_color then
+        visuals.draw_lines(player, ps, bot, target, line_color)
     end
 
-    -- Behavior dispatch
     if ps.bot_mode == "follow" then
         follow_player(player, ps, bot)
-
     elseif ps.bot_mode == "wander" then
         wander_bot(player, ps, bot)
-
     elseif ps.bot_mode == "survey" then
         survey_bot(player, ps, bot, tick)
     end
@@ -762,11 +675,10 @@ script.on_event(defines.events.on_player_removed, on_player_removed)
 ----------------------------------------------------------------------
 
 script.on_event(defines.events.on_tick, function(event)
-    if event.tick % BOT_UPDATE_INTERVAL ~= 0 then
+    if event.tick % BOT.update_interval ~= 0 then
         return
     end
 
-    -- This mod currently supports single-player; extend for MP if needed
     local player = game.get_player(1)
     if not (player and player.valid) then
         return

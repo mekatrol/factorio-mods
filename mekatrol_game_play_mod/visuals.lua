@@ -416,7 +416,7 @@ end
 --   * The caller is responsible for clearing lines between ticks by
 --     calling visuals.clear_lines(player_state) to prevent buildup.
 ---------------------------------------------------
-function visuals.draw_lines(player, player_state, bot_entity, line_color)
+function visuals.draw_lines(player, player_state, bot_entity, target_pos, line_color)
     if not (player and player.valid and bot_entity and bot_entity.valid) then
         return
     end
@@ -437,20 +437,20 @@ function visuals.draw_lines(player, player_state, bot_entity, line_color)
     local y_offset = 0
 
     local bot_pos = bot_entity.position
-    local line_end_pos = {
+    local bot_line_pos = {
         x = bot_pos.x,
         y = bot_pos.y + y_offset
     }
 
     ------------------------------------------------------------------
-    -- 3. Draw the line from the player to the bot
+    -- 3. Draw the line from the bot to the target
     ------------------------------------------------------------------
-    if line_color then
+    if target_pos and line_color then
         local line = rendering.draw_line {
             color = line_color,
             width = 1,
-            from = player.position,
-            to = line_end_pos,
+            from = bot_line_pos,
+            to = target_pos,
             surface = bot_entity.surface,
             draw_on_ground = true,
             only_in_alt_mode = false,
