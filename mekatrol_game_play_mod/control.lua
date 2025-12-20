@@ -23,42 +23,6 @@ local BOT = config.bot
 local MODES = config.modes
 
 ----------------------------------------------------------------------
--- Mode setting
-----------------------------------------------------------------------
-
-local function set_player_bot_mode(player, ps, new_mode)
-    if not MODES.index[new_mode] then
-        new_mode = "follow"
-    end
-
-    if ps.bot_mode == new_mode then
-        return
-    end
-
-    ps.bot_mode = new_mode
-    utils.print_bot_message(player, "green", "mode set to %s", new_mode)
-
-    if new_mode == "follow" then
-        ps.bot_target_position = nil
-        return
-    end
-
-    if new_mode == "survey" then
-        mapping.ensure_survey_sets(ps)
-
-        -- Reset the frontier queue and seen-set for a fresh survey pass.
-        -- Do NOT reset mapped positions; those represent accumulated coverage.
-        ps.survey_frontier = {}
-        ps.survey_seen = {}
-
-        local bot = ps.bot_entity
-        local bpos = bot.position
-        local start_a = mapping.ring_seed_for_center(bpos)
-        mapping.add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 24, start_a, 0)
-    end
-end
-
-----------------------------------------------------------------------
 -- Follow mode
 ----------------------------------------------------------------------
 
@@ -110,7 +74,7 @@ local function follow_player(player, ps, bot)
         x = ppos.x + so,
         y = ppos.y - 2
     }
-    
+
     mapping.move_bot_towards(player, bot, target)
 end
 
@@ -165,7 +129,7 @@ local function wander_bot(player, ps, bot)
     local char = player.character
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char then
-            set_player_bot_mode(player, ps, "survey")
+            state.set_player_bot_mode(player, ps, "survey")
             return
         end
     end
@@ -215,7 +179,7 @@ local function survey_bot(player, ps, bot, tick)
     local target = ps.bot_target_position or mapping.get_nearest_frontier(ps, bot.position)
 
     if not target then
-        set_player_bot_mode(player, ps, "follow")
+        state.set_player_bot_mode(player, ps, "follow")
         return
     end
 
@@ -238,118 +202,6 @@ local function survey_bot(player, ps, bot, tick)
     if discovered then
         mapping.add_frontier_on_radius_edge(player, ps, bot, bpos, target, BOT.survey.radius)
     end
-end
-
-----------------------------------------------------------------------
--- Hull scheduling and incremental processing
-----------------------------------------------------------------------
-
-local function evaluate_hull_need(ps, tick)
-    -- Only evaluate at a coarse cadence to avoid redundant work.
-    if tick % BOT.update_hull_interval ~= 0 then
-        return
-    end
-
-    local points, qcount, qhash = mapping.get_mapped_entity_points(ps)
-
-    -- If not enough points, reset hull state.
-    if qcount < 3 then
-        ps.hull_job = nil
-        ps.hull = nil
-        ps.hull_point_set = {}
-        ps.hull_quantized_count = 0
-        ps.hull_quantized_hash = 0
-        ps.hull_tick = tick
-        return
-    end
-
-    -- Detect point-set change relative to last committed fingerprint.
-    local changed = (qcount ~= ps.hull_quantized_count) or (qhash ~= ps.hull_quantized_hash)
-    if not changed then
-        return
-    end
-
-    -- Rebuild only if stale (same as before).
-    local stale = (tick - (ps.hull_tick or 0)) > 60 * 2
-    if not stale then
-        return
-    end
-
-    ps.hull_point_set = ps.hull_point_set or {}
-
-    -- Compute "new points since last time" by comparing against hull_point_set.
-    local new_points = {}
-    for i = 1, #points do
-        local p = points[i]
-        local key = tostring(p.x) .. "," .. tostring(p.y)
-        if not ps.hull_point_set[key] then
-            new_points[#new_points + 1] = {
-                x = p.x,
-                y = p.y
-            }
-        end
-    end
-
-    -- If we have an existing hull, and ALL newly-added points are inside/on it,
-    -- then the existing hull is still valid and we can skip recalculation.
-    if ps.hull and #ps.hull >= 3 and #new_points > 0 then
-        local all_inside = true
-        for i = 1, #new_points do
-            if not polygon.contains_point(ps.hull, new_points[i]) then
-                all_inside = false
-                break
-            end
-        end
-
-        if all_inside then
-            -- Commit the new fingerprint without changing the hull.
-            for i = 1, #new_points do
-                local p = new_points[i]
-                local key = tostring(p.x) .. "," .. tostring(p.y)
-                ps.hull_point_set[key] = true
-            end
-
-            ps.hull_quantized_count = qcount
-            ps.hull_quantized_hash = qhash
-            -- Keep hull_tick unchanged (hull shape did not change).
-            return
-        end
-    end
-
-    -- Otherwise we need a rebuild. Start (or restart) an incremental job.
-    -- Snapshot the full point set for the job.
-    ps.hull_job = polygon.start_concave_hull_job(points, 8, {
-        max_k = 12
-    })
-    ps.hull_job.qcount = qcount
-    ps.hull_job.qhash = qhash
-end
-
-local function step_hull_job(ps, tick)
-    if not ps.hull_job then
-        return
-    end
-
-    local step_budget = BOT.hull_steps_per_tick or 25
-    local done, hull = polygon.step_concave_hull_job(ps.hull_job, step_budget)
-    if not done then
-        return
-    end
-
-    ps.hull = hull
-    ps.hull_quantized_count = ps.hull_job.qcount
-    ps.hull_quantized_hash = ps.hull_job.qhash
-    ps.hull_tick = tick
-
-    -- Rebuild point-set membership for future delta checks.
-    ps.hull_point_set = {}
-    local job_points = ps.hull_job.pts
-    for i = 1, #job_points do
-        local p = job_points[i]
-        ps.hull_point_set[tostring(p.x) .. "," .. tostring(p.y)] = true
-    end
-
-    ps.hull_job = nil
 end
 
 ----------------------------------------------------------------------
@@ -427,8 +279,8 @@ local function update_bot_for_player(player, ps, tick)
     -- IMPORTANT: We intentionally do NOT compute mapped points/hash every tick.
     -- That avoids redundant hull-related work and keeps the script fast.
     ------------------------------------------------------------------
-    evaluate_hull_need(ps, tick)
-    step_hull_job(ps, tick)
+    mapping.evaluate_hull_need(ps, tick)
+    mapping.step_hull_job(ps, tick)
 
     -- Draw the most recently completed hull (if any).
     local hull = ps.hull
@@ -485,7 +337,7 @@ local function on_cycle_bot_mode(event)
         idx = 1
     end
 
-    set_player_bot_mode(p, ps, MODES.list[idx])
+    state.set_player_bot_mode(p, ps, MODES.list[idx])
 end
 
 local function on_toggle_render_survey_mode(event)

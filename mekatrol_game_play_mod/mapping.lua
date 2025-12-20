@@ -1,7 +1,7 @@
 local mapping = {}
 
 local config = require("configuration")
-local state = require("state")
+local polygon = require("polygon")
 local utils = require("utils")
 local visuals = require("visuals")
 
@@ -352,6 +352,118 @@ function mapping.get_mapped_entity_points(ps)
     end
 
     return points, count, hash
+end
+
+----------------------------------------------------------------------
+-- Hull scheduling and incremental processing
+----------------------------------------------------------------------
+
+function mapping.evaluate_hull_need(ps, tick)
+    -- Only evaluate at a coarse cadence to avoid redundant work.
+    if tick % BOT.update_hull_interval ~= 0 then
+        return
+    end
+
+    local points, qcount, qhash = mapping.get_mapped_entity_points(ps)
+
+    -- If not enough points, reset hull state.
+    if qcount < 3 then
+        ps.hull_job = nil
+        ps.hull = nil
+        ps.hull_point_set = {}
+        ps.hull_quantized_count = 0
+        ps.hull_quantized_hash = 0
+        ps.hull_tick = tick
+        return
+    end
+
+    -- Detect point-set change relative to last committed fingerprint.
+    local changed = (qcount ~= ps.hull_quantized_count) or (qhash ~= ps.hull_quantized_hash)
+    if not changed then
+        return
+    end
+
+    -- Rebuild only if stale (same as before).
+    local stale = (tick - (ps.hull_tick or 0)) > 60 * 2
+    if not stale then
+        return
+    end
+
+    ps.hull_point_set = ps.hull_point_set or {}
+
+    -- Compute "new points since last time" by comparing against hull_point_set.
+    local new_points = {}
+    for i = 1, #points do
+        local p = points[i]
+        local key = tostring(p.x) .. "," .. tostring(p.y)
+        if not ps.hull_point_set[key] then
+            new_points[#new_points + 1] = {
+                x = p.x,
+                y = p.y
+            }
+        end
+    end
+
+    -- If we have an existing hull, and ALL newly-added points are inside/on it,
+    -- then the existing hull is still valid and we can skip recalculation.
+    if ps.hull and #ps.hull >= 3 and #new_points > 0 then
+        local all_inside = true
+        for i = 1, #new_points do
+            if not polygon.contains_point(ps.hull, new_points[i]) then
+                all_inside = false
+                break
+            end
+        end
+
+        if all_inside then
+            -- Commit the new fingerprint without changing the hull.
+            for i = 1, #new_points do
+                local p = new_points[i]
+                local key = tostring(p.x) .. "," .. tostring(p.y)
+                ps.hull_point_set[key] = true
+            end
+
+            ps.hull_quantized_count = qcount
+            ps.hull_quantized_hash = qhash
+            -- Keep hull_tick unchanged (hull shape did not change).
+            return
+        end
+    end
+
+    -- Otherwise we need a rebuild. Start (or restart) an incremental job.
+    -- Snapshot the full point set for the job.
+    ps.hull_job = polygon.start_concave_hull_job(points, 8, {
+        max_k = 12
+    })
+    ps.hull_job.qcount = qcount
+    ps.hull_job.qhash = qhash
+end
+
+function mapping.step_hull_job(ps, tick)
+    if not ps.hull_job then
+        return
+    end
+
+    local step_budget = BOT.hull_steps_per_tick or 25
+    local done, hull = polygon.step_concave_hull_job(ps.hull_job, step_budget)
+    if not done then
+        return
+    end
+
+    ps.hull = hull
+    ps.hull_quantized_count = ps.hull_job.qcount
+    ps.hull_quantized_hash = ps.hull_job.qhash
+    ps.hull_tick = tick
+
+    -- Rebuild point-set membership for future delta checks.
+    ps.hull_point_set = {}
+    local job_points = ps.hull_job.pts
+    for i = 1, #job_points do
+        local p = job_points[i]
+        ps.hull_point_set[tostring(p.x) .. "," .. tostring(p.y)] = true
+    end
+
+    ps.hull_job = nil
 end
 
 return mapping
