@@ -8,10 +8,6 @@ local visual = require("visual")
 
 local BOT = config.bot
 
-function polymap.quantize(v, step)
-    return math.floor(v / step + 0.5) * step
-end
-
 function polymap.get_position_key(x, y, q)
     if q == 0.5 then
         return string.format("%.1f,%.1f", x, y)
@@ -275,8 +271,8 @@ function polymap.evaluate_hull_need(player, ps, points)
 
         -- quantize the point
         p = {
-            x = polymap.quantize(p.x, 0.5),
-            y = polymap.quantize(p.y, 0.5)
+            x = mapping.quantize(p.x, 0.5),
+            y = mapping.quantize(p.y, 0.5)
         }
 
         -- Is it in polygon?
@@ -339,8 +335,8 @@ function polymap.update(player, ps, tick)
         for dy = -2, 2 do
             if not (dx == 0 and dy == 0) then
                 ps.map_visited_queued_positions[#ps.map_visited_queued_positions + 1] = {
-                    x = polymap.quantize(tx + dx, 0.5),
-                    y = polymap.quantize(ty + dy, 0.5)
+                    x = mapping.quantize(tx + dx, 0.5),
+                    y = mapping.quantize(ty + dy, 0.5)
                 }
             end
         end
