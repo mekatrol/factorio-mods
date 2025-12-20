@@ -44,10 +44,6 @@ function mapping.get_position_key(x, y, q)
     return string.format("%.2f,%.2f", x, y)
 end
 
-----------------------------------------------------------------------
--- Survey helpers
-----------------------------------------------------------------------
-
 function mapping.quantize(v, step)
     return math.floor(v / step + 0.5) * step
 end
