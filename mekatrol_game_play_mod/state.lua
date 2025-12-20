@@ -56,6 +56,7 @@ function state.get_player_state(player_index)
             -- The quantized polygon hull already visited on the map
             map_visited_poly = {},
             map_visited_hull_job = nil,
+            map_visited_queued_positions = {},
 
             -- Render toggles (defaults ON)
             survey_render_mapped = true,
@@ -102,6 +103,7 @@ function state.get_player_state(player_index)
 
     ps.map_visited_poly = ps.map_visited_poly or {}
     ps.map_visited_hull_job = ps.map_visited_hull_job or nil
+    ps.map_visited_queued_positions = ps.map_visited_queued_positions or {}
 
     ps.survey_mapped_entities = ps.survey_mapped_entities or {}
     ps.survey_mapped_positions = ps.survey_mapped_positions or {}

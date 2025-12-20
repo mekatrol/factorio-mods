@@ -255,6 +255,113 @@ function polygon.k_nearest(points, from, k, used)
     return out
 end
 
+-- Returns intersection point of segments AB and CD, or nil if none / parallel / collinear.
+-- Includes endpoint intersections; you can filter those out if you want.
+function polygon.segment_intersection_point(a, b, c, d)
+    local r = {
+        x = b.x - a.x,
+        y = b.y - a.y
+    }
+    local s = {
+        x = d.x - c.x,
+        y = d.y - c.y
+    }
+
+    local function cross2(u, v)
+        return u.x * v.y - u.y * v.x
+    end
+
+    local denom = cross2(r, s)
+    if denom == 0 then
+        -- Parallel or collinear: skip (handling full overlap is more work; convex-hull recompute doesn’t need it).
+        return nil
+    end
+
+    local cma = {
+        x = c.x - a.x,
+        y = c.y - a.y
+    }
+    local t = cross2(cma, s) / denom
+    local u = cross2(cma, r) / denom
+
+    -- Intersection occurs within both segments if t,u in [0,1]
+    if t < 0 or t > 1 or u < 0 or u > 1 then
+        return nil
+    end
+
+    return {
+        x = a.x + t * r.x,
+        y = a.y + t * r.y
+    }
+end
+
+-- Given a polygon vertex list (closed implicitly), returns a list of intersection points.
+-- Skips adjacent edges and the first/last adjacency.
+function polygon.collect_self_intersections(poly)
+    local out = {}
+    local n = #poly
+    if n < 4 then
+        return out
+    end
+
+    local function edge(i)
+        local a = poly[i]
+        local b = poly[i % n + 1]
+        return a, b
+    end
+
+    for i = 1, n do
+        local a, b = edge(i)
+        for j = i + 1, n do
+            -- skip same edge and adjacent edges (including wrap adjacency)
+            if j == i then
+                goto continue
+            end
+            if j == i + 1 then
+                goto continue
+            end
+            if i == 1 and j == n then
+                goto continue
+            end
+
+            local c, d = edge(j)
+
+            -- quick boolean check first
+            if polygon.segments_intersect(a, b, c, d) then
+                local p = polygon.segment_intersection_point(a, b, c, d)
+                if p then
+                    out[#out + 1] = p
+                end
+            end
+
+            ::continue::
+        end
+    end
+
+    return out
+end
+
+-- Adds edge/edge intersection points to the point set, then recomputes convex hull.
+-- `points` is your original point cloud; `poly` is the polygon you want to heal (often the hull you just got).
+-- If you don't have the original point cloud anymore, pass `poly` for both args.
+function polygon.recalc_convex_with_intersections(points, poly)
+    local ints = polygon.collect_self_intersections(poly)
+    if #ints == 0 then
+        return poly
+    end
+
+    local all = {}
+    for i = 1, #points do
+        all[#all + 1] = points[i]
+    end
+    for i = 1, #ints do
+        all[#all + 1] = ints[i]
+    end
+
+    all = polygon.dedupe_points(all)
+    return polygon.convex_hull(all)
+end
+
 ----------------------------------------------------------------------
 -- Incremental concave hull job API
 --
@@ -334,7 +441,7 @@ function polygon.step_concave_hull_job(player, job, step_budget)
         if job.phase == "init_attempt" then
             -- If k has escalated too far, fall back to convex hull.
             if job.kk > job.max_k then
-                job.result = polygon.convex_hull(copy_points(job.pts))
+                job.result = polygon.convex_hull(polygon.copy_points(job.pts))
                 polygon.set_job_phase(player, job, "fallback_done")
                 return true, job.result
             end

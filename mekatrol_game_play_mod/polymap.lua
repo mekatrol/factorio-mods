@@ -100,7 +100,8 @@ function polymap.step_concave_hull_job(player, job, step_budget)
         if job.phase == "init_attempt" then
             -- If k has escalated too far, fall back to convex hull.
             if job.kk > job.max_k then
-                job.result = polygon.convex_hull(polygon.copy_points(job.pts))
+                local pts = polygon.copy_points(job.pts)
+                job.result = polygon.convex_hull(pts)
                 polymap.set_job_phase(player, job, "fallback_done")
                 return true, job.result
             end
@@ -253,27 +254,11 @@ function polymap.evaluate_hull_need(player, ps, points)
     ps.map_visited_poly = ps.map_visited_poly or {}
 
     -- Get number of points already in the poly
-    local poly_point_count = #ps.map_visited_poly or 0
+    local poly_point_count = #ps.map_visited_poly
 
-    -- If not enough points, reset hull state.
+    -- If not enough points, reset hull job and return
     if (poly_point_count + #points) < 3 then
         ps.map_visited_hull_job = nil
-
-        for i = 1, #points do
-            local p = points[i]
-
-            -- quantize the point
-            p = {
-                x = polymap.quantize(p.x, 0.5),
-                y = polymap.quantize(p.y, 0.5)
-            }
-
-            ps.map_visited_poly[#ps.map_visited_poly + 1] = {
-                x = p.x,
-                y = p.y
-            }
-        end
-
         return
     end
 
@@ -290,7 +275,7 @@ function polymap.evaluate_hull_need(player, ps, points)
 
         -- quantize the point
         p = {
-            x = mapping.quantize(p.x, 0.5),
+            x = polymap.quantize(p.x, 0.5),
             y = polymap.quantize(p.y, 0.5)
         }
 
@@ -303,14 +288,17 @@ function polymap.evaluate_hull_need(player, ps, points)
         end
     end
 
+    -- clear any queued positions as they are not in the polygon
+    ps.map_visited_queued_positions = {}
+
     if old_point_count == #ps.map_visited_poly then
         -- there are no new points outside the polygon
-        return
+        -- return
     end
 
     -- start a new job to find concave hull
     ps.map_visited_hull_job = polymap.start_concave_hull_job(player, ps.map_visited_poly, 8, {
-        max_k = 120
+        max_k = 1200
     })
 end
 
@@ -342,7 +330,23 @@ function polymap.update(player, ps, tick)
     -- That avoids redundant hull-related work and keeps the script fast.
     ------------------------------------------------------------------
     local bot_pos = ps.bot_entity.position
-    polymap.evaluate_hull_need(player, ps, {bot_pos})
+
+    -- Add the centers of the 8 neighboring tiles around the bot's current tile
+    local tx = math.floor(bot_pos.x)
+    local ty = math.floor(bot_pos.y)
+
+    for dx = -2, 2 do
+        for dy = -2, 2 do
+            if not (dx == 0 and dy == 0) then
+                ps.map_visited_queued_positions[#ps.map_visited_queued_positions + 1] = {
+                    x = polymap.quantize(tx + dx, 0.5),
+                    y = polymap.quantize(ty + dy, 0.5)
+                }
+            end
+        end
+    end
+
+    polymap.evaluate_hull_need(player, ps, ps.map_visited_queued_positions)
     polymap.step_hull_job(player, ps, tick)
 
     -- Draw the most recently completed hull (if any).
