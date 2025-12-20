@@ -397,7 +397,7 @@ function mapping.evaluate_hull_need(player, ps, tick)
     -- Otherwise we need a rebuild. Start (or restart) an incremental job.
     -- Snapshot the full point set for the job.
     ps.hull_job = polygon.start_concave_hull_job(player, points, 8, {
-        max_k = 12
+        max_k = 120
     })
     ps.hull_job.qcount = qcount
     ps.hull_job.qhash = qhash
@@ -410,9 +410,12 @@ function mapping.step_hull_job(player, ps, tick)
 
     local step_budget = BOT.hull_steps_per_tick or 25
     local done, hull = polygon.step_concave_hull_job(player, ps.hull_job, step_budget)
+    
     if not done then
         return
     end
+
+    util.print_bot_message(player, "red", "job done: %s", ps.hull_job.phase)
 
     ps.hull = hull
     ps.hull_quantized_count = ps.hull_job.qcount
