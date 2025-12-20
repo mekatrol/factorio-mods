@@ -1,18 +1,15 @@
 ----------------------------------------------------------------------
 -- control.lua (Factorio 2.x / Space Age)
 --
--- Notes:
--- - This file uses a consistent parameter order for context-aware helpers:
---     (player, ps, bot, ...)
--- - Survey frontier insertion is now strict:
---     1) A frontier node is only queued if there is at least one static mappable entity
---        near that node position.
---     2) A frontier node is not queued if that position is already mapped.
---     3) A frontier node is not queued if it was already seen/queued before.
--- - Survey now tracks mapped positions independently of mapped entities:
---     ps.survey_mapped_positions["x,y"] = true
---   This prevents repeatedly re-queuing frontier nodes for already-covered locations.
--- - Comments use consistent casing and are intentionally verbose.
+-- Goals of this version:
+-- 1) Keep gameplay smooth by avoiding long single-tick work.
+-- 2) Compute the concave hull incrementally over many ticks (state machine job),
+--    instead of calling polygon.concave_hull(...) synchronously.
+-- 3) Remove redundant hull calculations:
+--    - Do NOT compute both the synchronous hull and the incremental hull.
+--    - Do NOT recompute mapped points/hash every tick while a job is running.
+--
+-- Source base: your pasted control.lua. :contentReference[oaicite:0]{index=0}
 ----------------------------------------------------------------------
 local config = require("configuration")
 local polygon = require("polygon")
@@ -40,12 +37,11 @@ local function print_bot_message(player, color, fmt, ...)
     player.print({"", string.format("[color=%s][Game Play Bot][/color] ", color), msg})
 end
 
--- Simple, fast, order-independent hash combiner
--- Uses 32-bit arithmetic semantics via Lua numbers
+-- Simple, fast, order-independent hash combiner.
+-- Uses 32-bit wrap semantics implemented via Lua numbers.
 local function hash_combine(h, v)
-    -- constants chosen for good avalanche without bitops
     h = h + v * 0x9e3779b1
-    h = h - math.floor(h / 0x100000000) * 0x100000000 -- wrap to 32-bit
+    h = h - math.floor(h / 0x100000000) * 0x100000000
     return h
 end
 
@@ -74,18 +70,61 @@ local function get_player_state(player_index)
 
             bot_target_position = nil,
 
-            -- Survey data.
-            survey_mapped_entities = {}, -- Map: entity_key -> entity_info.
-            survey_mapped_positions = {}, -- Set: "x,y" (quantized) -> true.
-            survey_frontier = {}, -- Queue: { {x=, y=}, ... }.
-            survey_done = {}, -- positions already surveyed
-            survey_seen = {}, -- Set: "x,y" (quantized) -> true.
+            ------------------------------------------------------------------
+            -- Survey data:
+            --
+            -- survey_mapped_entities:
+            --   Map of stable entity_key -> info snapshot (position, name, etc).
+            --
+            -- survey_mapped_positions:
+            --   Set of quantized "x,y" keys. This is "coverage"; it prevents
+            --   repeatedly re-adding frontier nodes for already-surveyed places.
+            --
+            -- survey_frontier:
+            --   Queue/list of frontier nodes (positions the bot should visit).
+            --
+            -- survey_done:
+            --   List of already-visited frontier nodes (for visuals/debug).
+            --
+            -- survey_seen:
+            --   Set of quantized "x,y" keys so we don't enqueue the same node
+            --   multiple times.
+            ------------------------------------------------------------------
+            survey_mapped_entities = {},
+            survey_mapped_positions = {},
+            survey_frontier = {},
+            survey_done = {},
+            survey_seen = {},
 
+            ------------------------------------------------------------------
+            -- Hull data:
+            --
+            -- hull:
+            --   The last completed hull polygon, if any.
+            --
+            -- hull_job:
+            --   The current incremental job state (serializable table). When
+            --   present, we advance it a limited amount each tick.
+            --
+            -- hull_quantized_count / hull_quantized_hash:
+            --   A cheap fingerprint of the point set used for the *last
+            --   completed hull*. If the mapped point set changes, these will
+            --   no longer match and we schedule a new job.
+            --
+            -- hull_tick:
+            --   When hull was last completed (used to avoid rebuilding too often).
+            --
+            -- hull_last_eval_tick:
+            --   When we last computed (points,count,hash) from mapped entities.
+            --   This allows us to avoid recomputing mapped points/hash every tick.
+            ------------------------------------------------------------------
             hull = nil,
-            hull_points_count = 0,
-            hull_tick = 0,
+            hull_job = nil,
             hull_quantized_count = 0,
             hull_quantized_hash = 0,
+            hull_tick = 0,
+            hull_last_eval_tick = 0,
+            hull_point_set = {}, -- set: "x,y" => true for quantized hull input points we've already seen
 
             visuals = {
                 bot_highlight = nil,
@@ -107,10 +146,12 @@ local function get_player_state(player_index)
         ps.survey_mapped_positions = ps.survey_mapped_positions or {}
 
         ps.hull = ps.hull or nil
-        ps.hull_points_count = ps.hull_points_count or 0
-        ps.hull_tick = ps.hull_tick or 0
+        ps.hull_job = ps.hull_job or nil
         ps.hull_quantized_count = ps.hull_quantized_count or 0
         ps.hull_quantized_hash = ps.hull_quantized_hash or 0
+        ps.hull_tick = ps.hull_tick or 0
+        ps.hull_last_eval_tick = ps.hull_last_eval_tick or 0
+        ps.hull_point_set = ps.hull_point_set or {}
 
         ps.visuals = ps.visuals or {}
         ps.visuals.lines = ps.visuals.lines or nil
@@ -162,6 +203,7 @@ local function move_bot_towards(player, bot, target)
     local dx = pos.x - bp.x
     local dy = pos.y - bp.y
     local d2 = dx * dx + dy * dy
+
     if d2 == 0 then
         return
     end
@@ -201,19 +243,16 @@ local function get_entity_key(entity)
         return entity.unit_number
     end
 
-    -- Fallback: name + position + surface, which is good enough for most static entities.
+    -- Fallback: name + position + surface.
     local p = entity.position
     return string.format("%s@%s,%s#%d", entity.name, p.x, p.y, entity.surface.index)
 end
 
 local function get_position_key(x, y, q)
-    -- Keep this stable; it is used as a set key.
-    -- For q=0.5 we keep 1 decimal place.
     if q == 0.5 then
         return string.format("%.1f,%.1f", x, y)
     end
 
-    -- Fallback formatting for other quantization values.
     return string.format("%.2f,%.2f", x, y)
 end
 
@@ -226,7 +265,6 @@ local function quantize(v, step)
 end
 
 local function ensure_survey_sets(ps)
-    -- Frontier queue and sets may be missing in older saves or after partial state resets.
     ps.survey_frontier = ps.survey_frontier or {}
     ps.survey_done = ps.survey_done or {}
     ps.survey_seen = ps.survey_seen or {}
@@ -234,7 +272,6 @@ local function ensure_survey_sets(ps)
 end
 
 local function mark_position_mapped(ps, x, y, q)
-    -- Mark a quantized position as mapped so we do not add frontier nodes for it again.
     local qx = quantize(x, q)
     local qy = quantize(y, q)
     ps.survey_mapped_positions[get_position_key(qx, qy, q)] = true
@@ -247,7 +284,6 @@ local function is_position_mapped(ps, x, y, q)
 end
 
 local function ring_seed_for_center(center)
-    -- Stable-ish angle seed so rings do not always start at 0 radians.
     local x = quantize(center.x, 1)
     local y = quantize(center.y, 1)
     local h = (x * 12.9898 + y * 78.233)
@@ -263,7 +299,6 @@ end
 
 local function get_nearest_frontier(ps, bot_pos)
     local frontier = ps.survey_frontier
-    local done = ps.survey_done
     if #frontier == 0 then
         return nil
     end
@@ -280,32 +315,31 @@ local function get_nearest_frontier(ps, bot_pos)
     end
 
     local node = frontier[best_i]
-    table.remove(frontier, best_i) -- remove from frontier list
-    table.insert(done, node) -- add to done list
+    table.remove(frontier, best_i)
+    table.insert(ps.survey_done, node)
     return node
 end
 
 local function add_frontier_node(player, ps, bot, x, y)
     ensure_survey_sets(ps)
 
-    -- Quantize to half-tiles; adjust q if you want coarser/finer frontiers.
+    -- Frontier nodes are quantized to half-tiles.
     local q = 0.5
     x = quantize(x, q)
     y = quantize(y, q)
 
     local key = get_position_key(x, y, q)
     if ps.survey_seen[key] == true then
-        -- we have already seen this node
         return
     end
 
-    -- Do not enqueue nodes for locations that have already been mapped.
+    -- Never enqueue already-covered locations.
     if is_position_mapped(ps, x, y, q) then
         return
     end
 
-    -- Only enqueue if there is at least one static mappable entity near this position.
-    -- "Contains an entity at that position" is approximated by a very small radius.
+    -- Only enqueue frontier nodes that are "interesting":
+    -- we require at least one static mappable entity very near the node.
     local surf = bot.surface
     local char = player.character
 
@@ -329,7 +363,6 @@ local function add_frontier_node(player, ps, bot, x, y)
         return
     end
 
-    -- Mark as seen and enqueue.
     ps.survey_seen[key] = true
     table.insert(ps.survey_frontier, {
         x = x,
@@ -338,7 +371,6 @@ local function add_frontier_node(player, ps, bot, x, y)
 end
 
 local function add_ring_frontiers(player, ps, bot, center, radius, count, start_angle, radial_offset)
-    -- Radial_offset lets you place points slightly outside the scan radius.
     ensure_survey_sets(ps)
 
     radial_offset = radial_offset or 0
@@ -358,8 +390,6 @@ local function add_ring_frontiers(player, ps, bot, center, radius, count, start_
 end
 
 local function add_frontier_on_radius_edge(player, ps, bot, center_pos, point_pos, radius)
-    -- Add frontier nodes on the scan edge in the direction of a detected entity.
-    -- This helps the survey expand outward along interesting directions.
     ensure_survey_sets(ps)
 
     local dx = point_pos.x - center_pos.x
@@ -374,12 +404,10 @@ local function add_frontier_on_radius_edge(player, ps, bot, center_pos, point_po
     local nx = dx / d
     local ny = dy / d
 
-    -- Primary edge point in the entity direction.
     local ex = center_pos.x + nx * radius
     local ey = center_pos.y + ny * radius
     add_frontier_node(player, ps, bot, ex, ey)
 
-    -- Also add two slight angular offsets to broaden coverage.
     local angle = math.atan2(ny, nx)
     local delta = math.rad(15)
 
@@ -431,18 +459,28 @@ local function upsert_mapped_entity(player, ps, entity, tick)
         info.last_seen_tick = tick
     end
 
-    -- Mark the entity position as mapped so we do not re-add frontier nodes for this location.
-    -- This uses the same quantization as frontier nodes (half-tile).
+    -- Mark location as mapped (coverage) so we don't enqueue frontier nodes repeatedly.
     mark_position_mapped(ps, entity.position.x, entity.position.y, 0.5)
 
     return is_new
 end
 
+----------------------------------------------------------------------
+-- Hull point extraction and fingerprinting
+----------------------------------------------------------------------
+
 local function get_mapped_entity_points(ps)
+    -- Convert mapped entities into a de-duplicated set of quantized points.
+    -- Also compute:
+    --   count = number of unique points
+    --   hash  = order-independent hash of points
+    --
+    -- The hash+count combination is used to detect point-set changes cheaply,
+    -- without deep-comparing tables.
     local points = {}
     local seen = {}
 
-    local q = 1.0 -- hull quantization (recommended)
+    local q = 1.0 -- hull quantization
     local hash = 0
     local count = 0
 
@@ -450,7 +488,6 @@ local function get_mapped_entity_points(ps)
         local x = quantize(info.position.x, q)
         local y = quantize(info.position.y, q)
 
-        -- Stable integer grid coordinates when q = 1.0
         local ix = x
         local iy = y
 
@@ -464,8 +501,6 @@ local function get_mapped_entity_points(ps)
             }
             count = count + 1
 
-            -- Hash the coordinate pair (order-independent)
-            -- Use different primes to mix x/y
             local v = ix * 73856093 + iy * 19349663
             hash = hash_combine(hash, v)
         end
@@ -499,11 +534,10 @@ local function set_player_bot_mode(player, ps, new_mode)
         ensure_survey_sets(ps)
 
         -- Reset the frontier queue and seen-set for a fresh survey pass.
-        -- Do not reset mapped positions here; they represent accumulated coverage.
+        -- Do NOT reset mapped positions; those represent accumulated coverage.
         ps.survey_frontier = {}
         ps.survey_seen = {}
 
-        -- add frontier ring from current position
         local bot = ps.bot_entity
         local bpos = bot.position
         local start_a = ring_seed_for_center(bpos)
@@ -523,7 +557,6 @@ local function follow_player(player, ps, bot)
     local ppos = player.position
     local bpos = bot.position
 
-    -- Detect movement direction.
     local prev = ps.last_player_position
     local left, right = false, false
 
@@ -541,20 +574,21 @@ local function follow_player(player, ps, bot)
         y = ppos.y
     }
 
-    -- Update side offset.
     local side = BOT.movement.side_offset_distance
     local so = ps.last_player_side_offset_x or -side
+
     if left and so ~= side then
         so = side
     elseif right and so ~= -side then
         so = -side
     end
+
     ps.last_player_side_offset_x = so
 
-    -- Check follow distance.
     local follow = BOT.movement.follow_distance
     local dx = ppos.x - bpos.x
     local dy = ppos.y - bpos.y
+
     if dx * dx + dy * dy <= follow * follow then
         return
     end
@@ -604,14 +638,11 @@ local function wander_bot(player, ps, bot)
     local step = BOT.movement.step_distance
 
     if dx * dx + dy * dy > step * step then
-        -- Not yet reached target position.
         return
     end
 
-    -- Target reached, pick a new target next iteration.
     ps.bot_target_position = nil
 
-    -- Detect nearby entities and switch to survey if something is found.
     local found = surf.find_entities_filtered {
         position = bpos,
         radius = BOT.wander.detection_radius
@@ -644,21 +675,17 @@ local function perform_survey_scan(player, ps, bot, tick)
 
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char and is_static_mappable(e) then
-            -- Push exploration outward where we detected something.
             add_frontier_on_radius_edge(player, ps, bot, bpos, e.position, BOT.survey.radius)
 
-            -- Record entity mapping.
             if upsert_mapped_entity(player, ps, e, tick) then
                 discovered_any = true
             end
         end
     end
 
-    -- Expand around the scan radius edge (subject to add_frontier_node rules).
     local start_a = ring_seed_for_center(bpos)
     add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a, 0)
 
-    -- If nothing was discovered, optionally push outward slightly to keep expanding coverage.
     if not discovered_any then
         add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a + math.pi / 12, 1.0)
     end
@@ -673,14 +700,11 @@ local function survey_bot(player, ps, bot, tick)
 
     local target = ps.bot_target_position or get_nearest_frontier(ps, bot.position)
 
-    -- If bot was not targetting and there are no more frontiers then terminate survey mode
     if not target then
-        -- No more frontier nodes, return to follow mode.
         set_player_bot_mode(player, ps, "follow")
         return
     end
 
-    -- Target the frontier position and move toward it.
     ps.bot_target_position = target
     move_bot_towards(player, bot, target)
 
@@ -690,18 +714,14 @@ local function survey_bot(player, ps, bot, tick)
     local d2 = dx * dx + dy * dy
 
     local thr = BOT.survey.arrival_threshold
-
     if d2 > (thr * thr) then
-        -- Still not at target so return
         return
     end
 
-    -- Bot arrived at survey location
     ps.bot_target_position = nil
 
     local discovered = perform_survey_scan(player, ps, bot, tick)
     if discovered then
-        -- Push exploration outward where we detected something
         add_frontier_on_radius_edge(player, ps, bot, bpos, target, BOT.survey.radius)
     end
 end
@@ -713,14 +733,61 @@ end
 local function destroy_player_bot(player, silent)
     local ps = get_player_state(player.index)
 
+    -- Destroy the bot entity (if present).
     if ps.bot_entity and ps.bot_entity.valid then
         ps.bot_entity.destroy()
     end
 
+    -- Clear ALL render objects / visuals.
     visuals.clear_all(ps)
 
+    -- Disable + clear entity reference.
     ps.bot_entity = nil
     ps.bot_enabled = false
+
+    ------------------------------------------------------------------
+    -- Reset behavior state back to "follow".
+    ------------------------------------------------------------------
+    ps.bot_mode = "follow"
+    ps.bot_target_position = nil
+
+    -- Movement bookkeeping.
+    ps.last_player_position = nil
+    ps.last_player_side_offset_x = -BOT.movement.side_offset_distance
+
+    ------------------------------------------------------------------
+    -- Clear ALL survey / mapping point sets.
+    ------------------------------------------------------------------
+    ps.survey_mapped_entities = {}
+    ps.survey_mapped_positions = {}
+    ps.survey_frontier = {}
+    ps.survey_done = {}
+    ps.survey_seen = {}
+
+    ------------------------------------------------------------------
+    -- Clear ALL hull state (including incremental job + fingerprints).
+    ------------------------------------------------------------------
+    ps.hull = nil
+    ps.hull_job = nil
+    ps.hull_point_set = {}
+    ps.hull_quantized_count = 0
+    ps.hull_quantized_hash = 0
+    ps.hull_tick = 0
+    ps.hull_last_eval_tick = 0
+
+    ------------------------------------------------------------------
+    -- Clear any stored visual ids (so visuals code doesn't try to reuse them).
+    -- visuals.clear_all(ps) should already destroy render ids; this just resets
+    -- your bookkeeping tables to empty.
+    ------------------------------------------------------------------
+    ps.visuals = {
+        bot_highlight = nil,
+        lines = nil,
+        radius_circle = nil,
+        mapped_entities = {},
+        survey_frontier = {},
+        survey_done = {}
+    }
 
     if not silent then
         print_bot_message(player, "yellow", "deactivated")
@@ -757,6 +824,118 @@ local function create_player_bot(player)
 end
 
 ----------------------------------------------------------------------
+-- Hull scheduling and incremental processing
+----------------------------------------------------------------------
+
+local function evaluate_hull_need(ps, tick)
+    -- Only evaluate at a coarse cadence to avoid redundant work.
+    if tick % BOT.update_hull_interval ~= 0 then
+        return
+    end
+
+    local points, qcount, qhash = get_mapped_entity_points(ps)
+
+    -- If not enough points, reset hull state.
+    if qcount < 3 then
+        ps.hull_job = nil
+        ps.hull = nil
+        ps.hull_point_set = {}
+        ps.hull_quantized_count = 0
+        ps.hull_quantized_hash = 0
+        ps.hull_tick = tick
+        return
+    end
+
+    -- Detect point-set change relative to last committed fingerprint.
+    local changed = (qcount ~= ps.hull_quantized_count) or (qhash ~= ps.hull_quantized_hash)
+    if not changed then
+        return
+    end
+
+    -- Rebuild only if stale (same as before).
+    local stale = (tick - (ps.hull_tick or 0)) > 60 * 2
+    if not stale then
+        return
+    end
+
+    ps.hull_point_set = ps.hull_point_set or {}
+
+    -- Compute "new points since last time" by comparing against hull_point_set.
+    local new_points = {}
+    for i = 1, #points do
+        local p = points[i]
+        local key = tostring(p.x) .. "," .. tostring(p.y)
+        if not ps.hull_point_set[key] then
+            new_points[#new_points + 1] = {
+                x = p.x,
+                y = p.y
+            }
+        end
+    end
+
+    -- If we have an existing hull, and ALL newly-added points are inside/on it,
+    -- then the existing hull is still valid and we can skip recalculation.
+    if ps.hull and #ps.hull >= 3 and #new_points > 0 then
+        local all_inside = true
+        for i = 1, #new_points do
+            if not polygon.contains_point(ps.hull, new_points[i]) then
+                all_inside = false
+                break
+            end
+        end
+
+        if all_inside then
+            -- Commit the new fingerprint without changing the hull.
+            for i = 1, #new_points do
+                local p = new_points[i]
+                local key = tostring(p.x) .. "," .. tostring(p.y)
+                ps.hull_point_set[key] = true
+            end
+
+            ps.hull_quantized_count = qcount
+            ps.hull_quantized_hash = qhash
+            -- Keep hull_tick unchanged (hull shape did not change).
+            return
+        end
+    end
+
+    -- Otherwise we need a rebuild. Start (or restart) an incremental job.
+    -- Snapshot the full point set for the job.
+    ps.hull_job = polygon.start_concave_hull_job(points, 8, {
+        max_k = 12
+    })
+    ps.hull_job.qcount = qcount
+    ps.hull_job.qhash = qhash
+end
+
+local function step_hull_job(ps, tick)
+    if not ps.hull_job then
+        return
+    end
+
+    local step_budget = BOT.hull_steps_per_tick or 25
+    local done, hull = polygon.step_concave_hull_job(ps.hull_job, step_budget)
+    if not done then
+        return
+    end
+
+    ps.hull = hull
+    ps.hull_quantized_count = ps.hull_job.qcount
+    ps.hull_quantized_hash = ps.hull_job.qhash
+    ps.hull_tick = tick
+
+    -- Rebuild point-set membership for future delta checks.
+    ps.hull_point_set = {}
+    local job_points = ps.hull_job.pts
+    for i = 1, #job_points do
+        local p = job_points[i]
+        ps.hull_point_set[tostring(p.x) .. "," .. tostring(p.y)] = true
+    end
+
+    ps.hull_job = nil
+end
+
+----------------------------------------------------------------------
 -- Visuals and behavior dispatch
 ----------------------------------------------------------------------
 
@@ -766,16 +945,15 @@ local function update_bot_for_player(player, ps, tick)
         return
     end
 
+    -- Clear transient visuals each update; they are redrawn below.
     visuals.clear_lines(ps)
     visuals.draw_bot_highlight(player, ps)
 
     local radius = nil
     local radius_color = nil
 
-    -- Target is either a mode-specific target or the player position.
     local target = ps.bot_target_position or player.position
 
-    -- Default line color (muted gray).
     local line_color = {
         r = 0.3,
         g = 0.3,
@@ -813,6 +991,7 @@ local function update_bot_for_player(player, ps, tick)
         visuals.draw_lines(player, ps, bot, target, line_color)
     end
 
+    -- Mode behavior step.
     if ps.bot_mode == "follow" then
         follow_player(player, ps, bot)
     elseif ps.bot_mode == "wander" then
@@ -821,30 +1000,22 @@ local function update_bot_for_player(player, ps, tick)
         survey_bot(player, ps, bot, tick)
     end
 
-    if tick % BOT.update_hull_interval == 0 then
-        local points, qcount, qhash = get_mapped_entity_points(ps)
+    ------------------------------------------------------------------
+    -- Hull processing (non-blocking)
+    --
+    -- 1) Every update_hull_interval ticks, compute the fingerprint of the mapped
+    --    points and decide whether we need to start/restart the hull job.
+    -- 2) Every tick, advance the current job by a limited step budget.
+    --
+    -- IMPORTANT: We intentionally do NOT compute mapped points/hash every tick.
+    -- That avoids redundant hull-related work and keeps the script fast.
+    ------------------------------------------------------------------
+    evaluate_hull_need(ps, tick)
+    step_hull_job(ps, tick)
 
-        if qcount >= 3 then
-            local changed = (qcount ~= ps.hull_quantized_count) or (qhash ~= ps.hull_quantized_hash)
-
-            local stale = (tick - (ps.hull_tick or 0)) > 60 * 2
-
-            if changed and stale then
-                ps.hull = polygon.concave_hull(points, 8, {
-                    max_k = 12
-                })
-
-                ps.hull_quantized_count = qcount
-                ps.hull_quantized_hash = qhash
-                ps.hull_tick = tick
-            end
-        end
-    end
-
+    -- Draw the most recently completed hull (if any).
     local hull = ps.hull
-    if hull then
-        -- hull is an ordered CCW polygon
-        -- { {x,y}, {x,y}, ... }
+    if hull and #hull >= 2 then
         for i = 1, #hull do
             local a = hull[i]
             local b = hull[i % #hull + 1]
@@ -908,18 +1079,18 @@ local function on_entity_died(event)
         return
     end
 
-    ensure_storage_tables()
-
-    for idx, ps in pairs(storage.game_bot) do
+    for idx, ps in pairs(storage.game_bot or {}) do
         if ps.bot_entity == ent then
-            ps.bot_entity = nil
-            ps.bot_enabled = false
-            visuals.clear_all(ps)
-
             local pl = game.get_player(idx)
             if pl and pl.valid then
+                destroy_player_bot(pl, true)
                 print_bot_message(pl, "yellow", "destroyed")
+            else
+                -- Player not valid; still clear state.
+                visuals.clear_all(ps)
+                storage.game_bot[idx] = nil
             end
+            return
         end
     end
 end

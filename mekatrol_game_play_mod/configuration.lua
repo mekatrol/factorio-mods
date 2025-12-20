@@ -6,23 +6,26 @@ local config = {}
 
 config.bot = {
     update_interval = 1,
-    update_hull_interval = 100,
+    update_hull_interval = 20,
+
+    -- limit hull work per tick to avoid long script updates
+    hull_steps_per_tick = 25,
 
     movement = {
         step_distance = 0.18,
         follow_distance = 1.0,
-        side_offset_distance = 2.0,
+        side_offset_distance = 2.0
     },
 
     wander = {
         step_distance = 5.0,
-        detection_radius = 5.0,
+        detection_radius = 5.0
     },
 
     survey = {
         radius = 6.0,
-        arrival_threshold = 0.5, -- distance threshold for "arrived at frontier node"
-    },
+        arrival_threshold = 0.5 -- distance threshold for "arrived at frontier node"
+    }
 }
 
 ----------------------------------------------------------------------
@@ -30,7 +33,7 @@ config.bot = {
 ----------------------------------------------------------------------
 
 config.modes = {
-    list = { "follow", "wander", "survey" },
+    list = {"follow", "wander", "survey"},
     index = {}
 }
 
@@ -69,7 +72,7 @@ config.non_static_types = {
     smoke = true,
     fire = true,
     stream = true,
-    decorative = true,
+    decorative = true
 }
 
 return config
