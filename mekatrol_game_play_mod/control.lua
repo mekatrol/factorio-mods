@@ -12,509 +12,15 @@
 -- Source base: your pasted control.lua. :contentReference[oaicite:0]{index=0}
 ----------------------------------------------------------------------
 local config = require("configuration")
+local mapping = require("mapping")
 local polygon = require("polygon")
+local state = require("state")
+local utils = require("utils")
 local visuals = require("visuals")
 
 -- Config aliases.
 local BOT = config.bot
 local MODES = config.modes
-local NON_STATIC_TYPES = config.non_static_types
-
-----------------------------------------------------------------------
--- Print helpers
-----------------------------------------------------------------------
-
-local function print_bot_message(player, color, fmt, ...)
-    if not (player and player.valid) then
-        return
-    end
-
-    local ok, msg = pcall(string.format, fmt, ...)
-    if not ok then
-        msg = "<format error>"
-    end
-
-    player.print({"", string.format("[color=%s][Game Play Bot][/color] ", color), msg})
-end
-
--- Simple, fast, order-independent hash combiner.
--- Uses 32-bit wrap semantics implemented via Lua numbers.
-local function hash_combine(h, v)
-    h = h + v * 0x9e3779b1
-    h = h - math.floor(h / 0x100000000) * 0x100000000
-    return h
-end
-
-----------------------------------------------------------------------
--- Storage and player state
-----------------------------------------------------------------------
-
-local function ensure_storage_tables()
-    storage.game_bot = storage.game_bot or {}
-end
-
-local function get_player_state(player_index)
-    ensure_storage_tables()
-
-    local all = storage.game_bot
-    local ps = all[player_index]
-
-    if not ps then
-        ps = {
-            bot_entity = nil,
-            bot_enabled = false,
-
-            bot_mode = "follow",
-            last_player_position = nil,
-            last_player_side_offset_x = -BOT.movement.side_offset_distance,
-
-            bot_target_position = nil,
-
-            ------------------------------------------------------------------
-            -- Survey data:
-            --
-            -- survey_mapped_entities:
-            --   Map of stable entity_key -> info snapshot (position, name, etc).
-            --
-            -- survey_mapped_positions:
-            --   Set of quantized "x,y" keys. This is "coverage"; it prevents
-            --   repeatedly re-adding frontier nodes for already-surveyed places.
-            --
-            -- survey_frontier:
-            --   Queue/list of frontier nodes (positions the bot should visit).
-            --
-            -- survey_done:
-            --   List of already-visited frontier nodes (for visuals/debug).
-            --
-            -- survey_seen:
-            --   Set of quantized "x,y" keys so we don't enqueue the same node
-            --   multiple times.
-            ------------------------------------------------------------------
-            survey_render_mapped = true,
-            survey_render_points = true,
-
-            survey_mapped_entities = {},
-            survey_mapped_positions = {},
-            survey_frontier = {},
-            survey_done = {},
-            survey_seen = {},
-
-            ------------------------------------------------------------------
-            -- Hull data:
-            --
-            -- hull:
-            --   The last completed hull polygon, if any.
-            --
-            -- hull_job:
-            --   The current incremental job state (serializable table). When
-            --   present, we advance it a limited amount each tick.
-            --
-            -- hull_quantized_count / hull_quantized_hash:
-            --   A cheap fingerprint of the point set used for the *last
-            --   completed hull*. If the mapped point set changes, these will
-            --   no longer match and we schedule a new job.
-            --
-            -- hull_tick:
-            --   When hull was last completed (used to avoid rebuilding too often).
-            --
-            -- hull_last_eval_tick:
-            --   When we last computed (points,count,hash) from mapped entities.
-            --   This allows us to avoid recomputing mapped points/hash every tick.
-            ------------------------------------------------------------------
-            hull = nil,
-            hull_job = nil,
-            hull_quantized_count = 0,
-            hull_quantized_hash = 0,
-            hull_tick = 0,
-            hull_last_eval_tick = 0,
-            hull_point_set = {}, -- set: "x,y" => true for quantized hull input points we've already seen
-
-            visuals = {
-                bot_highlight = nil,
-                lines = nil,
-                radius_circle = nil,
-                mapped_entities = {},
-                survey_frontier = {},
-                survey_done = {}
-            }
-        }
-
-        all[player_index] = ps
-    else
-        -- Defensive initialization for upgrades / older saves.
-        ps.survey_render_mapped = ps.survey_render_mapped or false
-        ps.survey_render_points = ps.survey_render_points or false
-        ps.survey_frontier = ps.survey_frontier or {}
-        ps.survey_done = ps.survey_done or {}
-        ps.survey_seen = ps.survey_seen or {}
-        ps.survey_mapped_entities = ps.survey_mapped_entities or {}
-        ps.survey_mapped_positions = ps.survey_mapped_positions or {}
-
-        ps.hull = ps.hull or nil
-        ps.hull_job = ps.hull_job or nil
-        ps.hull_quantized_count = ps.hull_quantized_count or 0
-        ps.hull_quantized_hash = ps.hull_quantized_hash or 0
-        ps.hull_tick = ps.hull_tick or 0
-        ps.hull_last_eval_tick = ps.hull_last_eval_tick or 0
-        ps.hull_point_set = ps.hull_point_set or {}
-
-        ps.visuals = ps.visuals or {}
-        ps.visuals.lines = ps.visuals.lines or nil
-        ps.visuals.bot_highlight = ps.visuals.bot_highlight or nil
-        ps.visuals.radius_circle = ps.visuals.radius_circle or nil
-        ps.visuals.mapped_entities = ps.visuals.mapped_entities or {}
-        ps.visuals.survey_frontier = ps.visuals.survey_frontier or {}
-        ps.visuals.survey_done = ps.visuals.survey_done or {}
-    end
-
-    return ps
-end
-
-----------------------------------------------------------------------
--- Movement and position helpers
-----------------------------------------------------------------------
-
-local function resolve_target_position(target)
-    if type(target) == "table" then
-        if target.position then
-            return target.position, nil
-        elseif target.x and target.y then
-            return target, nil
-        elseif target[1] and target[2] then
-            return {
-                x = target[1],
-                y = target[2]
-            }, nil
-        end
-    end
-
-    return nil, tostring(target)
-end
-
-local function move_bot_towards(player, bot, target)
-    if not (bot and bot.valid) then
-        return
-    end
-
-    local pos, err = resolve_target_position(target)
-    if not pos then
-        print_bot_message(player, "red", "invalid target: %s", err or "?")
-        return
-    end
-
-    local step = BOT.movement.step_distance
-
-    local bp = bot.position
-    local dx = pos.x - bp.x
-    local dy = pos.y - bp.y
-    local d2 = dx * dx + dy * dy
-
-    if d2 == 0 then
-        return
-    end
-
-    local dist = math.sqrt(d2)
-    if dist <= step then
-        bot.teleport({pos.x, pos.y})
-        return
-    end
-
-    bot.teleport({
-        x = bp.x + dx / dist * step,
-        y = bp.y + dy / dist * step
-    })
-end
-
-----------------------------------------------------------------------
--- Mappable entity helpers
-----------------------------------------------------------------------
-
-local function is_static_mappable(entity)
-    if not (entity and entity.valid) then
-        return false
-    end
-
-    -- Ignore types that are considered non-static (moving, temporary, etc.).
-    if NON_STATIC_TYPES[entity.type] then
-        return false
-    end
-
-    return true
-end
-
-local function get_entity_key(entity)
-    -- Prefer unit_number for stable identity when available.
-    if entity.unit_number then
-        return entity.unit_number
-    end
-
-    -- Fallback: name + position + surface.
-    local p = entity.position
-    return string.format("%s@%s,%s#%d", entity.name, p.x, p.y, entity.surface.index)
-end
-
-local function get_position_key(x, y, q)
-    if q == 0.5 then
-        return string.format("%.1f,%.1f", x, y)
-    end
-
-    return string.format("%.2f,%.2f", x, y)
-end
-
-----------------------------------------------------------------------
--- Survey helpers
-----------------------------------------------------------------------
-
-local function quantize(v, step)
-    return math.floor(v / step + 0.5) * step
-end
-
-local function ensure_survey_sets(ps)
-    ps.survey_frontier = ps.survey_frontier or {}
-    ps.survey_done = ps.survey_done or {}
-    ps.survey_seen = ps.survey_seen or {}
-    ps.survey_mapped_positions = ps.survey_mapped_positions or {}
-end
-
-local function mark_position_mapped(ps, x, y, q)
-    local qx = quantize(x, q)
-    local qy = quantize(y, q)
-    ps.survey_mapped_positions[get_position_key(qx, qy, q)] = true
-end
-
-local function is_position_mapped(ps, x, y, q)
-    local qx = quantize(x, q)
-    local qy = quantize(y, q)
-    return ps.survey_mapped_positions[get_position_key(qx, qy, q)] == true
-end
-
-local function ring_seed_for_center(center)
-    local x = quantize(center.x, 1)
-    local y = quantize(center.y, 1)
-    local h = (x * 12.9898 + y * 78.233)
-    local frac = h - math.floor(h)
-    return frac * 2 * math.pi
-end
-
-local function frontier_distance_sq(bot_pos, node)
-    local dx = node.x - bot_pos.x
-    local dy = node.y - bot_pos.y
-    return dx * dx + dy * dy
-end
-
-local function get_nearest_frontier(ps, bot_pos)
-    local frontier = ps.survey_frontier
-    if #frontier == 0 then
-        return nil
-    end
-
-    local best_i = 1
-    local best_d2 = frontier_distance_sq(bot_pos, frontier[1])
-
-    for i = 2, #frontier do
-        local d2 = frontier_distance_sq(bot_pos, frontier[i])
-        if d2 < best_d2 then
-            best_d2 = d2
-            best_i = i
-        end
-    end
-
-    local node = frontier[best_i]
-    table.remove(frontier, best_i)
-    table.insert(ps.survey_done, node)
-    return node
-end
-
-local function add_frontier_node(player, ps, bot, x, y)
-    ensure_survey_sets(ps)
-
-    -- Frontier nodes are quantized to half-tiles.
-    local q = 0.5
-    x = quantize(x, q)
-    y = quantize(y, q)
-
-    local key = get_position_key(x, y, q)
-    if ps.survey_seen[key] == true then
-        return
-    end
-
-    -- Never enqueue already-covered locations.
-    if is_position_mapped(ps, x, y, q) then
-        return
-    end
-
-    -- Only enqueue frontier nodes that are "interesting":
-    -- we require at least one static mappable entity very near the node.
-    local surf = bot.surface
-    local char = player.character
-
-    local found = surf.find_entities_filtered {
-        position = {
-            x = x,
-            y = y
-        },
-        radius = 0.49
-    }
-
-    local discovered_any = false
-    for _, e in ipairs(found) do
-        if e.valid and e ~= bot and e ~= char and is_static_mappable(e) then
-            discovered_any = true
-            break
-        end
-    end
-
-    if not discovered_any then
-        return
-    end
-
-    ps.survey_seen[key] = true
-    table.insert(ps.survey_frontier, {
-        x = x,
-        y = y
-    })
-end
-
-local function add_ring_frontiers(player, ps, bot, center, radius, count, start_angle, radial_offset)
-    ensure_survey_sets(ps)
-
-    radial_offset = radial_offset or 0
-    start_angle = start_angle or 0
-
-    if count <= 0 then
-        return
-    end
-
-    local step = (2 * math.pi) / count
-    local r = radius + radial_offset
-
-    for i = 0, count - 1 do
-        local a = start_angle + i * step
-        add_frontier_node(player, ps, bot, center.x + math.cos(a) * r, center.y + math.sin(a) * r)
-    end
-end
-
-local function add_frontier_on_radius_edge(player, ps, bot, center_pos, point_pos, radius)
-    ensure_survey_sets(ps)
-
-    local dx = point_pos.x - center_pos.x
-    local dy = point_pos.y - center_pos.y
-    local d2 = dx * dx + dy * dy
-
-    if d2 <= 0 then
-        return
-    end
-
-    local d = math.sqrt(d2)
-    local nx = dx / d
-    local ny = dy / d
-
-    local ex = center_pos.x + nx * radius
-    local ey = center_pos.y + ny * radius
-    add_frontier_node(player, ps, bot, ex, ey)
-
-    local angle = math.atan2(ny, nx)
-    local delta = math.rad(15)
-
-    add_frontier_node(player, ps, bot, center_pos.x + math.cos(angle + delta) * radius,
-        center_pos.y + math.sin(angle + delta) * radius)
-
-    add_frontier_node(player, ps, bot, center_pos.x + math.cos(angle - delta) * radius,
-        center_pos.y + math.sin(angle - delta) * radius)
-end
-
-----------------------------------------------------------------------
--- Mapping upsert
-----------------------------------------------------------------------
-
-local function upsert_mapped_entity(player, ps, entity, tick)
-    local key = get_entity_key(entity)
-    if not key then
-        return false
-    end
-
-    ensure_survey_sets(ps)
-
-    local mapped = ps.survey_mapped_entities
-    local info = mapped[key]
-    local is_new = false
-
-    if not info then
-        is_new = true
-        info = {
-            name = entity.name,
-            surface_index = entity.surface.index,
-            position = {
-                x = entity.position.x,
-                y = entity.position.y
-            },
-            force_name = entity.force and entity.force.name or nil,
-            last_seen_tick = tick,
-            discovered_by_player_index = player.index
-        }
-
-        mapped[key] = info
-
-        if ps.survey_render_mapped then
-            local box_id = visuals.draw_mapped_entity_box(player, ps, entity)
-            ps.visuals.mapped_entities[key] = box_id
-        end
-    else
-        local pos = entity.position
-        info.position.x = pos.x
-        info.position.y = pos.y
-        info.last_seen_tick = tick
-    end
-
-    -- Mark location as mapped (coverage) so we don't enqueue frontier nodes repeatedly.
-    mark_position_mapped(ps, entity.position.x, entity.position.y, 0.5)
-
-    return is_new
-end
-
-----------------------------------------------------------------------
--- Hull point extraction and fingerprinting
-----------------------------------------------------------------------
-
-local function get_mapped_entity_points(ps)
-    -- Convert mapped entities into a de-duplicated set of quantized points.
-    -- Also compute:
-    --   count = number of unique points
-    --   hash  = order-independent hash of points
-    --
-    -- The hash+count combination is used to detect point-set changes cheaply,
-    -- without deep-comparing tables.
-    local points = {}
-    local seen = {}
-
-    local q = 1.0 -- hull quantization
-    local hash = 0
-    local count = 0
-
-    for _, info in pairs(ps.survey_mapped_entities) do
-        local x = quantize(info.position.x, q)
-        local y = quantize(info.position.y, q)
-
-        local ix = x
-        local iy = y
-
-        local key = ix .. "," .. iy
-        if not seen[key] then
-            seen[key] = true
-
-            points[#points + 1] = {
-                x = ix,
-                y = iy
-            }
-            count = count + 1
-
-            local v = ix * 73856093 + iy * 19349663
-            hash = hash_combine(hash, v)
-        end
-    end
-
-    return points, count, hash
-end
 
 ----------------------------------------------------------------------
 -- Mode setting
@@ -530,7 +36,7 @@ local function set_player_bot_mode(player, ps, new_mode)
     end
 
     ps.bot_mode = new_mode
-    print_bot_message(player, "green", "mode set to %s", new_mode)
+    utils.print_bot_message(player, "green", "mode set to %s", new_mode)
 
     if new_mode == "follow" then
         ps.bot_target_position = nil
@@ -538,7 +44,7 @@ local function set_player_bot_mode(player, ps, new_mode)
     end
 
     if new_mode == "survey" then
-        ensure_survey_sets(ps)
+        mapping.ensure_survey_sets(ps)
 
         -- Reset the frontier queue and seen-set for a fresh survey pass.
         -- Do NOT reset mapped positions; those represent accumulated coverage.
@@ -547,8 +53,8 @@ local function set_player_bot_mode(player, ps, new_mode)
 
         local bot = ps.bot_entity
         local bpos = bot.position
-        local start_a = ring_seed_for_center(bpos)
-        add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 24, start_a, 0)
+        local start_a = mapping.ring_seed_for_center(bpos)
+        mapping.add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 24, start_a, 0)
     end
 end
 
@@ -604,7 +110,8 @@ local function follow_player(player, ps, bot)
         x = ppos.x + so,
         y = ppos.y - 2
     }
-    move_bot_towards(player, bot, target)
+    
+    mapping.move_bot_towards(player, bot, target)
 end
 
 ----------------------------------------------------------------------
@@ -637,7 +144,7 @@ local function wander_bot(player, ps, bot)
         ps.bot_target_position = target
     end
 
-    move_bot_towards(player, bot, target)
+    mapping.move_bot_towards(player, bot, target)
 
     local bpos = bot.position
     local dx = target.x - bpos.x
@@ -681,20 +188,20 @@ local function perform_survey_scan(player, ps, bot, tick)
     local discovered_any = false
 
     for _, e in ipairs(found) do
-        if e.valid and e ~= bot and e ~= char and is_static_mappable(e) then
-            add_frontier_on_radius_edge(player, ps, bot, bpos, e.position, BOT.survey.radius)
+        if e.valid and e ~= bot and e ~= char and mapping.is_static_mappable(e) then
+            mapping.add_frontier_on_radius_edge(player, ps, bot, bpos, e.position, BOT.survey.radius)
 
-            if upsert_mapped_entity(player, ps, e, tick) then
+            if mapping.upsert_mapped_entity(player, ps, e, tick) then
                 discovered_any = true
             end
         end
     end
 
-    local start_a = ring_seed_for_center(bpos)
-    add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a, 0)
+    local start_a = mapping.ring_seed_for_center(bpos)
+    mapping.add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a, 0)
 
     if not discovered_any then
-        add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a + math.pi / 12, 1.0)
+        mapping.add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a + math.pi / 12, 1.0)
     end
 
     return discovered_any
@@ -705,7 +212,7 @@ local function survey_bot(player, ps, bot, tick)
         return
     end
 
-    local target = ps.bot_target_position or get_nearest_frontier(ps, bot.position)
+    local target = ps.bot_target_position or mapping.get_nearest_frontier(ps, bot.position)
 
     if not target then
         set_player_bot_mode(player, ps, "follow")
@@ -713,7 +220,7 @@ local function survey_bot(player, ps, bot, tick)
     end
 
     ps.bot_target_position = target
-    move_bot_towards(player, bot, target)
+    mapping.move_bot_towards(player, bot, target)
 
     local bpos = bot.position
     local dx = target.x - bpos.x
@@ -729,107 +236,8 @@ local function survey_bot(player, ps, bot, tick)
 
     local discovered = perform_survey_scan(player, ps, bot, tick)
     if discovered then
-        add_frontier_on_radius_edge(player, ps, bot, bpos, target, BOT.survey.radius)
+        mapping.add_frontier_on_radius_edge(player, ps, bot, bpos, target, BOT.survey.radius)
     end
-end
-
-----------------------------------------------------------------------
--- Bot lifecycle
-----------------------------------------------------------------------
-
-local function destroy_player_bot(player, silent)
-    local ps = get_player_state(player.index)
-
-    -- Destroy the bot entity (if present).
-    if ps.bot_entity and ps.bot_entity.valid then
-        ps.bot_entity.destroy()
-    end
-
-    -- Clear ALL render objects / visuals.
-    visuals.clear_all(ps)
-
-    -- Disable + clear entity reference.
-    ps.bot_entity = nil
-    ps.bot_enabled = false
-
-    ------------------------------------------------------------------
-    -- Reset behavior state back to "follow".
-    ------------------------------------------------------------------
-    ps.bot_mode = "follow"
-    ps.bot_target_position = nil
-
-    -- Movement bookkeeping.
-    ps.last_player_position = nil
-    ps.last_player_side_offset_x = -BOT.movement.side_offset_distance
-
-    ------------------------------------------------------------------
-    -- Clear ALL survey / mapping point sets.
-    ------------------------------------------------------------------
-    ps.survey_render_mapped = true
-    ps.survey_render_points = true
-    ps.survey_mapped_entities = {}
-    ps.survey_mapped_positions = {}
-    ps.survey_frontier = {}
-    ps.survey_done = {}
-    ps.survey_seen = {}
-
-    ------------------------------------------------------------------
-    -- Clear ALL hull state (including incremental job + fingerprints).
-    ------------------------------------------------------------------
-    ps.hull = nil
-    ps.hull_job = nil
-    ps.hull_point_set = {}
-    ps.hull_quantized_count = 0
-    ps.hull_quantized_hash = 0
-    ps.hull_tick = 0
-    ps.hull_last_eval_tick = 0
-
-    ------------------------------------------------------------------
-    -- Clear any stored visual ids (so visuals code doesn't try to reuse them).
-    -- visuals.clear_all(ps) should already destroy render ids; this just resets
-    -- your bookkeeping tables to empty.
-    ------------------------------------------------------------------
-    ps.visuals = {
-        bot_highlight = nil,
-        lines = nil,
-        radius_circle = nil,
-        mapped_entities = {},
-        survey_frontier = {},
-        survey_done = {}
-    }
-
-    if not silent then
-        print_bot_message(player, "yellow", "deactivated")
-    end
-end
-
-local function create_player_bot(player)
-    local ps = get_player_state(player.index)
-
-    if ps.bot_entity and ps.bot_entity.valid then
-        ps.bot_enabled = true
-        return ps.bot_entity
-    end
-
-    local pos = player.position
-    local ent = player.surface.create_entity {
-        name = "mekatrol-game-play-bot",
-        position = {pos.x - 2, pos.y - 2},
-        force = player.force,
-        raise_built = true
-    }
-
-    if not ent then
-        print_bot_message(player, "red", "create failed")
-        return nil
-    end
-
-    ps.bot_entity = ent
-    ps.bot_enabled = true
-    ent.destructible = true
-
-    print_bot_message(player, "green", "created")
-    return ent
 end
 
 ----------------------------------------------------------------------
@@ -842,7 +250,7 @@ local function evaluate_hull_need(ps, tick)
         return
     end
 
-    local points, qcount, qhash = get_mapped_entity_points(ps)
+    local points, qcount, qhash = mapping.get_mapped_entity_points(ps)
 
     -- If not enough points, reset hull state.
     if qcount < 3 then
@@ -1054,11 +462,11 @@ local function on_toggle_bot(event)
         return
     end
 
-    local ps = get_player_state(p.index)
+    local ps = state.get_player_state(p.index)
     if ps.bot_entity and ps.bot_entity.valid then
-        destroy_player_bot(p, false)
+        state.destroy_player_bot(p, false)
     else
-        create_player_bot(p)
+        state.create_player_bot(p)
     end
 end
 
@@ -1068,7 +476,7 @@ local function on_cycle_bot_mode(event)
         return
     end
 
-    local ps = get_player_state(p.index)
+    local ps = state.get_player_state(p.index)
     local cur = ps.bot_mode or "follow"
     local idx = MODES.index[cur] or 1
 
@@ -1086,7 +494,7 @@ local function on_toggle_render_survey_mode(event)
         return
     end
 
-    local ps = get_player_state(p.index)
+    local ps = state.get_player_state(p.index)
     ps.survey_render_mapped = not ps.survey_render_mapped
     ps.survey_render_points = ps.survey_render_mapped -- just follows mapped state
 
@@ -1096,7 +504,7 @@ local function on_toggle_render_survey_mode(event)
         visuals.clear_mapped_entities(ps)
     end
 
-    print_bot_message(p, "green", "survey render: %s", ps.survey_render_mapped)
+    utils.print_bot_message(p, "green", "survey render: %s", ps.survey_render_mapped)
 end
 
 ----------------------------------------------------------------------
@@ -1114,7 +522,7 @@ local function on_entity_died(event)
             local pl = game.get_player(idx)
             if pl and pl.valid then
                 destroy_player_bot(pl, true)
-                print_bot_message(pl, "yellow", "destroyed")
+                utils.print_bot_message(pl, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
                 visuals.clear_all(ps)
@@ -1130,7 +538,7 @@ end
 ----------------------------------------------------------------------
 
 local function on_player_removed(event)
-    ensure_storage_tables()
+    state.ensure_storage_tables()
 
     local all = storage.game_bot
     local idx = event.player_index
@@ -1156,11 +564,11 @@ end
 ----------------------------------------------------------------------
 
 script.on_init(function()
-    ensure_storage_tables()
+    state.ensure_storage_tables()
 end)
 
 script.on_configuration_changed(function(_)
-    ensure_storage_tables()
+    state.ensure_storage_tables()
 end)
 
 ----------------------------------------------------------------------
@@ -1190,7 +598,7 @@ script.on_event(defines.events.on_tick, function(event)
         return
     end
 
-    local ps = get_player_state(player.index)
+    local ps = state.get_player_state(player.index)
     if not ps then
         return
     end
