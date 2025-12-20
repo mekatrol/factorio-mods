@@ -90,6 +90,9 @@ local function get_player_state(player_index)
             --   Set of quantized "x,y" keys so we don't enqueue the same node
             --   multiple times.
             ------------------------------------------------------------------
+            survey_render_mapped = true,
+            survey_render_points = true,
+
             survey_mapped_entities = {},
             survey_mapped_positions = {},
             survey_frontier = {},
@@ -139,6 +142,8 @@ local function get_player_state(player_index)
         all[player_index] = ps
     else
         -- Defensive initialization for upgrades / older saves.
+        ps.survey_render_mapped = ps.survey_render_mapped or false
+        ps.survey_render_points = ps.survey_render_points or false
         ps.survey_frontier = ps.survey_frontier or {}
         ps.survey_done = ps.survey_done or {}
         ps.survey_seen = ps.survey_seen or {}
@@ -450,8 +455,10 @@ local function upsert_mapped_entity(player, ps, entity, tick)
 
         mapped[key] = info
 
-        local box_id = visuals.draw_mapped_entity_box(player, ps, entity)
-        ps.visuals.mapped_entities[key] = box_id
+        if ps.survey_render_mapped then
+            local box_id = visuals.draw_mapped_entity_box(player, ps, entity)
+            ps.visuals.mapped_entities[key] = box_id
+        end
     else
         local pos = entity.position
         info.position.x = pos.x
@@ -758,6 +765,8 @@ local function destroy_player_bot(player, silent)
     ------------------------------------------------------------------
     -- Clear ALL survey / mapping point sets.
     ------------------------------------------------------------------
+    ps.survey_render_mapped = true
+    ps.survey_render_points = true
     ps.survey_mapped_entities = {}
     ps.survey_mapped_positions = {}
     ps.survey_frontier = {}
@@ -1029,8 +1038,10 @@ local function update_bot_for_player(player, ps, tick)
         end
     end
 
-    visuals.draw_survey_frontier(player, ps, bot)
-    visuals.draw_survey_done(player, ps, bot)
+    if ps.survey_render_points then
+        visuals.draw_survey_frontier(player, ps, bot)
+        visuals.draw_survey_done(player, ps, bot)
+    end
 end
 
 ----------------------------------------------------------------------
@@ -1067,6 +1078,25 @@ local function on_cycle_bot_mode(event)
     end
 
     set_player_bot_mode(p, ps, MODES.list[idx])
+end
+
+local function on_toggle_render_survey_mode(event)
+    local p = game.get_player(event.player_index)
+    if not (p and p.valid) then
+        return
+    end
+
+    local ps = get_player_state(p.index)
+    ps.survey_render_mapped = not ps.survey_render_mapped
+    ps.survey_render_points = ps.survey_render_mapped -- just follows mapped state
+
+    if not ps.survey_render_mapped then
+        visuals.clear_survey_frontier(ps)
+        visuals.clear_survey_done(ps)
+        visuals.clear_mapped_entities(ps)
+    end
+
+    print_bot_message(p, "green", "survey render: %s", ps.survey_render_mapped)
 end
 
 ----------------------------------------------------------------------
@@ -1139,6 +1169,7 @@ end)
 
 script.on_event("mekatrol-game-play-bot-toggle", on_toggle_bot)
 script.on_event("mekatrol-game-play-bot-next-mode", on_cycle_bot_mode)
+script.on_event("mekatrol-game-play-bot-render-survey-mode", on_toggle_render_survey_mode)
 
 script.on_event(defines.events.on_entity_died, on_entity_died)
 script.on_event(defines.events.on_player_removed, on_player_removed)

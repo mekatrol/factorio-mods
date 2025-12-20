@@ -50,6 +50,17 @@ data:extend({{
     key_sequence = "CONTROL + SHIFT + H",
 
     consuming = "none"
+}, {
+    -- Third hotkey: enable/disable render survey mode.
+    --
+    -- This hotkey is used to change the bot's render survey mode
+    type = "custom-input",
+    name = "mekatrol-game-play-bot-render-survey-mode",
+
+    -- Default key combination: Ctrl + Shift + R
+    key_sequence = "CONTROL + SHIFT + R",
+
+    consuming = "none"
 }})
 
 ----------------------------------------------------------------------
