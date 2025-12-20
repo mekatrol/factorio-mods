@@ -53,6 +53,10 @@ function state.get_player_state(player_index)
 
             bot_target_position = nil,
 
+            -- The quantized polygon hull already visited on the map
+            map_visited_poly = {},
+            map_visited_hull_job = nil,
+
             -- Render toggles (defaults ON)
             survey_render_mapped = true,
             survey_render_points = true,
@@ -95,6 +99,9 @@ function state.get_player_state(player_index)
     if ps.survey_render_points == nil then
         ps.survey_render_points = true
     end
+
+    ps.map_visited_poly = ps.map_visited_poly or {}
+    ps.map_visited_hull_job = ps.map_visited_hull_job or nil
 
     ps.survey_mapped_entities = ps.survey_mapped_entities or {}
     ps.survey_mapped_positions = ps.survey_mapped_positions or {}

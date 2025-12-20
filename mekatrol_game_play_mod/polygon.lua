@@ -28,32 +28,32 @@ local util = require("util")
 -- Basic vector/geometry helpers
 ----------------------------------------------------------------------
 
-local function cross(o, a, b)
+function polygon.cross(o, a, b)
     -- Cross product (OA x OB). Sign indicates orientation.
     return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
 end
 
-local function dist2(a, b)
+function polygon.dist2(a, b)
     local dx = a.x - b.x
     local dy = a.y - b.y
     return dx * dx + dy * dy
 end
 
-local function points_equal(a, b)
+function polygon.points_equal(a, b)
     return a.x == b.x and a.y == b.y
 end
 
-local function on_segment(a, b, p)
+function polygon.on_segment(a, b, p)
     return math.min(a.x, b.x) <= p.x and p.x <= math.max(a.x, b.x) and math.min(a.y, b.y) <= p.y and p.y <=
                math.max(a.y, b.y)
 end
 
-local function orient(a, b, c)
+function polygon.orient(a, b, c)
     -- Returns:
     --   1  if a->b->c is CCW turn
     --  -1  if CW turn
     --   0  if collinear
-    local v = cross(a, b, c)
+    local v = polygon.cross(a, b, c)
     if v > 0 then
         return 1
     end
@@ -63,34 +63,34 @@ local function orient(a, b, c)
     return 0
 end
 
-local function segments_intersect(a, b, c, d)
+function polygon.segments_intersect(a, b, c, d)
     -- Proper + collinear intersections.
-    local o1 = orient(a, b, c)
-    local o2 = orient(a, b, d)
-    local o3 = orient(c, d, a)
-    local o4 = orient(c, d, b)
+    local o1 = polygon.orient(a, b, c)
+    local o2 = polygon.orient(a, b, d)
+    local o3 = polygon.orient(c, d, a)
+    local o4 = polygon.orient(c, d, b)
 
     if o1 ~= o2 and o3 ~= o4 then
         return true
     end
 
-    if o1 == 0 and on_segment(a, b, c) then
+    if o1 == 0 and polygon.on_segment(a, b, c) then
         return true
     end
-    if o2 == 0 and on_segment(a, b, d) then
+    if o2 == 0 and polygon.on_segment(a, b, d) then
         return true
     end
-    if o3 == 0 and on_segment(c, d, a) then
+    if o3 == 0 and polygon.on_segment(c, d, a) then
         return true
     end
-    if o4 == 0 and on_segment(c, d, b) then
+    if o4 == 0 and polygon.on_segment(c, d, b) then
         return true
     end
 
     return false
 end
 
-local function would_self_intersect(hull, candidate)
+function polygon.would_self_intersect(hull, candidate)
     -- Checks whether adding segment (last hull point -> candidate)
     -- would intersect any existing hull edge excluding adjacent edges.
     local n = #hull
@@ -105,7 +105,7 @@ local function would_self_intersect(hull, candidate)
     for i = 1, n - 2 do
         local c = hull[i]
         local d = hull[i + 1]
-        if segments_intersect(a, b, c, d) then
+        if polygon.segments_intersect(a, b, c, d) then
             return true
         end
     end
@@ -113,7 +113,7 @@ local function would_self_intersect(hull, candidate)
     return false
 end
 
-local function angle_ccw(prev_dir, from, to)
+function polygon.angle_ccw(prev_dir, from, to)
     -- Returns CCW turn angle [0, 2pi) from prev_dir to vector from->to.
     local vx = to.x - from.x
     local vy = to.y - from.y
@@ -135,7 +135,7 @@ end
 -- Shared polygon membership test (boundary counts as inside)
 ----------------------------------------------------------------------
 
-local function point_in_poly(poly, p)
+function polygon.point_in_poly(poly, p)
     -- Ray casting. Boundary is treated as inside.
     local inside = false
     local n = #poly
@@ -146,7 +146,7 @@ local function point_in_poly(poly, p)
         local b = poly[j]
 
         -- Boundary check.
-        if orient(a, b, p) == 0 and on_segment(a, b, p) then
+        if polygon.orient(a, b, p) == 0 and polygon.on_segment(a, b, p) then
             return true
         end
 
@@ -167,9 +167,9 @@ local function point_in_poly(poly, p)
     return inside
 end
 
-local function all_points_inside_or_on(hull, points)
+function polygon.all_points_inside_or_on(hull, points)
     for i = 1, #points do
-        if not point_in_poly(hull, points[i]) then
+        if not polygon.point_in_poly(hull, points[i]) then
             return false
         end
     end
@@ -180,7 +180,7 @@ end
 -- Point set helpers
 ----------------------------------------------------------------------
 
-local function copy_points(points)
+function polygon.copy_points(points)
     local out = {}
     for i = 1, #points do
         local p = points[i]
@@ -192,7 +192,7 @@ local function copy_points(points)
     return out
 end
 
-local function dedupe_points(points)
+function polygon.dedupe_points(points)
     -- Exact dedupe. Works well if caller already quantizes.
     local seen = {}
     local out = {}
@@ -212,7 +212,7 @@ local function dedupe_points(points)
     return out
 end
 
-local function lowest_point(points)
+function polygon.lowest_point(points)
     -- Lowest Y, then lowest X.
     local idx = 1
     for i = 2, #points do
@@ -225,17 +225,17 @@ local function lowest_point(points)
     return idx
 end
 
-local function k_nearest(points, from, k, used)
+function polygon.k_nearest(points, from, k, used)
     -- Returns up to k nearest points to "from" that are not used.
     -- "used" is a boolean array indexed by point index.
     local arr = {}
 
     for i = 1, #points do
         local p = points[i]
-        if not used[i] and not points_equal(p, from) then
+        if not used[i] and not polygon.points_equal(p, from) then
             arr[#arr + 1] = {
                 idx = i,
-                d2 = dist2(from, p)
+                d2 = polygon.dist2(from, p)
             }
         end
     end
@@ -269,7 +269,7 @@ end
 function polygon.start_concave_hull_job(player, points, k, opts)
     opts = opts or {}
 
-    local pts = dedupe_points(points)
+    local pts = polygon.dedupe_points(points)
     local n = #pts
 
     local job = {
@@ -341,7 +341,7 @@ function polygon.step_concave_hull_job(player, job, step_budget)
 
             -- Reset attempt state.
             job.used = {}
-            job.start_idx = lowest_point(job.pts)
+            job.start_idx = polygon.lowest_point(job.pts)
             job.start = job.pts[job.start_idx]
             job.used[job.start_idx] = true
 
@@ -363,17 +363,17 @@ function polygon.step_concave_hull_job(player, job, step_budget)
                 job.kk = job.kk + 1
                 polygon.set_job_phase(player, job, "init_attempt")
             else
-                local candidates = k_nearest(job.pts, job.current, job.kk, job.used)
+                local candidates = polygon.k_nearest(job.pts, job.current, job.kk, job.used)
                 if #candidates == 0 then
                     job.kk = job.kk + 1
                     polygon.set_job_phase(player, job, "init_attempt")
                 else
                     -- Pick candidate with smallest CCW turn; break ties by distance.
                     table.sort(candidates, function(a, b)
-                        local aa = angle_ccw(job.prev_dir, job.current, a)
-                        local ab = angle_ccw(job.prev_dir, job.current, b)
+                        local aa = polygon.angle_ccw(job.prev_dir, job.current, a)
+                        local ab = polygon.angle_ccw(job.prev_dir, job.current, b)
                         if aa == ab then
-                            return dist2(job.current, a) < dist2(job.current, b)
+                            return polygon.dist2(job.current, a) < polygon.dist2(job.current, b)
                         end
                         return aa < ab
                     end)
@@ -384,7 +384,7 @@ function polygon.step_concave_hull_job(player, job, step_budget)
                         local cand = candidates[i]
 
                         -- Allow closing to start only when hull is long enough.
-                        local closing = (#job.hull >= 3 and points_equal(cand, job.start))
+                        local closing = (#job.hull >= 3 and polygon.points_equal(cand, job.start))
 
                         if closing then
                             -- Closing segment must not intersect existing hull edges.
@@ -394,7 +394,7 @@ function polygon.step_concave_hull_job(player, job, step_budget)
                             for e = 1, #job.hull - 2 do
                                 local c = job.hull[e]
                                 local d = job.hull[e + 1]
-                                if segments_intersect(a, b, c, d) then
+                                if polygon.segments_intersect(a, b, c, d) then
                                     intersects = true
                                     break
                                 end
@@ -405,7 +405,7 @@ function polygon.step_concave_hull_job(player, job, step_budget)
                             end
                         else
                             -- Standard candidate must not self-intersect.
-                            if not would_self_intersect(job.hull, cand) then
+                            if not polygon.would_self_intersect(job.hull, cand) then
                                 next = cand
                                 break
                             end
@@ -416,7 +416,7 @@ function polygon.step_concave_hull_job(player, job, step_budget)
                         -- No candidate can extend hull without intersection: failed attempt.
                         job.kk = job.kk + 1
                         polygon.set_job_phase(player, job, "init_attempt")
-                    elseif points_equal(next, job.start) then
+                    elseif polygon.points_equal(next, job.start) then
                         -- Closed polygon; validate point containment.
                         polygon.set_job_phase(player, job, "validate")
                         job.validate_i = 1
@@ -466,7 +466,7 @@ function polygon.step_concave_hull_job(player, job, step_budget)
                     polygon.set_job_phase(player, job, "init_attempt")
                 else
                     local p = job.pts[job.validate_i]
-                    if not point_in_poly(job.hull, p) then
+                    if not polygon.point_in_poly(job.hull, p) then
                         job.validated_ok = false
                     end
                     job.validate_i = job.validate_i + 1
@@ -486,7 +486,7 @@ end
 function polygon.concave_hull(points, k, opts)
     opts = opts or {}
 
-    local pts = dedupe_points(points)
+    local pts = polygon.dedupe_points(points)
     local n = #pts
     if n < 3 then
         return pts
@@ -504,7 +504,7 @@ function polygon.concave_hull(points, k, opts)
 
     for kk = k, max_k do
         local used = {}
-        local start_idx = lowest_point(pts)
+        local start_idx = polygon.lowest_point(pts)
         local start = pts[start_idx]
         used[start_idx] = true
 
@@ -519,16 +519,16 @@ function polygon.concave_hull(points, k, opts)
         while guard < 10000 do
             guard = guard + 1
 
-            local candidates = k_nearest(pts, current, kk, used)
+            local candidates = polygon.k_nearest(pts, current, kk, used)
             if #candidates == 0 then
                 break
             end
 
             table.sort(candidates, function(a, b)
-                local aa = angle_ccw(prev_dir, current, a)
-                local ab = angle_ccw(prev_dir, current, b)
+                local aa = polygon.angle_ccw(prev_dir, current, a)
+                local ab = polygon.angle_ccw(prev_dir, current, b)
                 if aa == ab then
-                    return dist2(current, a) < dist2(current, b)
+                    return polygon.dist2(current, a) < polygon.dist2(current, b)
                 end
                 return aa < ab
             end)
@@ -536,7 +536,7 @@ function polygon.concave_hull(points, k, opts)
             local next = nil
             for i = 1, #candidates do
                 local cand = candidates[i]
-                local closing = (#hull >= 3 and points_equal(cand, start))
+                local closing = (#hull >= 3 and polygon.points_equal(cand, start))
 
                 if closing then
                     local intersects = false
@@ -545,7 +545,7 @@ function polygon.concave_hull(points, k, opts)
                     for e = 1, #hull - 2 do
                         local c = hull[e]
                         local d = hull[e + 1]
-                        if segments_intersect(a, b, c, d) then
+                        if polygon.segments_intersect(a, b, c, d) then
                             intersects = true
                             break
                         end
@@ -555,7 +555,7 @@ function polygon.concave_hull(points, k, opts)
                         break
                     end
                 else
-                    if not would_self_intersect(hull, cand) then
+                    if not polygon.would_self_intersect(hull, cand) then
                         next = cand
                         break
                     end
@@ -566,7 +566,7 @@ function polygon.concave_hull(points, k, opts)
                 break
             end
 
-            if points_equal(next, start) then
+            if polygon.points_equal(next, start) then
                 break -- closed
             end
 
@@ -589,13 +589,13 @@ function polygon.concave_hull(points, k, opts)
             end
         end
 
-        if #hull >= 3 and all_points_inside_or_on(hull, pts) then
+        if #hull >= 3 and polygon.all_points_inside_or_on(hull, pts) then
             return hull
         end
     end
 
     -- Fallback: convex hull of the same point set we attempted.
-    return polygon.convex_hull(copy_points(pts))
+    return polygon.convex_hull(polygon.copy_points(pts))
 end
 
 ----------------------------------------------------------------------
@@ -605,13 +605,13 @@ end
 function polygon.convex_hull(points)
     local n = #points
     if n < 3 then
-        return copy_points(points)
+        return polygon.copy_points(points)
     end
 
-    local pts = copy_points(points)
+    local pts = polygon.copy_points(points)
 
     -- 1) pivot: lowest Y, then lowest X
-    local pivot_idx = lowest_point(pts)
+    local pivot_idx = polygon.lowest_point(pts)
     pts[1], pts[pivot_idx] = pts[pivot_idx], pts[1]
     local pivot = pts[1]
 
@@ -624,9 +624,9 @@ function polygon.convex_hull(points)
             return false
         end
 
-        local c = cross(pivot, a, b)
+        local c = polygon.cross(pivot, a, b)
         if c == 0 then
-            return dist2(pivot, a) < dist2(pivot, b)
+            return polygon.dist2(pivot, a) < polygon.dist2(pivot, b)
         end
         return c > 0
     end)
@@ -637,12 +637,12 @@ function polygon.convex_hull(points)
         while #filtered >= 2 do
             local last = filtered[#filtered]
             local prev = filtered[#filtered - 1]
-            if cross(prev, last, pts[i]) ~= 0 then
+            if polygon.cross(prev, last, pts[i]) ~= 0 then
                 break
             end
 
             -- Keep the farthest collinear point from prev.
-            if dist2(prev, pts[i]) > dist2(prev, last) then
+            if polygon.dist2(prev, pts[i]) > polygon.dist2(prev, last) then
                 filtered[#filtered] = pts[i]
             end
 
@@ -662,7 +662,7 @@ function polygon.convex_hull(points)
         while #hull >= 2 do
             local top = hull[#hull]
             local next_to_top = hull[#hull - 1]
-            if cross(next_to_top, top, filtered[i]) > 0 then
+            if polygon.cross(next_to_top, top, filtered[i]) > 0 then
                 break
             end
             table.remove(hull)
@@ -681,7 +681,7 @@ function polygon.contains_point(poly, p)
     if not poly or #poly < 3 then
         return false
     end
-    return point_in_poly(poly, p)
+    return polygon.point_in_poly(poly, p)
 end
 
 return polygon

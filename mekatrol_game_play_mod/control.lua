@@ -15,6 +15,7 @@ local config = require("configuration")
 local follow = require("follow")
 local mapping = require("mapping")
 local polygon = require("polygon")
+local polymap = require("polymap")
 local state = require("state")
 local survey = require("survey")
 local util = require("util")
@@ -92,6 +93,7 @@ local function update_bot_for_player(player, ps, tick)
     end
     
     mapping.update(player, ps, tick)
+    polymap.update(player, ps, tick)
 
     if ps.survey_render_points then
         visual.draw_survey_frontier(player, ps, bot)
