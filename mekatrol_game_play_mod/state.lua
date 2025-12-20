@@ -29,6 +29,8 @@ local function ensure_visuals_table(ps)
     ps.visual.mapped_entities = ps.visual.mapped_entities or {}
     ps.visual.survey_frontier = ps.visual.survey_frontier or {}
     ps.visual.survey_done = ps.visual.survey_done or {}
+    ps.visual.overlay_texts = ps.visual.overlay_texts or {}
+    ps.visual.overlay_next_tick = nil
 end
 
 function state.ensure_survey_sets(ps)
@@ -84,7 +86,9 @@ function state.get_player_state(player_index)
                 radius_circle = nil,
                 mapped_entities = {},
                 survey_frontier = {},
-                survey_done = {}
+                survey_done = {},
+                overlay_next_tick = nil,
+                overlay_texts = {}
             }
         }
 

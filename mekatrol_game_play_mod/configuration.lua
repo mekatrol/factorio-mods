@@ -6,7 +6,7 @@ local config = {}
 
 config.bot = {
     update_interval = 1,
-    update_hull_interval = 20,
+    update_hull_interval = 2,
 
     -- limit hull work per tick to avoid long script updates
     hull_steps_per_tick = 25,

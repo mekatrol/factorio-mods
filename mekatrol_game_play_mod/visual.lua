@@ -241,6 +241,23 @@ function visual.clear_mapped_entities(player_state)
     player_state.visual.mapped_entities = {}
 end
 
+function visual.clear_overlay(player_state)
+    if not player_state then
+        return
+    end
+
+    -- Clear any overlay objects that were created
+    if player_state.overlay_texts then
+        for _, obj in pairs(player_state.overlay_texts) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+    end
+
+    player_state.overlay_texts = {}
+end
+
 ---------------------------------------------------
 -- FUNCTION: clear_all(player_state)
 --
@@ -280,6 +297,113 @@ end
 --   caller will manage per-tick lifecycle (e.g. clearing lines before
 --   redrawing).
 ----------------------------------------------------------------------
+
+-- Compute the world-space position that corresponds
+-- to the top-left corner of the screen for this player.
+local function get_screen_top_left_world(player)
+    -- Fallbacks in case any field is missing
+    local res = player.display_resolution or {
+        width = 1920,
+        height = 1080
+    }
+    local scale = player.display_scale or 1
+    local zoom = player.zoom or 1
+
+    -- “Effective” resolution after UI scaling
+    local w_pixels = res.width / scale
+    local h_pixels = res.height / scale
+
+    -- 1 tile = 32 pixels at zoom = 1
+    local tiles_per_pixel = 1 / (32 * zoom)
+
+    local half_w_tiles = (w_pixels * tiles_per_pixel) / 2
+    local half_h_tiles = (h_pixels * tiles_per_pixel) / 2
+
+    local cx = player.position.x
+    local cy = player.position.y
+
+    -- world position of top-left corner
+    return {
+        x = cx - half_w_tiles,
+        y = cy - half_h_tiles
+    }
+end
+
+function visual.update_overlay(player, player_state, lines)
+    if not (player and player.valid) then
+        return
+    end
+
+    visual.clear_overlay(player_state)
+
+    -------------------------------------------------------
+    -- Keep text the same size regardless of zoom
+    -------------------------------------------------------
+    local base_scale = 1.5
+    local zoom = player.zoom or 1
+    local effective_scale = base_scale / zoom
+
+    -------------------------------------------------------
+    -- Top-left of the current camera + small margin
+    -------------------------------------------------------
+    local tl = get_screen_top_left_world(player)
+
+    local margin_tiles_x = 0.5
+    local margin_tiles_y = 0.5
+
+    local base_pos = {
+        x = tl.x + margin_tiles_x,
+        y = tl.y + margin_tiles_y
+    }
+
+    -------------------------------------------------------
+    -- Draw or update the text
+    -------------------------------------------------------
+
+    -- Line spacing in tiles, scaled with text size
+    local base_line_spacing_tiles = 0.8
+    local line_spacing = base_line_spacing_tiles * (effective_scale / base_scale)
+
+    -- Update/create one visual per line
+    for index, line in ipairs(lines) do
+        local line_pos = {
+            x = base_pos.x,
+            y = base_pos.y + (index - 1) * line_spacing
+        }
+
+        -- Ensure container exists
+        local overlays = player_state.overlay_texts
+        if not overlays then
+            overlays = {}
+            player_state.overlay_texts = overlays
+        end
+
+        local obj = overlays[index]
+
+        if obj and obj.valid then
+            obj.text = line
+            obj.target = line_pos
+            obj.scale = effective_scale
+        else
+            overlays[index] = rendering.draw_text {
+                text = line,
+                surface = player.surface,
+                target = line_pos,
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 0,
+                    a = 0.8
+                }, -- semi-transparent yellow
+                scale = effective_scale,
+                alignment = "left",
+                vertical_alignment = "top",
+                draw_on_ground = false,
+                only_in_alt_mode = false
+            }
+        end
+    end
+end
 
 ---------------------------------------------------
 -- FUNCTION: draw_radius_circle(player, player_state, bot_entity, radius, color)

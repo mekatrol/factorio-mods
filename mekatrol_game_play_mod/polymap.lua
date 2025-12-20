@@ -128,7 +128,7 @@ local function evaluate_hull_need(player, ps, points)
 
     if old_point_count == #ps.map_visited_poly then
         -- there are no new points outside the polygon
-        -- return
+        return
     end
 
     -- start a new job to find concave hull
