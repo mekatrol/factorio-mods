@@ -466,4 +466,35 @@ function mapping.step_hull_job(ps, tick)
     ps.hull_job = nil
 end
 
+function mapping.update(player, ps, tick)
+    ------------------------------------------------------------------
+    -- Hull processing (non-blocking)
+    --
+    -- 1) Every update_hull_interval ticks, compute the fingerprint of the mapped
+    --    points and decide whether we need to start/restart the hull job.
+    -- 2) Every tick, advance the current job by a limited step budget.
+    --
+    -- IMPORTANT: We intentionally do NOT compute mapped points/hash every tick.
+    -- That avoids redundant hull-related work and keeps the script fast.
+    ------------------------------------------------------------------
+    mapping.evaluate_hull_need(ps, tick)
+    mapping.step_hull_job(ps, tick)
+
+    -- Draw the most recently completed hull (if any).
+    local hull = ps.hull
+    if hull and #hull >= 2 then
+        for i = 1, #hull do
+            local a = hull[i]
+            local b = hull[i % #hull + 1]
+
+            visual.draw_line(player, ps, a, b, {
+                r = 1,
+                g = 0,
+                b = 0,
+                a = 0.8
+            })
+        end
+    end
+end
+
 return mapping
