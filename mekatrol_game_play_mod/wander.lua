@@ -1,7 +1,7 @@
 local wander = {}
 
 local config = require("configuration")
-local mapping = require("mapping")
+local positioning = require("positioning")
 local state = require("state")
 
 local BOT = config.bot
@@ -36,7 +36,7 @@ function wander.update(player, ps, bot)
         ps.bot_target_position = target
     end
 
-    mapping.move_bot_towards(player, bot, target)
+    positioning.move_bot_towards(player, bot, target)
 
     local bpos = bot.position
     local dx = target.x - bpos.x

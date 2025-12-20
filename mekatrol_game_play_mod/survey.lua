@@ -2,6 +2,7 @@ local survey = {}
 
 local config = require("configuration")
 local mapping = require("mapping")
+local positioning = require("positioning")
 local state = require("state")
 
 local BOT = config.bot
@@ -55,7 +56,7 @@ function survey.update(player, ps, bot, tick)
     end
 
     ps.bot_target_position = target
-    mapping.move_bot_towards(player, bot, target)
+    positioning.move_bot_towards(player, bot, target)
 
     local bpos = bot.position
     local dx = target.x - bpos.x
