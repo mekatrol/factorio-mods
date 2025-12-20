@@ -335,9 +335,8 @@ function mapping.evaluate_hull_need(player, ps, tick)
         return
     end
 
-    -- Don't need to start hull if job already running
+    -- Don't need to start hull if job already running, let it finish
     if ps.hull_job then
-        util.print_bot_message(player, "red", "job already running: %s", ps.hull_job.phase)
         return
     end
 
@@ -414,8 +413,6 @@ function mapping.step_hull_job(player, ps, tick)
     if not done then
         return
     end
-
-    util.print_bot_message(player, "red", "job done: %s", ps.hull_job.phase)
 
     ps.hull = hull
     ps.hull_quantized_count = ps.hull_job.qcount
