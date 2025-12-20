@@ -3,10 +3,6 @@
 -- Responsibilities:
 --   - Own persistent per-player bot state in `storage.game_bot[player_index]`
 --   - Provide helpers to create/destroy bot and change bot mode
---
--- Important: Avoid circular requires.
---   Do NOT `require("mapping")` at top-level if mapping.lua requires state.lua.
---   Instead, require mapping lazily inside the function that needs it.
 local state = {}
 
 local config = require("configuration")
@@ -33,6 +29,13 @@ local function ensure_visuals_table(ps)
     ps.visual.mapped_entities = ps.visual.mapped_entities or {}
     ps.visual.survey_frontier = ps.visual.survey_frontier or {}
     ps.visual.survey_done = ps.visual.survey_done or {}
+end
+
+function state.ensure_survey_sets(ps)
+    ps.survey_frontier = ps.survey_frontier or {}
+    ps.survey_done = ps.survey_done or {}
+    ps.survey_seen = ps.survey_seen or {}
+    ps.survey_mapped_positions = ps.survey_mapped_positions or {}
 end
 
 function state.get_player_state(player_index)
@@ -137,7 +140,7 @@ function state.set_player_bot_mode(player, ps, new_mode)
 
     -- Survey mode: create a new frontier ring around the bot.
     if new_mode == "survey" then
-        mapping.ensure_survey_sets(ps)
+        state.ensure_survey_sets(ps)
 
         -- Start a fresh frontier queue for this pass.
         ps.survey_frontier = {}
@@ -147,7 +150,7 @@ function state.set_player_bot_mode(player, ps, new_mode)
         if bot and bot.valid then
             local bpos = bot.position
             local start_a = mapping.ring_seed_for_center(bpos)
-            mapping.add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 24, start_a, 0)
+            mapping.add_ring_frontiers(player, state, ps, bot, bpos, BOT.survey.radius, 24, start_a, 0)
         end
     end
 end

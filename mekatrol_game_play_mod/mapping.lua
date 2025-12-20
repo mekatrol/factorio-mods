@@ -48,13 +48,6 @@ function mapping.quantize(v, step)
     return math.floor(v / step + 0.5) * step
 end
 
-function mapping.ensure_survey_sets(ps)
-    ps.survey_frontier = ps.survey_frontier or {}
-    ps.survey_done = ps.survey_done or {}
-    ps.survey_seen = ps.survey_seen or {}
-    ps.survey_mapped_positions = ps.survey_mapped_positions or {}
-end
-
 function mapping.mark_position_mapped(ps, x, y, q)
     local qx = mapping.quantize(x, q)
     local qy = mapping.quantize(y, q)
@@ -104,8 +97,8 @@ function mapping.get_nearest_frontier(ps, bot_pos)
     return node
 end
 
-function mapping.add_frontier_node(player, ps, bot, x, y)
-    mapping.ensure_survey_sets(ps)
+function mapping.add_frontier_node(player, state, ps, bot, x, y)
+    state.ensure_survey_sets(ps)
 
     -- Frontier nodes are quantized to half-tiles.
     local q = 0.5
@@ -154,8 +147,8 @@ function mapping.add_frontier_node(player, ps, bot, x, y)
     })
 end
 
-function mapping.add_ring_frontiers(player, ps, bot, center, radius, count, start_angle, radial_offset)
-    mapping.ensure_survey_sets(ps)
+function mapping.add_ring_frontiers(player, state, ps, bot, center, radius, count, start_angle, radial_offset)
+    state.ensure_survey_sets(ps)
 
     radial_offset = radial_offset or 0
     start_angle = start_angle or 0
@@ -169,12 +162,12 @@ function mapping.add_ring_frontiers(player, ps, bot, center, radius, count, star
 
     for i = 0, count - 1 do
         local a = start_angle + i * step
-        mapping.add_frontier_node(player, ps, bot, center.x + math.cos(a) * r, center.y + math.sin(a) * r)
+        mapping.add_frontier_node(player, state, ps, bot, center.x + math.cos(a) * r, center.y + math.sin(a) * r)
     end
 end
 
-function mapping.add_frontier_on_radius_edge(player, ps, bot, center_pos, point_pos, radius)
-    mapping.ensure_survey_sets(ps)
+function mapping.add_frontier_on_radius_edge(player, state, ps, bot, center_pos, point_pos, radius)
+    state.ensure_survey_sets(ps)
 
     local dx = point_pos.x - center_pos.x
     local dy = point_pos.y - center_pos.y
@@ -190,15 +183,15 @@ function mapping.add_frontier_on_radius_edge(player, ps, bot, center_pos, point_
 
     local ex = center_pos.x + nx * radius
     local ey = center_pos.y + ny * radius
-    mapping.add_frontier_node(player, ps, bot, ex, ey)
+    mapping.add_frontier_node(player, state, ps, bot, ex, ey)
 
     local angle = math.atan2(ny, nx)
     local delta = math.rad(15)
 
-    mapping.add_frontier_node(player, ps, bot, center_pos.x + math.cos(angle + delta) * radius,
+    mapping.add_frontier_node(player, state, ps, bot, center_pos.x + math.cos(angle + delta) * radius,
         center_pos.y + math.sin(angle + delta) * radius)
 
-    mapping.add_frontier_node(player, ps, bot, center_pos.x + math.cos(angle - delta) * radius,
+    mapping.add_frontier_node(player, state, ps, bot, center_pos.x + math.cos(angle - delta) * radius,
         center_pos.y + math.sin(angle - delta) * radius)
 end
 
@@ -206,13 +199,13 @@ end
 -- Mapping upsert
 ----------------------------------------------------------------------
 
-function mapping.upsert_mapped_entity(player, ps, entity, tick)
+function mapping.upsert_mapped_entity(player, state, ps, entity, tick)
     local key = mapping.get_entity_key(entity)
     if not key then
         return false
     end
 
-    mapping.ensure_survey_sets(ps)
+    state.ensure_survey_sets(ps)
 
     local mapped = ps.survey_mapped_entities
     local info = mapped[key]

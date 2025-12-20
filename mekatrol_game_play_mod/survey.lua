@@ -25,19 +25,19 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char and mapping.is_static_mappable(e) then
-            mapping.add_frontier_on_radius_edge(player, ps, bot, bpos, e.position, BOT.survey.radius)
+            mapping.add_frontier_on_radius_edge(player, state, ps, bot, bpos, e.position, BOT.survey.radius)
 
-            if mapping.upsert_mapped_entity(player, ps, e, tick) then
+            if mapping.upsert_mapped_entity(player, state, ps, e, tick) then
                 discovered_any = true
             end
         end
     end
 
     local start_a = mapping.ring_seed_for_center(bpos)
-    mapping.add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a, 0)
+    mapping.add_ring_frontiers(player, state, ps, bot, bpos, BOT.survey.radius, 12, start_a, 0)
 
     if not discovered_any then
-        mapping.add_ring_frontiers(player, ps, bot, bpos, BOT.survey.radius, 12, start_a + math.pi / 12, 1.0)
+        mapping.add_ring_frontiers(player, state, ps, bot, bpos, BOT.survey.radius, 12, start_a + math.pi / 12, 1.0)
     end
 
     return discovered_any
@@ -72,7 +72,7 @@ function survey.update(player, ps, bot, tick)
 
     local discovered = survey.perform_survey_scan(player, ps, bot, tick)
     if discovered then
-        mapping.add_frontier_on_radius_edge(player, ps, bot, bpos, target, BOT.survey.radius)
+        mapping.add_frontier_on_radius_edge(player, state, ps, bot, bpos, target, BOT.survey.radius)
     end
 end
 
