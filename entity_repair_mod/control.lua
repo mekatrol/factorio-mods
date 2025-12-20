@@ -43,6 +43,7 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
     ["mekatrol-repair-bot"] = CUSTOM_BOT_HEALTH,
     ["mekatrol-mapping-bot"] = CUSTOM_BOT_HEALTH,
     ["mekatrol-cleanup-bot"] = 100,
+    ["mekatrol-game-play-bot"] = 500,
     ["crash-site-spaceship"] = 600,
     ["construction-robot"] = 100,
     ["logistic-robot"] = 100,
@@ -88,7 +89,8 @@ local ENTITY_MAX_HEALTH = ENTITY_MAX_HEALTH or {
 
 local ignore_names = {
     ["mekatrol-repair-bot"] = true,
-    ["mekatrol-cleanup-bot"] = true
+    ["mekatrol-cleanup-bot"] = true,
+    ["mekatrol-game-play-bot"] = true
 }
 
 local UNKNOWN_ENTITY_WARNED = UNKNOWN_ENTITY_WARNED or {}
