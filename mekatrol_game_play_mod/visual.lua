@@ -1,12 +1,12 @@
 ----------------------------------------------------------------------
--- visuals.lua
+-- visual.lua
 --
 -- Purpose:
 --   This module provides helper functions for drawing and managing
 --   visual overlays around the player's bot entity using Factorio’s
 --   rendering API (Factorio 2.x).
 --
---   The visuals implemented here are:
+--   The visual implemented here are:
 --     * A rectangular highlight around the bot.
 --     * An optional line between the player and the bot whose color
 --       depends on the bot's current mode.
@@ -14,7 +14,7 @@
 --     * Optional boxes around mapped entities.
 --
 --   All render objects are stored in the per-player state under
---   player_state.visuals and must be explicitly destroyed when no
+--   player_state.visual and must be explicitly destroyed when no
 --   longer needed. This module intentionally does NOT perform any
 --   game logic or persistent storage configuration; it only operates
 --   on the data it is given.
@@ -24,7 +24,7 @@
 --   player_state = {
 --       bot_entity = <LuaEntity or nil>,
 --       bot_mode   = <string> or nil, -- e.g. "follow", "wander"
---       visuals    = {
+--       visual    = {
 --           bot_highlight   = <LuaRenderObject or nil>,
 --           lines           = <array of LuaRenderObject or nil>,
 --           radius_circle   = <LuaRenderObject or nil>,
@@ -40,11 +40,11 @@ local MOD_NAME = "mekatrol_game_play_mod"
 ---------------------------------------------------
 -- MODULE TABLE
 ---------------------------------------------------
-local visuals = {}
+local visual = {}
 
 local function ensure_lines_table(ps)
-    ps.visuals = ps.visuals or {}
-    ps.visuals.lines = ps.visuals.lines or {}
+    ps.visual = ps.visual or {}
+    ps.visual.lines = ps.visual.lines or {}
 end
 
 ----------------------------------------------------------------------
@@ -65,7 +65,7 @@ end
 -- Parameters:
 --   player_state : table
 --       The per-player state table that contains:
---         * player_state.visuals.bot_highlight — a LuaRenderObject or nil.
+--         * player_state.visual.bot_highlight — a LuaRenderObject or nil.
 --
 -- Behavior:
 --   * If a highlight exists and is still valid, it is explicitly
@@ -77,25 +77,25 @@ end
 --     disappear; they must always be explicitly destroyed.
 --   * This function is safe to call even if no highlight exists.
 ---------------------------------------------------
-function visuals.clear_bot_highlight(player_state)
-    if not (player_state and player_state.visuals) then
+function visual.clear_bot_highlight(player_state)
+    if not (player_state and player_state.visual) then
         return
     end
 
-    local highlight = player_state.visuals.bot_highlight
+    local highlight = player_state.visual.bot_highlight
     if highlight and highlight.valid then
         highlight:destroy()
     end
 
-    player_state.visuals.bot_highlight = nil
+    player_state.visual.bot_highlight = nil
 end
 
-function visuals.clear_survey_frontier(player_state)
-    if not (player_state and player_state.visuals) then
+function visual.clear_survey_frontier(player_state)
+    if not (player_state and player_state.visual) then
         return
     end
 
-    local frontier = player_state.visuals.survey_frontier
+    local frontier = player_state.visual.survey_frontier
     if not frontier then
         return
     end
@@ -106,15 +106,15 @@ function visuals.clear_survey_frontier(player_state)
         end
     end
 
-    player_state.visuals.survey_frontier = {}
+    player_state.visual.survey_frontier = {}
 end
 
-function visuals.clear_survey_done(player_state)
-    if not (player_state and player_state.visuals) then
+function visual.clear_survey_done(player_state)
+    if not (player_state and player_state.visual) then
         return
     end
 
-    local done = player_state.visuals.survey_done
+    local done = player_state.visual.survey_done
     if not done then
         return
     end
@@ -125,7 +125,7 @@ function visuals.clear_survey_done(player_state)
         end
     end
 
-    player_state.visuals.survey_done = {}
+    player_state.visual.survey_done = {}
 end
 
 ---------------------------------------------------
@@ -133,12 +133,12 @@ end
 --
 -- Purpose:
 --   Destroys and clears all line render objects associated with the
---   player's bot visuals.
+--   player's bot visual.
 --
 -- Parameters:
 --   player_state : table
 --       The per-player state table that contains:
---         * player_state.visuals.lines — an array of LuaRenderObject
+--         * player_state.visual.lines — an array of LuaRenderObject
 --           or nil.
 --
 -- Behavior:
@@ -148,15 +148,15 @@ end
 --
 -- Notes:
 --   * This does NOT clear the highlight rectangle or radius circle.
---     Use visuals.clear_bot_highlight / visuals.clear_radius_circle
+--     Use visual.clear_bot_highlight / visual.clear_radius_circle
 --     for those.
 ---------------------------------------------------
-function visuals.clear_lines(player_state)
-    if not (player_state and player_state.visuals) then
+function visual.clear_lines(player_state)
+    if not (player_state and player_state.visual) then
         return
     end
 
-    local lines = player_state.visuals.lines
+    local lines = player_state.visual.lines
     if not lines then
         return
     end
@@ -167,7 +167,7 @@ function visuals.clear_lines(player_state)
         end
     end
 
-    player_state.visuals.lines = {}
+    player_state.visual.lines = {}
 end
 
 ---------------------------------------------------
@@ -175,70 +175,70 @@ end
 --
 -- Purpose:
 --   Destroys and clears the radius circle render object (if any)
---   associated with the player's bot visuals.
+--   associated with the player's bot visual.
 --
 -- Parameters:
 --   player_state : table
 --       The per-player state table that contains:
---         * player_state.visuals.radius_circle — a LuaRenderObject or nil.
+--         * player_state.visual.radius_circle — a LuaRenderObject or nil.
 --
 -- Behavior:
 --   * If a radius circle exists and is valid, calls :destroy().
 --   * Clears the reference (sets it to nil) afterwards.
 --
 -- Notes:
---   * Safe to call when no radius circle exists or when visuals is nil.
+--   * Safe to call when no radius circle exists or when visual is nil.
 ---------------------------------------------------
-function visuals.clear_radius_circle(player_state)
-    if not (player_state and player_state.visuals) then
+function visual.clear_radius_circle(player_state)
+    if not (player_state and player_state.visual) then
         return
     end
 
-    local circle = player_state.visuals.radius_circle
+    local circle = player_state.visual.radius_circle
     if circle and circle.valid then
         circle:destroy()
     end
 
-    player_state.visuals.radius_circle = nil
+    player_state.visual.radius_circle = nil
 end
 
 ---------------------------------------------------
 -- FUNCTION: clear_mapped_entities(player_state)
 --
 -- Purpose:
---   Clears all mapping-related visuals and resets the mapped_entities
+--   Clears all mapping-related visual and resets the mapped_entities
 --   tracking table for the player.
 --
 -- Parameters:
 --   player_state : table
 --       The per-player state containing:
---         * player_state.visuals.mapped_entities — table of
+--         * player_state.visual.mapped_entities — table of
 --           entity-key -> LuaRenderObject id mappings.
 --
 -- Behavior:
 --   * Calls rendering.clear(MOD_NAME) to remove all render objects
 --     owned by this mod.
---   * Resets player_state.visuals.mapped_entities to an empty table.
+--   * Resets player_state.visual.mapped_entities to an empty table.
 --
 -- Notes:
 --   * This is a coarse clear: it removes all render objects created
 --     by this mod, not only mapped-entity boxes for this player.
 --   * Intended for full visual reset (e.g. when destroying the bot).
 ---------------------------------------------------
-function visuals.clear_mapped_entities(player_state)
+function visual.clear_mapped_entities(player_state)
     if not player_state then
         return
     end
 
-    if not player_state.visuals then
-        player_state.visuals = {}
+    if not player_state.visual then
+        player_state.visual = {}
     end
 
     -- Wipe all rendering objects created by this mod.
     pcall(rendering.clear, MOD_NAME)
 
     -- Reset per-player mapping state.
-    player_state.visuals.mapped_entities = {}
+    player_state.visual.mapped_entities = {}
 end
 
 ---------------------------------------------------
@@ -246,7 +246,7 @@ end
 --
 -- Purpose:
 --   Convenience helper that clears all known render objects belonging
---   to the player's bot visuals (highlight, lines, radius circle,
+--   to the player's bot visual (highlight, lines, radius circle,
 --   mapped entities).
 --
 -- Parameters:
@@ -258,17 +258,17 @@ end
 --   * Calls clear_radius_circle(player_state).
 --   * Calls clear_mapped_entities(player_state).
 ---------------------------------------------------
-function visuals.clear_all(player_state)
+function visual.clear_all(player_state)
     if not player_state then
         return
     end
 
-    visuals.clear_lines(player_state)
-    visuals.clear_bot_highlight(player_state)
-    visuals.clear_radius_circle(player_state)
-    visuals.clear_mapped_entities(player_state)
-    visuals.clear_survey_frontier(player_state)
-    visuals.clear_survey_done(player_state)
+    visual.clear_lines(player_state)
+    visual.clear_bot_highlight(player_state)
+    visual.clear_radius_circle(player_state)
+    visual.clear_mapped_entities(player_state)
+    visual.clear_survey_frontier(player_state)
+    visual.clear_survey_done(player_state)
 end
 
 ----------------------------------------------------------------------
@@ -293,7 +293,7 @@ end
 --       The player who will see this circle.
 --
 --   player_state : table
---       The per-player state whose visuals table will track the circle.
+--       The per-player state whose visual table will track the circle.
 --
 --   bot_entity   : LuaEntity
 --       The bot entity at the center of the circle.
@@ -305,18 +305,18 @@ end
 --       Color to render the radius (RGBA table).
 --
 -- Behavior:
---   * Clears any existing radius circle via visuals.clear_radius_circle.
+--   * Clears any existing radius circle via visual.clear_radius_circle.
 --   * If bot is valid and radius is positive, draws a new circle
 --     anchored to the bot entity.
---   * Stores the render reference in player_state.visuals.radius_circle.
+--   * Stores the render reference in player_state.visual.radius_circle.
 ---------------------------------------------------
-function visuals.draw_radius_circle(player, player_state, bot_entity, radius, color)
-    if not (player_state and player_state.visuals) then
+function visual.draw_radius_circle(player, player_state, bot_entity, radius, color)
+    if not (player_state and player_state.visual) then
         return
     end
 
     -- Destroy old circle if it exists.
-    visuals.clear_radius_circle(player_state)
+    visual.clear_radius_circle(player_state)
 
     if not (bot_entity and bot_entity.valid) then
         return
@@ -340,7 +340,7 @@ function visuals.draw_radius_circle(player, player_state, bot_entity, radius, co
     }
 
     -- Store the render object so we can destroy it later.
-    player_state.visuals.radius_circle = circle
+    player_state.visual.radius_circle = circle
 end
 
 ---------------------------------------------------
@@ -357,7 +357,7 @@ end
 --   player_state : table
 --       The per-player state containing:
 --         * player_state.bot_entity             — the bot entity.
---         * player_state.visuals.bot_highlight  — existing highlight
+--         * player_state.visual.bot_highlight  — existing highlight
 --           render object or nil.
 --
 -- Behavior:
@@ -370,8 +370,8 @@ end
 --   4. If no highlight exists, a new rectangle is created with
 --      rendering.draw_rectangle and stored.
 ---------------------------------------------------
-function visuals.draw_bot_highlight(player, player_state)
-    if not (player and player.valid and player_state and player_state.visuals) then
+function visual.draw_bot_highlight(player, player_state)
+    if not (player and player.valid and player_state and player_state.visual) then
         return
     end
 
@@ -398,21 +398,21 @@ function visuals.draw_bot_highlight(player, player_state)
     ------------------------------------------------------------------
     -- 3. Update existing highlight (if it exists)
     ------------------------------------------------------------------
-    local existing = player_state.visuals.bot_highlight
+    local existing = player_state.visual.bot_highlight
     if existing then
         if existing.valid then
             existing.left_top = left_top
             existing.right_bottom = right_bottom
             return
         else
-            player_state.visuals.bot_highlight = nil
+            player_state.visual.bot_highlight = nil
         end
     end
 
     ------------------------------------------------------------------
     -- 4. Create a new highlight rectangle for this bot
     ------------------------------------------------------------------
-    player_state.visuals.bot_highlight = rendering.draw_rectangle {
+    player_state.visual.bot_highlight = rendering.draw_rectangle {
         color = {
             r = 0,
             g = 0.2,
@@ -430,7 +430,7 @@ function visuals.draw_bot_highlight(player, player_state)
     }
 end
 
-function visuals.draw_line(player, ps, a, b, color, width)
+function visual.draw_line(player, ps, a, b, color, width)
     if not (player and player.valid) then
         return nil
     end
@@ -453,7 +453,7 @@ function visuals.draw_line(player, ps, a, b, color, width)
         draw_on_ground = true
     }
 
-    ps.visuals.lines[#ps.visuals.lines + 1] = id
+    ps.visual.lines[#ps.visual.lines + 1] = id
     return id
 end
 
@@ -465,11 +465,11 @@ end
 --
 -- Parameters:
 --   player       : LuaPlayer
---       The player who will see the visuals.
+--       The player who will see the visual.
 --
 --   player_state : table
 --       The per-player state containing:
---         * player_state.visuals.lines   — array of LuaRenderObject
+--         * player_state.visual.lines   — array of LuaRenderObject
 --           or nil, tracking previously drawn lines.
 --
 --   bot_entity   : LuaEntity
@@ -480,15 +480,15 @@ end
 --
 -- Behavior:
 --   1. Validates player, bot, and state.
---   2. Ensures player_state.visuals and visuals.lines exist.
+--   2. Ensures player_state.visual and visual.lines exist.
 --   3. Draws a line from the player's position to the bot's position.
---   4. Stores the created render object in player_state.visuals.lines.
+--   4. Stores the created render object in player_state.visual.lines.
 --
 -- Notes:
 --   * The caller is responsible for clearing lines between ticks by
---     calling visuals.clear_lines(player_state) to prevent buildup.
+--     calling visual.clear_lines(player_state) to prevent buildup.
 ---------------------------------------------------
-function visuals.draw_lines(player, player_state, bot_entity, target_pos, line_color)
+function visual.draw_lines(player, player_state, bot_entity, target_pos, line_color)
     if not (player and player.valid and bot_entity and bot_entity.valid) then
         return
     end
@@ -498,10 +498,10 @@ function visuals.draw_lines(player, player_state, bot_entity, target_pos, line_c
     end
 
     ------------------------------------------------------------------
-    -- 1. Ensure visuals containers exist
+    -- 1. Ensure visual containers exist
     ------------------------------------------------------------------
-    player_state.visuals = player_state.visuals or {}
-    player_state.visuals.lines = player_state.visuals.lines or {}
+    player_state.visual = player_state.visual or {}
+    player_state.visual.lines = player_state.visual.lines or {}
 
     ------------------------------------------------------------------
     -- 2. Compute target position for the line end
@@ -529,11 +529,11 @@ function visuals.draw_lines(player, player_state, bot_entity, target_pos, line_c
             players = {player}
         }
 
-        player_state.visuals.lines[#player_state.visuals.lines + 1] = line
+        player_state.visual.lines[#player_state.visual.lines + 1] = line
     end
 end
 
-function visuals.draw_survey_frontier(player, player_state, bot_entity)
+function visual.draw_survey_frontier(player, player_state, bot_entity)
     if not (player and player.valid and bot_entity and bot_entity.valid) then
         return
     end
@@ -569,11 +569,11 @@ function visuals.draw_survey_frontier(player, player_state, bot_entity)
             players = {player}
         }
 
-        player_state.visuals.survey_frontier[#player_state.visuals.survey_frontier + 1] = frontier
+        player_state.visual.survey_frontier[#player_state.visual.survey_frontier + 1] = frontier
     end
 end
 
-function visuals.draw_survey_done(player, player_state, bot_entity)
+function visual.draw_survey_done(player, player_state, bot_entity)
     if not (player and player.valid and bot_entity and bot_entity.valid) then
         return
     end
@@ -609,7 +609,7 @@ function visuals.draw_survey_done(player, player_state, bot_entity)
             players = {player}
         }
 
-        player_state.visuals.survey_done[#player_state.visuals.survey_done + 1] = done
+        player_state.visual.survey_done[#player_state.visual.survey_done + 1] = done
     end
 end
 
@@ -624,7 +624,7 @@ end
 --       Player who will see the box.
 --
 --   player_state : table
---       Per-player state (visuals table is not modified here; the
+--       Per-player state (visual table is not modified here; the
 --       caller stores the returned render id/object).
 --
 --   entity       : LuaEntity
@@ -635,7 +635,7 @@ end
 --       Render object (or id) returned by rendering.draw_rectangle,
 --       or nil if no box could be drawn.
 ---------------------------------------------------
-function visuals.draw_mapped_entity_box(player, player_state, entity)
+function visual.draw_mapped_entity_box(player, player_state, entity)
     if not (entity and entity.valid) then
         return nil
     end
@@ -667,6 +667,6 @@ end
 ----------------------------------------------------------------------
 -- MODULE RETURN
 --
--- Expose the visuals API for use by control.lua and other modules.
+-- Expose the visual API for use by control.lua and other modules.
 ----------------------------------------------------------------------
-return visuals
+return visual

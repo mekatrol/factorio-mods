@@ -11,7 +11,7 @@
 --
 -- Factorio 2.0: uses `storage` instead of `global`.
 ----------------------------------------------------------------------
-local visuals = require("visuals")
+local visual = require("visual")
 
 ----------------------------------------------------------------------
 -- TUNABLE CONSTANTS
@@ -124,9 +124,9 @@ local function init_player(player)
     -- line from bot to current target (item, chest, or roam point).
     -- The visual function itself will only show it in pickup mode.
     if pdata.target_position then
-        visuals.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
+        visual.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
     else
-        visuals.draw_target_line(bot, pdata, nil, pdata.mode or "idle") -- clears old line
+        visual.draw_target_line(bot, pdata, nil, pdata.mode or "idle") -- clears old line
     end
 
     -- Visual references:
@@ -584,7 +584,7 @@ end
 
 local function update_cleanup_bot_for_player(player, pdata, tick)
     if not pdata.cleanup_bot_enabled then
-        visuals.clear_all(pdata)
+        visual.clear_all(pdata)
         return
     end
 
@@ -743,30 +743,30 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     -- Visual overlays
     ------------------------------------------------------------------
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
-    visuals.draw_bot_highlight(bot, pdata, has_unplaceable)
+    visual.draw_bot_highlight(bot, pdata, has_unplaceable)
 
     -- search circle
-    if visuals.update_search_radius_circle then
-        visuals.update_search_radius_circle(player, pdata, bot, ITEM_SEARCH_RADIUS)
+    if visual.update_search_radius_circle then
+        visual.update_search_radius_circle(player, pdata, bot, ITEM_SEARCH_RADIUS)
     end
 
     if chest and chest.valid then
-        visuals.draw_chest_highlight(chest, pdata, CHEST_HIGHLIGHT_Y_OFFSET)
+        visual.draw_chest_highlight(chest, pdata, CHEST_HIGHLIGHT_Y_OFFSET)
     else
-        visuals.clear_chest_highlight(pdata)
+        visual.clear_chest_highlight(pdata)
     end
-    visuals.draw_bot_player_line(player, bot, pdata, pdata.mode or "idle")
+    visual.draw_bot_player_line(player, bot, pdata, pdata.mode or "idle")
 
     local carried_total_for_ui = get_total_carried(pdata)
 
-    visuals.draw_status_text(bot, pdata, pdata.mode or "idle", carried_total_for_ui, BOT_MAX_ITEM_COUNT)
+    visual.draw_status_text(bot, pdata, pdata.mode or "idle", carried_total_for_ui, BOT_MAX_ITEM_COUNT)
 
     -- line from bot to current target (item, chest, or roam point).
     -- The visual function itself will only show it in pickup mode.
     if pdata.target_position then
-        visuals.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
+        visual.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
     else
-        visuals.draw_target_line(bot, pdata, nil, pdata.mode or "idle") -- clears old line
+        visual.draw_target_line(bot, pdata, nil, pdata.mode or "idle") -- clears old line
     end
 end
 
@@ -849,11 +849,11 @@ script.on_event("mekatrol-toggle-cleanup-bot", function(event)
         end
         pdata.cleanup_bot = nil
 
-        -- Clear carried items and visuals.
+        -- Clear carried items and visual.
         pdata.carried_items = {}
         pdata.unplaceable_items = {}
 
-        visuals.clear_all(pdata)
+        visual.clear_all(pdata)
 
         pdata.target_position = nil
         pdata.mode = "idle"

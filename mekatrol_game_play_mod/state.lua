@@ -11,8 +11,8 @@ local state = {}
 
 local config = require("configuration")
 local mapping = require("mapping")
-local utils = require("utils")
-local visuals = require("visuals")
+local util = require("util")
+local visual = require("visual")
 
 local BOT = config.bot
 local MODES = config.modes
@@ -26,13 +26,13 @@ function state.ensure_storage_tables()
 end
 
 local function ensure_visuals_table(ps)
-    ps.visuals = ps.visuals or {}
-    ps.visuals.bot_highlight = ps.visuals.bot_highlight or nil
-    ps.visuals.lines = ps.visuals.lines or nil
-    ps.visuals.radius_circle = ps.visuals.radius_circle or nil
-    ps.visuals.mapped_entities = ps.visuals.mapped_entities or {}
-    ps.visuals.survey_frontier = ps.visuals.survey_frontier or {}
-    ps.visuals.survey_done = ps.visuals.survey_done or {}
+    ps.visual = ps.visual or {}
+    ps.visual.bot_highlight = ps.visual.bot_highlight or nil
+    ps.visual.lines = ps.visual.lines or nil
+    ps.visual.radius_circle = ps.visual.radius_circle or nil
+    ps.visual.mapped_entities = ps.visual.mapped_entities or {}
+    ps.visual.survey_frontier = ps.visual.survey_frontier or {}
+    ps.visual.survey_done = ps.visual.survey_done or {}
 end
 
 function state.get_player_state(player_index)
@@ -70,7 +70,7 @@ function state.get_player_state(player_index)
             hull_last_eval_tick = 0,
             hull_point_set = {}, -- set: "x,y" => true
 
-            visuals = {
+            visual = {
                 bot_highlight = nil,
                 lines = nil,
                 radius_circle = nil,
@@ -127,7 +127,7 @@ function state.set_player_bot_mode(player, ps, new_mode)
     end
 
     ps.bot_mode = new_mode
-    utils.print_bot_message(player, "green", "mode set to %s", new_mode)
+    util.print_bot_message(player, "green", "mode set to %s", new_mode)
 
     -- Follow mode: no fixed target.
     if new_mode == "follow" then
@@ -164,8 +164,8 @@ function state.destroy_player_bot(player, silent)
         ps.bot_entity.destroy()
     end
 
-    -- Clear ALL render objects / visuals.
-    visuals.clear_all(ps)
+    -- Clear ALL render objects / visual.
+    visual.clear_all(ps)
 
     -- Disable + clear entity reference.
     ps.bot_entity = nil
@@ -200,7 +200,7 @@ function state.destroy_player_bot(player, silent)
     ps.survey_render_points = true
 
     -- Reset bookkeeping for render IDs.
-    ps.visuals = {
+    ps.visual = {
         bot_highlight = nil,
         lines = nil,
         radius_circle = nil,
@@ -210,7 +210,7 @@ function state.destroy_player_bot(player, silent)
     }
 
     if not silent then
-        utils.print_bot_message(player, "yellow", "deactivated")
+        util.print_bot_message(player, "yellow", "deactivated")
     end
 end
 
@@ -231,7 +231,7 @@ function state.create_player_bot(player)
     }
 
     if not ent then
-        utils.print_bot_message(player, "red", "create failed")
+        util.print_bot_message(player, "red", "create failed")
         return nil
     end
 
@@ -239,7 +239,7 @@ function state.create_player_bot(player)
     ps.bot_enabled = true
     ent.destructible = true
 
-    utils.print_bot_message(player, "green", "created")
+    util.print_bot_message(player, "green", "created")
     return ent
 end
 

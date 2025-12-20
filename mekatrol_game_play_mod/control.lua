@@ -15,8 +15,8 @@ local config = require("configuration")
 local mapping = require("mapping")
 local polygon = require("polygon")
 local state = require("state")
-local utils = require("utils")
-local visuals = require("visuals")
+local util = require("util")
+local visual = require("visual")
 
 -- Config aliases.
 local BOT = config.bot
@@ -214,9 +214,9 @@ local function update_bot_for_player(player, ps, tick)
         return
     end
 
-    -- Clear transient visuals each update; they are redrawn below.
-    visuals.clear_lines(ps)
-    visuals.draw_bot_highlight(player, ps)
+    -- Clear transient visual each update; they are redrawn below.
+    visual.clear_lines(ps)
+    visual.draw_bot_highlight(player, ps)
 
     local radius = nil
     local radius_color = nil
@@ -251,13 +251,13 @@ local function update_bot_for_player(player, ps, tick)
     end
 
     if radius and radius > 0 then
-        visuals.draw_radius_circle(player, ps, bot, radius, radius_color)
+        visual.draw_radius_circle(player, ps, bot, radius, radius_color)
     else
-        visuals.clear_radius_circle(ps)
+        visual.clear_radius_circle(ps)
     end
 
     if target then
-        visuals.draw_lines(player, ps, bot, target, line_color)
+        visual.draw_lines(player, ps, bot, target, line_color)
     end
 
     -- Mode behavior step.
@@ -289,7 +289,7 @@ local function update_bot_for_player(player, ps, tick)
             local a = hull[i]
             local b = hull[i % #hull + 1]
 
-            visuals.draw_line(player, ps, a, b, {
+            visual.draw_line(player, ps, a, b, {
                 r = 1,
                 g = 0,
                 b = 0,
@@ -299,8 +299,8 @@ local function update_bot_for_player(player, ps, tick)
     end
 
     if ps.survey_render_points then
-        visuals.draw_survey_frontier(player, ps, bot)
-        visuals.draw_survey_done(player, ps, bot)
+        visual.draw_survey_frontier(player, ps, bot)
+        visual.draw_survey_done(player, ps, bot)
     end
 end
 
@@ -351,12 +351,12 @@ local function on_toggle_render_survey_mode(event)
     ps.survey_render_points = ps.survey_render_mapped -- just follows mapped state
 
     if not ps.survey_render_mapped then
-        visuals.clear_survey_frontier(ps)
-        visuals.clear_survey_done(ps)
-        visuals.clear_mapped_entities(ps)
+        visual.clear_survey_frontier(ps)
+        visual.clear_survey_done(ps)
+        visual.clear_mapped_entities(ps)
     end
 
-    utils.print_bot_message(p, "green", "survey render: %s", ps.survey_render_mapped)
+    util.print_bot_message(p, "green", "survey render: %s", ps.survey_render_mapped)
 end
 
 ----------------------------------------------------------------------
@@ -374,10 +374,10 @@ local function on_entity_died(event)
             local pl = game.get_player(idx)
             if pl and pl.valid then
                 destroy_player_bot(pl, true)
-                utils.print_bot_message(pl, "yellow", "destroyed")
+                util.print_bot_message(pl, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
-                visuals.clear_all(ps)
+                visual.clear_all(ps)
                 storage.game_bot[idx] = nil
             end
             return

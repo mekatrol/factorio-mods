@@ -21,7 +21,7 @@ local EVENT_on_mapped_entities_cleared = script.generate_event_name()
 ---------------------------------------------------
 -- MODULES
 ---------------------------------------------------
-local visuals = require("visuals")
+local visual = require("visual")
 
 ---------------------------------------------------
 -- NON-STATIC BLACKLIST
@@ -152,8 +152,8 @@ local function upsert_mapped_entity(player, pdata, entity, tick)
         pdata.mapped_entities[key] = true
 
         -- Draw rectangle
-        if visuals.add_mapped_entity_box then
-            local id = visuals.add_mapped_entity_box(player, pdata, entity)
+        if visual.add_mapped_entity_box then
+            local id = visual.add_mapped_entity_box(player, pdata, entity)
             pdata.mapped_entity_visuals[key] = id
         end
     else
@@ -221,8 +221,8 @@ local function update_bot(player, pdata, tick)
     bot.teleport(offset)
 
     -- BLUE SEARCH CIRCLE (still every tick; cheap)
-    if visuals.update_search_radius_circle then
-        visuals.update_search_radius_circle(player, pdata, bot, SEARCH_RADIUS)
+    if visual.update_search_radius_circle then
+        visual.update_search_radius_circle(player, pdata, bot, SEARCH_RADIUS)
     end
 
     ----------------------------------------------------------------

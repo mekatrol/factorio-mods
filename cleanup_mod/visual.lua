@@ -1,11 +1,11 @@
 ----------------------------------------------------------------------
--- visuals.lua
+-- visual.lua
 --
 -- All visual / rendering helpers for the cleanup bot.
 -- Nothing in here affects gameplay; it only draws overlays
 -- so you can see what the bot is doing.
 ----------------------------------------------------------------------
-local visuals = {}
+local visual = {}
 
 -- Must match "name" in info.json
 local MOD_NAME = "cleanup_mod"
@@ -18,7 +18,7 @@ local MOD_NAME = "cleanup_mod"
 -- you suspect some rendering references might be stale.
 ----------------------------------------------------------------------
 
-function visuals.force_clear_mod_objects(pdata)
+function visual.force_clear_mod_objects(pdata)
     if not pdata then
         return
     end
@@ -82,15 +82,15 @@ end
 -- Clear higher-level groups
 ----------------------------------------------------------------------
 
-function visuals.clear_bot_highlight(pdata)
+function visual.clear_bot_highlight(pdata)
     clear_object("vis_bot_highlight", pdata)
 end
 
-function visuals.clear_chest_highlight(pdata)
+function visual.clear_chest_highlight(pdata)
     clear_object("vis_chest_highlight", pdata)
 end
 
-function visuals.clear_bot_line(pdata)
+function visual.clear_bot_line(pdata)
     if not pdata then
         return
     end
@@ -108,7 +108,7 @@ function visuals.clear_bot_line(pdata)
     pdata.vis_bot_lines = {}
 end
 
-function visuals.clear_status_text(pdata)
+function visual.clear_status_text(pdata)
     clear_object("vis_status_text", pdata)
 end
 
@@ -120,9 +120,9 @@ end
 --   aligned if your bot sprite is tall or offset.
 ----------------------------------------------------------------------
 
-function visuals.draw_bot_highlight(bot, pdata, has_unplaceable)
+function visual.draw_bot_highlight(bot, pdata, has_unplaceable)
     if not (bot and bot.valid) then
-        visuals.clear_bot_highlight(pdata)
+        visual.clear_bot_highlight(pdata)
         return
     end
 
@@ -172,7 +172,7 @@ end
 ---------------------------------------------------
 -- Bright-blue search radius circle around the bot
 ---------------------------------------------------
-function visuals.update_search_radius_circle(player, pdata, bot, radius)
+function visual.update_search_radius_circle(player, pdata, bot, radius)
     -- Destroy old circle if it exists (handles both id and object)
     if pdata.vis_search_radius_circle then
         destroy_render_handle(pdata.vis_search_radius_circle)
@@ -204,7 +204,7 @@ function visuals.update_search_radius_circle(player, pdata, bot, radius)
     pdata.vis_search_radius_circle = id
 end
 
-function visuals.clear_search_radius_circle(pdata)
+function visual.clear_search_radius_circle(pdata)
     if pdata.vis_search_radius_circle then
         destroy_render_handle(pdata.vis_search_radius_circle)
         pdata.vis_search_radius_circle = nil
@@ -215,9 +215,9 @@ end
 -- Draw a rectangle around the storage chest the bot is using.
 ----------------------------------------------------------------------
 
-function visuals.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
+function visual.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
     if not (chest and chest.valid) then
-        visuals.clear_chest_highlight(pdata)
+        visual.clear_chest_highlight(pdata)
         return
     end
 
@@ -262,13 +262,13 @@ end
 --   "idle"      – bot is near the player with nothing to do
 ----------------------------------------------------------------------
 
-function visuals.draw_bot_player_line(player, bot, pdata, mode)
+function visual.draw_bot_player_line(player, bot, pdata, mode)
     if not (player and player.valid and bot and bot.valid and pdata) then
         return
     end
 
     -- Ensure table exists and is empty
-    visuals.clear_bot_line(pdata)
+    visual.clear_bot_line(pdata)
     pdata.vis_bot_lines = pdata.vis_bot_lines or {}
 
     local color
@@ -320,9 +320,9 @@ end
 --   shows mode and how many items are currently carried.
 ----------------------------------------------------------------------
 
-function visuals.draw_status_text(bot, pdata, mode, carried_count, max_capacity)
+function visual.draw_status_text(bot, pdata, mode, carried_count, max_capacity)
     if not (bot and bot.valid) then
-        visuals.clear_status_text(pdata)
+        visual.clear_status_text(pdata)
         return
     end
 
@@ -387,14 +387,14 @@ end
 --
 -- We only show this in "pickup" mode; in other modes it is cleared.
 ----------------------------------------------------------------------
-function visuals.draw_target_line(bot, pdata, target_pos, mode)
+function visual.draw_target_line(bot, pdata, target_pos, mode)
     if not pdata then
         return
     end
 
     -- If no valid target or wrong mode, just clear any existing line.
     if mode ~= "pickup" or not (bot and bot.valid and target_pos) then
-        visuals.clear_target_line(pdata)
+        visual.clear_target_line(pdata)
         return
     end
 
@@ -429,25 +429,25 @@ function visuals.draw_target_line(bot, pdata, target_pos, mode)
     }
 end
 
-function visuals.clear_target_line(pdata)
+function visual.clear_target_line(pdata)
     clear_object("vis_target_line", pdata)
 end
 
 ----------------------------------------------------------------------
--- Master reset for all visuals associated with this player’s bot.
+-- Master reset for all visual associated with this player’s bot.
 ----------------------------------------------------------------------
 
-function visuals.clear_all(pdata)
+function visual.clear_all(pdata)
     if not pdata then
         return
     end
 
-    visuals.clear_bot_highlight(pdata)
-    visuals.clear_chest_highlight(pdata)
-    visuals.clear_search_radius_circle(pdata)
-    visuals.clear_bot_line(pdata)
-    visuals.clear_status_text(pdata)
-    visuals.clear_target_line(pdata)
+    visual.clear_bot_highlight(pdata)
+    visual.clear_chest_highlight(pdata)
+    visual.clear_search_radius_circle(pdata)
+    visual.clear_bot_line(pdata)
+    visual.clear_status_text(pdata)
+    visual.clear_target_line(pdata)
 end
 
-return visuals
+return visual

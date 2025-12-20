@@ -1,4 +1,4 @@
-local visuals = {}
+local visual = {}
 
 ---------------------------------------------------
 -- Helper to safely destroy a rendering object
@@ -32,7 +32,7 @@ end
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
 ---------------------------------------------------
-function visuals.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_offset)
+function visual.update_bot_health_bar(bot, pdata, max_health, bot_highlight_y_offset)
     if not (bot and bot.valid and max_health and max_health > 0) then
         -- Cleanup if bot missing
         destroy_render_handle(pdata.bot_health_bg)
@@ -144,7 +144,7 @@ end
 ---------------------------------------------------
 -- BOT / PLAYER LINES
 ---------------------------------------------------
-function visuals.clear_lines(pdata)
+function visual.clear_lines(pdata)
     if pdata.vis_lines then
         for _, obj in pairs(pdata.vis_lines) do
             destroy_render_handle(obj)
@@ -153,7 +153,7 @@ function visuals.clear_lines(pdata)
     end
 end
 
-function visuals.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_offset)
+function visual.draw_bot_player_visuals(player, bot, pdata, bot_highlight_y_offset)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
@@ -188,7 +188,7 @@ end
 ---------------------------------------------------
 -- BOT HIGHLIGHT
 ---------------------------------------------------
-function visuals.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
+function visual.draw_bot_highlight(bot, pdata, bot_highlight_y_offset)
     if not (bot and bot.valid) then
         return
     end
@@ -233,7 +233,7 @@ end
 ---------------------------------------------------
 -- Green box around mapped entities
 ---------------------------------------------------
-function visuals.add_mapped_entity_box(player, pdata, entity)
+function visual.add_mapped_entity_box(player, pdata, entity)
     if not (entity and entity.valid) then
         return nil
     end
@@ -265,7 +265,7 @@ end
 ---------------------------------------------------
 -- Bright-blue search radius circle around the bot
 ---------------------------------------------------
-function visuals.update_search_radius_circle(player, pdata, bot, radius)
+function visual.update_search_radius_circle(player, pdata, bot, radius)
     -- Destroy old circle if it exists (handles both id and object)
     if pdata.vis_search_radius_circle then
         destroy_render_handle(pdata.vis_search_radius_circle)
@@ -297,11 +297,11 @@ function visuals.update_search_radius_circle(player, pdata, bot, radius)
     pdata.vis_search_radius_circle = id
 end
 
-function visuals.clear_search_radius_circle(pdata)
+function visual.clear_search_radius_circle(pdata)
     if pdata.vis_search_radius_circle then
         destroy_render_handle(pdata.vis_search_radius_circle)
         pdata.vis_search_radius_circle = nil
     end
 end
 
-return visuals
+return visual

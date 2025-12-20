@@ -1,4 +1,4 @@
-local visuals = {}
+local visual = {}
 
 -- Must match "name" in info.json
 local MOD_NAME = "entity_repair_mod"
@@ -6,7 +6,7 @@ local MOD_NAME = "entity_repair_mod"
 ----------------------------------------------------------------
 -- Wipe ALL rendering objects created by this mod
 ----------------------------------------------------------------
-function visuals.force_clear_mod_objects(pdata)
+function visual.force_clear_mod_objects(pdata)
     if not pdata then
         return
     end
@@ -14,7 +14,7 @@ function visuals.force_clear_mod_objects(pdata)
     pcall(rendering.clear, MOD_NAME)
 end
 
-function visuals.clear_bot_health_bar(pdata)
+function visual.clear_bot_health_bar(pdata)
     if pdata.bot_health_bg and pdata.bot_health_bg.valid then
         pdata.bot_health_bg:destroy()
     end
@@ -29,14 +29,14 @@ function visuals.clear_bot_health_bar(pdata)
     pdata.bot_health_text = nil
 end
 
-function visuals.clear_bot_highlight(pdata)
+function visual.clear_bot_highlight(pdata)
     if pdata.vis_bot_highlight and pdata.vis_bot_highlight.valid then
         pdata.vis_bot_highlight:destroy()
     end
     pdata.vis_bot_highlight = nil
 end
 
-function visuals.clear_chest_highlight(pdata)
+function visual.clear_chest_highlight(pdata)
     if pdata.vis_chest_highlight and pdata.vis_chest_highlight.valid then
         pdata.vis_chest_highlight:destroy()
     end
@@ -81,7 +81,7 @@ local function get_screen_top_left_world(player)
     }
 end
 
-function visuals.clear_destroyed_overlay(pdata)
+function visual.clear_destroyed_overlay(pdata)
     if not pdata then
         return
     end
@@ -114,7 +114,7 @@ function visuals.clear_destroyed_overlay(pdata)
 end
 
 -- destroyed_list: array or map of {name=..., type=..., position=..., surface=...}
-function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
+function visual.update_destroyed_overlay(player, pdata, destroyed_list)
     if not (player and player.valid) then
         return
     end
@@ -128,7 +128,7 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
         break
     end
     if not has_any then
-        visuals.clear_destroyed_overlay(pdata)
+        visual.clear_destroyed_overlay(pdata)
         return
     end
 
@@ -218,7 +218,7 @@ function visuals.update_destroyed_overlay(player, pdata, destroyed_list)
         end
     end
 
-    -- Destroy any extra visuals if the list shrank
+    -- Destroy any extra visual if the list shrank
     local count = #pdata.destroyed_overlay_texts
     local needed = #lines
     if count > needed then
@@ -273,7 +273,7 @@ end
 
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
-function visuals.update_bot_health_bar(player, bot, pdata, max_health, repair_pack_name)
+function visual.update_bot_health_bar(player, bot, pdata, max_health, repair_pack_name)
     if not (bot and bot.valid and max_health and max_health > 0) then
         -- Cleanup if bot missing
         if pdata.bot_health_bg and pdata.bot_health_bg.valid then
@@ -441,7 +441,7 @@ function visuals.update_bot_health_bar(player, bot, pdata, max_health, repair_pa
     end
 end
 
-function visuals.clear_lines(pdata)
+function visual.clear_lines(pdata)
     if pdata.vis_lines then
         for _, obj in pairs(pdata.vis_lines) do
             if obj and obj.valid then
@@ -452,7 +452,7 @@ function visuals.clear_lines(pdata)
     end
 end
 
-function visuals.draw_bot_player_visuals(player, bot, pdata)
+function visual.draw_bot_player_visuals(player, bot, pdata)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
@@ -502,7 +502,7 @@ end
 ---------------------------------------------------
 -- DAMAGED ENTITY MARKERS (DOTS + LINES)
 ---------------------------------------------------
-function visuals.clear_damaged_markers(pdata)
+function visual.clear_damaged_markers(pdata)
     if pdata.vis_damaged_markers then
         for _, obj in pairs(pdata.vis_damaged_markers) do
             if obj and obj.valid then
@@ -522,7 +522,7 @@ function visuals.clear_damaged_markers(pdata)
     end
 end
 
-function visuals.draw_damaged_visuals(bot, pdata, damaged_entities)
+function visual.draw_damaged_visuals(bot, pdata, damaged_entities)
     if not damaged_entities or #damaged_entities == 0 then
         return
     end
@@ -576,7 +576,7 @@ end
 ---------------------------------------------------
 -- BOT HIGHLIGHT
 ---------------------------------------------------
-function visuals.draw_bot_highlight(bot, pdata)
+function visual.draw_bot_highlight(bot, pdata)
     if not (bot and bot.valid) then
         return
     end
@@ -622,9 +622,9 @@ end
 ---------------------------------------------------
 -- CHEST HIGHLIGHT
 ---------------------------------------------------
-function visuals.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
+function visual.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
     if not (chest and chest.valid) then
-        visuals.clear_chest_highlight(pdata)
+        visual.clear_chest_highlight(pdata)
         return
     end
 
@@ -667,17 +667,17 @@ function visuals.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
 end
 
 -- Master “clear everything” helper:
-function visuals.clear_all(pdata)
+function visual.clear_all(pdata)
     if not pdata then
         return
     end
 
-    visuals.clear_bot_health_bar(pdata)
-    visuals.clear_bot_highlight(pdata)
-    visuals.clear_chest_highlight(pdata)
-    visuals.clear_lines(pdata)
-    visuals.clear_damaged_markers(pdata)
-    visuals.clear_destroyed_overlay(pdata)
+    visual.clear_bot_health_bar(pdata)
+    visual.clear_bot_highlight(pdata)
+    visual.clear_chest_highlight(pdata)
+    visual.clear_lines(pdata)
+    visual.clear_damaged_markers(pdata)
+    visual.clear_destroyed_overlay(pdata)
 end
 
-return visuals
+return visual

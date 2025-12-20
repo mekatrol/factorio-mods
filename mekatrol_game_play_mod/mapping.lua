@@ -2,8 +2,8 @@ local mapping = {}
 
 local config = require("configuration")
 local polygon = require("polygon")
-local utils = require("utils")
-local visuals = require("visuals")
+local util = require("util")
+local visual = require("visual")
 
 local BOT = config.bot
 local NON_STATIC_TYPES = config.non_static_types
@@ -36,7 +36,7 @@ function mapping.move_bot_towards(player, bot, target)
 
     local pos, err = mapping.resolve_target_position(target)
     if not pos then
-        utils.print_bot_message(player, "red", "invalid target: %s", err or "?")
+        util.print_bot_message(player, "red", "invalid target: %s", err or "?")
         return
     end
 
@@ -294,8 +294,8 @@ function mapping.upsert_mapped_entity(player, ps, entity, tick)
         mapped[key] = info
 
         if ps.survey_render_mapped then
-            local box_id = visuals.draw_mapped_entity_box(player, ps, entity)
-            ps.visuals.mapped_entities[key] = box_id
+            local box_id = visual.draw_mapped_entity_box(player, ps, entity)
+            ps.visual.mapped_entities[key] = box_id
         end
     else
         local pos = entity.position
@@ -347,7 +347,7 @@ function mapping.get_mapped_entity_points(ps)
             count = count + 1
 
             local v = ix * 73856093 + iy * 19349663
-            hash = utils.hash_combine(hash, v)
+            hash = util.hash_combine(hash, v)
         end
     end
 

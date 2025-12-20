@@ -15,7 +15,7 @@ local BOT_STEP_DISTANCE = 0.8
 -- MODULES
 ---------------------------------------------------
 local pathfinding = require("pathfinding")
-local visuals = require("visuals")
+local visual = require("visual")
 
 ---------------------------------------------------
 -- REPAIR PACK CONFIGURATION
@@ -331,7 +331,7 @@ local function init_player(player)
             bot_path_index = 1,
             bot_path_target = nil,
 
-            -- visuals (rendered on display)
+            -- visual (rendered on display)
             vis_bot_highlight = nil,
             vis_chest_highlight = nil,
             vis_lines = nil,
@@ -367,7 +367,7 @@ local function init_player(player)
         pdata.bot_path_index = pdata.bot_path_index or 1
         pdata.bot_path_target = pdata.bot_path_target or nil
 
-        -- visuals (rendered on display)
+        -- visual (rendered on display)
         pdata.vis_bot_highlight = pdata.vis_bot_highlight or nil
         pdata.vis_chest_highlight = pdata.vis_chest_highlight or nil
         pdata.vis_lines = pdata.vis_lines or pdata.vis_lines
@@ -711,7 +711,7 @@ local function build_nearest_route(entities, bot)
 end
 
 local function rebuild_repair_route(player, bot, pdata)
-    visuals.clear_damaged_markers(pdata)
+    visual.clear_damaged_markers(pdata)
 
     -- If bot or player is invalid, clear route and stop
     if not (bot and bot.valid and player and player.valid) then
@@ -722,7 +722,7 @@ local function rebuild_repair_route(player, bot, pdata)
 
     local search_center = player.position
 
-    visuals.draw_bot_player_visuals(player, bot, pdata)
+    visual.draw_bot_player_visuals(player, bot, pdata)
 
     local damaged = find_damaged_entities(bot, search_center, ENTITY_SEARCH_RADIUS)
 
@@ -732,7 +732,7 @@ local function rebuild_repair_route(player, bot, pdata)
         return
     end
 
-    visuals.draw_damaged_visuals(bot, pdata, damaged)
+    visual.draw_damaged_visuals(bot, pdata, damaged)
 
     pdata.damaged_entities = build_nearest_route(damaged, bot)
     pdata.damaged_entities_next_repair_index = 1
@@ -994,18 +994,18 @@ local function update_repair_bot_for_player(player, pdata)
     end
 
     -- clear any drawn lines
-    visuals.clear_lines(pdata)
+    visual.clear_lines(pdata)
 
     local max = get_entity_max_health(bot) or CUSTOM_BOT_HEALTH
-    visuals.update_bot_health_bar(player, bot, pdata, max, REPAIR_PACK_NAME)
+    visual.update_bot_health_bar(player, bot, pdata, max, REPAIR_PACK_NAME)
 
     -- draw rect around bot
-    visuals.draw_bot_highlight(bot, pdata)
+    visual.draw_bot_highlight(bot, pdata)
 
     -- draw rect around chest
     local chest = pdata.repair_chest
     if (chest and chest.valid) then
-        visuals.draw_chest_highlight(chest, pdata, 0)
+        visual.draw_chest_highlight(chest, pdata, 0)
     end
 
     -- Build/refresh the list of damaged entities around the player.
@@ -1022,7 +1022,7 @@ local function update_repair_bot_for_player(player, pdata)
         if pdata.last_mode ~= "follow" then
             pdata.last_mode = "follow"
         end
-        visuals.clear_damaged_markers(pdata)
+        visual.clear_damaged_markers(pdata)
 
         pathfinding.reset_bot_path(pdata)
 
@@ -1049,7 +1049,7 @@ local function update_repair_bot_for_player(player, pdata)
             idx = pdata.damaged_entities_next_repair_index or 1
 
             if not targets or #targets == 0 then
-                visuals.clear_damaged_markers(pdata)
+                visual.clear_damaged_markers(pdata)
                 return
             end
         end
@@ -1338,9 +1338,9 @@ script.on_event("mekatrol-toggle-repair-bot", function(event)
         pdata.damaged_entities = nil
         pdata.damaged_entities_next_repair_index = 1
 
-        -- clear all visuals
-        visuals.clear_all(pdata)
-        visuals.force_clear_mod_objects(pdata)
+        -- clear all visual
+        visual.clear_all(pdata)
+        visual.force_clear_mod_objects(pdata)
 
         pathfinding.reset_bot_path(pdata)
 
@@ -1396,7 +1396,7 @@ script.on_event(defines.events.on_tick, function(event)
     -- Update overlay for destroyed player entities
     local destroyed_sites = get_destroyed_sites()
     local surface_index = player.surface.index
-    visuals.update_destroyed_overlay(player, pdata, destroyed_sites[surface_index] or {})
+    visual.update_destroyed_overlay(player, pdata, destroyed_sites[surface_index] or {})
 
     if pdata.repair_bot_enabled then
         update_repair_bot_for_player(player, pdata)
