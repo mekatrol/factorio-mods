@@ -22,6 +22,8 @@
 ----------------------------------------------------------------------
 local polygon = {}
 
+local util = require("util")
+
 ----------------------------------------------------------------------
 -- Basic vector/geometry helpers
 ----------------------------------------------------------------------
@@ -260,7 +262,11 @@ end
 -- Each step call advances the algorithm by a bounded number of “micro-steps”.
 ----------------------------------------------------------------------
 
-function polygon.start_concave_hull_job(points, k, opts)
+function polygon.set_job_phase(player, job, phase)
+    job.phase = phase
+end
+
+function polygon.start_concave_hull_job(player, points, k, opts)
     opts = opts or {}
 
     local pts = dedupe_points(points)
@@ -285,11 +291,6 @@ function polygon.start_concave_hull_job(points, k, opts)
         current = nil,
         guard = 0,
 
-        -- phases:
-        --   init_attempt -> build -> validate -> done
-        -- or fallback_done (convex hull)
-        phase = "init_attempt",
-
         -- validation progress (incremental)
         validate_i = 1,
         validated_ok = true,
@@ -298,8 +299,13 @@ function polygon.start_concave_hull_job(points, k, opts)
         result = nil
     }
 
+    -- phases:
+    --   init_attempt -> build -> validate -> done
+    -- or fallback_done (convex hull)
+    polygon.set_job_phase(player, job, "init_attempt")
+
     if n < 3 then
-        job.phase = "done"
+        polygon.set_job_phase(player, job, "done")
         job.result = pts
         return job
     end
@@ -312,7 +318,7 @@ function polygon.start_concave_hull_job(points, k, opts)
     return job
 end
 
-function polygon.step_concave_hull_job(job, step_budget)
+function polygon.step_concave_hull_job(player, job, step_budget)
     if not job or job.phase == "done" or job.phase == "fallback_done" then
         return true, job and job.result or nil
     end
@@ -329,7 +335,7 @@ function polygon.step_concave_hull_job(job, step_budget)
             -- If k has escalated too far, fall back to convex hull.
             if job.kk > job.max_k then
                 job.result = polygon.convex_hull(copy_points(job.pts))
-                job.phase = "fallback_done"
+                polygon.set_job_phase(player, job, "fallback_done")
                 return true, job.result
             end
 
@@ -347,7 +353,7 @@ function polygon.step_concave_hull_job(job, step_budget)
             job.current = job.start
             job.guard = 0
 
-            job.phase = "build"
+            polygon.set_job_phase(player, job, "build")
 
         elseif job.phase == "build" then
             -- Guard against infinite loops.
@@ -355,12 +361,12 @@ function polygon.step_concave_hull_job(job, step_budget)
             if job.guard >= 10000 then
                 -- Treat as failed attempt; increase k and restart.
                 job.kk = job.kk + 1
-                job.phase = "init_attempt"
+                polygon.set_job_phase(player, job, "init_attempt")
             else
                 local candidates = k_nearest(job.pts, job.current, job.kk, job.used)
                 if #candidates == 0 then
                     job.kk = job.kk + 1
-                    job.phase = "init_attempt"
+                    polygon.set_job_phase(player, job, "init_attempt")
                 else
                     -- Pick candidate with smallest CCW turn; break ties by distance.
                     table.sort(candidates, function(a, b)
@@ -409,10 +415,10 @@ function polygon.step_concave_hull_job(job, step_budget)
                     if not next then
                         -- No candidate can extend hull without intersection: failed attempt.
                         job.kk = job.kk + 1
-                        job.phase = "init_attempt"
+                        polygon.set_job_phase(player, job, "init_attempt")
                     elseif points_equal(next, job.start) then
                         -- Closed polygon; validate point containment.
-                        job.phase = "validate"
+                        polygon.set_job_phase(player, job, "validate")
                         job.validate_i = 1
                         job.validated_ok = true
                     else
@@ -434,7 +440,7 @@ function polygon.step_concave_hull_job(job, step_budget)
 
                         -- If we’ve used all points, stop and validate.
                         if #job.hull >= job.n then
-                            job.phase = "validate"
+                            polygon.set_job_phase(player, job, "validate")
                             job.validate_i = 1
                             job.validated_ok = true
                         end
@@ -446,18 +452,18 @@ function polygon.step_concave_hull_job(job, step_budget)
             -- Validate incrementally: one point per micro-step.
             if #job.hull < 3 then
                 job.kk = job.kk + 1
-                job.phase = "init_attempt"
+                polygon.set_job_phase(player, job, "init_attempt")
             else
                 if job.validate_i > job.n then
                     if job.validated_ok then
                         job.result = job.hull
-                        job.phase = "done"
+                        polygon.set_job_phase(player, job, "done")
                         return true, job.result
                     end
 
                     -- Failed validation; increase k and retry.
                     job.kk = job.kk + 1
-                    job.phase = "init_attempt"
+                    polygon.set_job_phase(player, job, "init_attempt")
                 else
                     local p = job.pts[job.validate_i]
                     if not point_in_poly(job.hull, p) then

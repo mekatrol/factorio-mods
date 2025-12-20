@@ -90,7 +90,7 @@ local function update_bot_for_player(player, ps, tick)
     elseif ps.bot_mode == "survey" then
         survey.update(player, ps, bot, tick)
     end
-
+    
     mapping.update(player, ps, tick)
 
     if ps.survey_render_points then

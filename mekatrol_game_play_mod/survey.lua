@@ -33,13 +33,6 @@ function survey.perform_survey_scan(player, ps, bot, tick)
         end
     end
 
-    local start_a = mapping.ring_seed_for_center(bpos)
-    mapping.add_ring_frontiers(player, state, ps, bot, bpos, BOT.survey.radius, 12, start_a, 0)
-
-    if not discovered_any then
-        mapping.add_ring_frontiers(player, state, ps, bot, bpos, BOT.survey.radius, 12, start_a + math.pi / 12, 1.0)
-    end
-
     return discovered_any
 end
 

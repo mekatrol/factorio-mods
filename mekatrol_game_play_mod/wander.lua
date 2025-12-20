@@ -57,6 +57,7 @@ function wander.update(player, ps, bot)
     local char = player.character
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char then
+            -- return on first entity that is not bot nor player character
             state.set_player_bot_mode(player, ps, "survey")
             return
         end

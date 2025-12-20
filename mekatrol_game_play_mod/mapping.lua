@@ -166,6 +166,17 @@ function mapping.add_ring_frontiers(player, state, ps, bot, center, radius, coun
     end
 end
 
+function mapping.should_add_frontier(ps, x, y)
+    if not ps.hull then
+        return true
+    end
+
+    return polygon.contains_point(ps.hull, {
+        x = x,
+        y = y
+    })
+end
+
 function mapping.add_frontier_on_radius_edge(player, state, ps, bot, center_pos, point_pos, radius)
     state.ensure_survey_sets(ps)
 
@@ -180,19 +191,32 @@ function mapping.add_frontier_on_radius_edge(player, state, ps, bot, center_pos,
     local d = math.sqrt(d2)
     local nx = dx / d
     local ny = dy / d
-
-    local ex = center_pos.x + nx * radius
-    local ey = center_pos.y + ny * radius
-    mapping.add_frontier_node(player, state, ps, bot, ex, ey)
-
     local angle = math.atan2(ny, nx)
     local delta = math.rad(15)
 
-    mapping.add_frontier_node(player, state, ps, bot, center_pos.x + math.cos(angle + delta) * radius,
-        center_pos.y + math.sin(angle + delta) * radius)
+    -- Straight ahead
+    local ex = center_pos.x + nx * radius
+    local ey = center_pos.y + ny * radius
 
-    mapping.add_frontier_node(player, state, ps, bot, center_pos.x + math.cos(angle - delta) * radius,
-        center_pos.y + math.sin(angle - delta) * radius)
+    if mapping.should_add_frontier(ps, ex, ey) then
+        mapping.add_frontier_node(player, state, ps, bot, ex, ey)
+    end
+
+    -- Slightly left
+    ex = center_pos.x + math.cos(angle + delta) * radius
+    ey = center_pos.y + math.sin(angle + delta) * radius
+
+    if mapping.should_add_frontier(ps, ex, ey) then
+        mapping.add_frontier_node(player, state, ps, bot, ex, ey)
+    end
+
+    -- Slightly right
+    ex = center_pos.x + math.cos(angle - delta) * radius
+    ey = center_pos.y + math.sin(angle - delta) * radius
+
+    if mapping.should_add_frontier(ps, ex, ey) then
+        mapping.add_frontier_node(player, state, ps, bot, ex, ey)
+    end
 end
 
 ----------------------------------------------------------------------
@@ -292,7 +316,7 @@ end
 -- Hull scheduling and incremental processing
 ----------------------------------------------------------------------
 
-function mapping.evaluate_hull_need(ps, tick)
+function mapping.evaluate_hull_need(player, ps, tick)
     -- Only evaluate at a coarse cadence to avoid redundant work.
     if tick % BOT.update_hull_interval ~= 0 then
         return
@@ -308,6 +332,12 @@ function mapping.evaluate_hull_need(ps, tick)
         ps.hull_quantized_count = 0
         ps.hull_quantized_hash = 0
         ps.hull_tick = tick
+        return
+    end
+
+    -- Don't need to start hull if job already running
+    if ps.hull_job then
+        util.print_bot_message(player, "red", "job already running: %s", ps.hull_job.phase)
         return
     end
 
@@ -366,20 +396,20 @@ function mapping.evaluate_hull_need(ps, tick)
 
     -- Otherwise we need a rebuild. Start (or restart) an incremental job.
     -- Snapshot the full point set for the job.
-    ps.hull_job = polygon.start_concave_hull_job(points, 8, {
+    ps.hull_job = polygon.start_concave_hull_job(player, points, 8, {
         max_k = 12
     })
     ps.hull_job.qcount = qcount
     ps.hull_job.qhash = qhash
 end
 
-function mapping.step_hull_job(ps, tick)
+function mapping.step_hull_job(player, ps, tick)
     if not ps.hull_job then
         return
     end
 
     local step_budget = BOT.hull_steps_per_tick or 25
-    local done, hull = polygon.step_concave_hull_job(ps.hull_job, step_budget)
+    local done, hull = polygon.step_concave_hull_job(player, ps.hull_job, step_budget)
     if not done then
         return
     end
@@ -411,8 +441,8 @@ function mapping.update(player, ps, tick)
     -- IMPORTANT: We intentionally do NOT compute mapped points/hash every tick.
     -- That avoids redundant hull-related work and keeps the script fast.
     ------------------------------------------------------------------
-    mapping.evaluate_hull_need(ps, tick)
-    mapping.step_hull_job(ps, tick)
+    mapping.evaluate_hull_need(player, ps, tick)
+    mapping.step_hull_job(player, ps, tick)
 
     -- Draw the most recently completed hull (if any).
     local hull = ps.hull
@@ -429,6 +459,7 @@ function mapping.update(player, ps, tick)
             })
         end
     end
+
 end
 
 return mapping
