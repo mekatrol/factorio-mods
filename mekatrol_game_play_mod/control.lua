@@ -92,7 +92,7 @@ local function update_bot_for_player(player, ps, tick)
         survey.update(player, ps, bot, tick)
     end
     
-    mapping.update(player, ps, tick)
+    -- mapping.update(player, ps, tick)
     polymap.update(player, ps, tick)
 
     if ps.survey_render_points then
