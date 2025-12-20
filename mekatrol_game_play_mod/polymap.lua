@@ -8,7 +8,7 @@ local visual = require("visual")
 
 local BOT = config.bot
 
-function polymap.get_position_key(x, y, q)
+local function get_position_key(x, y, q)
     if q == 0.5 then
         return string.format("%.1f,%.1f", x, y)
     end
@@ -23,11 +23,11 @@ end
 -- Each step call advances the algorithm by a bounded number of “micro-steps”.
 ----------------------------------------------------------------------
 
-function polymap.set_job_phase(player, job, phase)
+local function set_job_phase(player, job, phase)
     job.phase = phase
 end
 
-function polymap.start_concave_hull_job(player, points, k, opts)
+local function start_concave_hull_job(player, points, k, opts)
     opts = opts or {}
 
     local pts = polygon.dedupe_points(points)
@@ -63,10 +63,10 @@ function polymap.start_concave_hull_job(player, points, k, opts)
     -- phases:
     --   init_attempt -> build -> validate -> done
     -- or fallback_done (convex hull)
-    polymap.set_job_phase(player, job, "init_attempt")
+    set_job_phase(player, job, "init_attempt")
 
     if n < 3 then
-        polymap.set_job_phase(player, job, "done")
+        set_job_phase(player, job, "done")
         job.result = pts
         return job
     end
@@ -80,7 +80,64 @@ function polymap.start_concave_hull_job(player, points, k, opts)
     return job
 end
 
-function polymap.step_concave_hull_job(player, job, step_budget)
+----------------------------------------------------------------------
+-- Hull scheduling and incremental processing
+----------------------------------------------------------------------
+
+local function evaluate_hull_need(player, ps, points)
+    -- Make sure is an array (table)
+    ps.map_visited_poly = ps.map_visited_poly or {}
+
+    -- Get number of points already in the poly
+    local poly_point_count = #ps.map_visited_poly
+
+    -- If not enough points, reset hull job and return
+    if (poly_point_count + #points) < 3 then
+        ps.map_visited_hull_job = nil
+        return
+    end
+
+    -- Don't need to start hull if job already running, let it finish
+    if ps.map_visited_hull_job then
+        return
+    end
+
+    -- Only process points not already in polygon
+    local old_point_count = #ps.map_visited_poly
+    for i = 1, #points do
+        -- Get next new points since last time
+        local p = points[i]
+
+        -- quantize the point
+        p = {
+            x = mapping.quantize(p.x, 0.5),
+            y = mapping.quantize(p.y, 0.5)
+        }
+
+        -- Is it in polygon?
+        if not polygon.contains_point(ps.map_visited_poly, p) then
+            ps.map_visited_poly[#ps.map_visited_poly + 1] = {
+                x = p.x,
+                y = p.y
+            }
+        end
+    end
+
+    -- clear any queued positions as they are not in the polygon
+    ps.map_visited_queued_positions = {}
+
+    if old_point_count == #ps.map_visited_poly then
+        -- there are no new points outside the polygon
+        -- return
+    end
+
+    -- start a new job to find concave hull
+    ps.map_visited_hull_job = start_concave_hull_job(player, ps.map_visited_poly, 8, {
+        max_k = 1200
+    })
+end
+
+local function step_hull_job_inner(player, job, step_budget)
     if not job or job.phase == "done" or job.phase == "fallback_done" then
         return true, job and job.result or nil
     end
@@ -98,7 +155,7 @@ function polymap.step_concave_hull_job(player, job, step_budget)
             if job.kk > job.max_k then
                 local pts = polygon.copy_points(job.pts)
                 job.result = polygon.convex_hull(pts)
-                polymap.set_job_phase(player, job, "fallback_done")
+                set_job_phase(player, job, "fallback_done")
                 return true, job.result
             end
 
@@ -116,7 +173,7 @@ function polymap.step_concave_hull_job(player, job, step_budget)
             job.current = job.start
             job.guard = 0
 
-            polymap.set_job_phase(player, job, "build")
+            set_job_phase(player, job, "build")
 
         elseif job.phase == "build" then
             -- Guard against infinite loops.
@@ -124,12 +181,12 @@ function polymap.step_concave_hull_job(player, job, step_budget)
             if job.guard >= 10000 then
                 -- Treat as failed attempt; increase k and restart.
                 job.kk = job.kk + 1
-                polymap.set_job_phase(player, job, "init_attempt")
+                set_job_phase(player, job, "init_attempt")
             else
                 local candidates = polygon.k_nearest(job.pts, job.current, job.kk, job.used)
                 if #candidates == 0 then
                     job.kk = job.kk + 1
-                    polymap.set_job_phase(player, job, "init_attempt")
+                    set_job_phase(player, job, "init_attempt")
                 else
                     -- Pick candidate with smallest CCW turn; break ties by distance.
                     table.sort(candidates, function(a, b)
@@ -178,10 +235,10 @@ function polymap.step_concave_hull_job(player, job, step_budget)
                     if not next then
                         -- No candidate can extend hull without intersection: failed attempt.
                         job.kk = job.kk + 1
-                        polymap.set_job_phase(player, job, "init_attempt")
+                        set_job_phase(player, job, "init_attempt")
                     elseif polygon.points_equal(next, job.start) then
                         -- Closed polygon; validate point containment.
-                        polymap.set_job_phase(player, job, "validate")
+                        set_job_phase(player, job, "validate")
                         job.validate_i = 1
                         job.validated_ok = true
                     else
@@ -203,7 +260,7 @@ function polymap.step_concave_hull_job(player, job, step_budget)
 
                         -- If we’ve used all points, stop and validate.
                         if #job.hull >= job.n then
-                            polymap.set_job_phase(player, job, "validate")
+                            set_job_phase(player, job, "validate")
                             job.validate_i = 1
                             job.validated_ok = true
                         end
@@ -215,18 +272,18 @@ function polymap.step_concave_hull_job(player, job, step_budget)
             -- Validate incrementally: one point per micro-step.
             if #job.hull < 3 then
                 job.kk = job.kk + 1
-                polymap.set_job_phase(player, job, "init_attempt")
+                set_job_phase(player, job, "init_attempt")
             else
                 if job.validate_i > job.n then
                     if job.validated_ok then
                         job.result = job.hull
-                        polymap.set_job_phase(player, job, "done")
+                        set_job_phase(player, job, "done")
                         return true, job.result
                     end
 
                     -- Failed validation; increase k and retry.
                     job.kk = job.kk + 1
-                    polymap.set_job_phase(player, job, "init_attempt")
+                    set_job_phase(player, job, "init_attempt")
                 else
                     local p = job.pts[job.validate_i]
                     if not polygon.point_in_poly(job.hull, p) then
@@ -241,70 +298,13 @@ function polymap.step_concave_hull_job(player, job, step_budget)
     return false, nil
 end
 
-----------------------------------------------------------------------
--- Hull scheduling and incremental processing
-----------------------------------------------------------------------
-
-function polymap.evaluate_hull_need(player, ps, points)
-    -- Make sure is an array (table)
-    ps.map_visited_poly = ps.map_visited_poly or {}
-
-    -- Get number of points already in the poly
-    local poly_point_count = #ps.map_visited_poly
-
-    -- If not enough points, reset hull job and return
-    if (poly_point_count + #points) < 3 then
-        ps.map_visited_hull_job = nil
-        return
-    end
-
-    -- Don't need to start hull if job already running, let it finish
-    if ps.map_visited_hull_job then
-        return
-    end
-
-    -- Only process points not already in polygon
-    local old_point_count = #ps.map_visited_poly
-    for i = 1, #points do
-        -- Get next new points since last time
-        local p = points[i]
-
-        -- quantize the point
-        p = {
-            x = mapping.quantize(p.x, 0.5),
-            y = mapping.quantize(p.y, 0.5)
-        }
-
-        -- Is it in polygon?
-        if not polygon.contains_point(ps.map_visited_poly, p) then
-            ps.map_visited_poly[#ps.map_visited_poly + 1] = {
-                x = p.x,
-                y = p.y
-            }
-        end
-    end
-
-    -- clear any queued positions as they are not in the polygon
-    ps.map_visited_queued_positions = {}
-
-    if old_point_count == #ps.map_visited_poly then
-        -- there are no new points outside the polygon
-        -- return
-    end
-
-    -- start a new job to find concave hull
-    ps.map_visited_hull_job = polymap.start_concave_hull_job(player, ps.map_visited_poly, 8, {
-        max_k = 1200
-    })
-end
-
-function polymap.step_hull_job(player, ps, tick)
+local function step_hull_job(player, ps, tick)
     if not ps.map_visited_hull_job then
         return
     end
 
     local step_budget = BOT.hull_steps_per_tick or 25
-    local done, hull = polymap.step_concave_hull_job(player, ps.map_visited_hull_job, step_budget)
+    local done, hull = step_hull_job_inner(player, ps.map_visited_hull_job, step_budget)
 
     if not done then
         return
@@ -342,8 +342,8 @@ function polymap.update(player, ps, tick)
         end
     end
 
-    polymap.evaluate_hull_need(player, ps, ps.map_visited_queued_positions)
-    polymap.step_hull_job(player, ps, tick)
+    evaluate_hull_need(player, ps, ps.map_visited_queued_positions)
+    step_hull_job(player, ps, tick)
 
     -- Draw the most recently completed hull (if any).
     local hull = ps.map_visited_poly
