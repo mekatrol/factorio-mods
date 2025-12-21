@@ -101,6 +101,24 @@ local function polygon_center(points)
     }
 end
 
+local function find_nearby_resource_tile(surface, name, pos, max_r)
+    local cx, cy = tile_xy_from_pos(pos)
+
+    for r = 0, max_r do
+        for dx = -r, r do
+            for dy = -r, r do
+                local tx = cx + dx
+                local ty = cy + dy
+                if tile_has_name(surface, name, tx, ty) then
+                    return tx, ty
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
 ----------------------------------------------------------------------
 -- Moore-neighborhood clockwise boundary tracing over tiles
 --
@@ -265,7 +283,17 @@ local function trace_step(player, ps, bot)
 
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
         if not tile_has_name(surf, name, tx, ty) then
-            return tile_center(tr.origin_tx, tr.origin_ty)
+            local found_tx, found_ty = find_nearby_resource_tile(surf, name, bot.position,
+                math.ceil(BOT.survey.radius) + 1)
+            if found_tx then
+                tr.origin_tx = found_tx
+                tr.origin_ty = found_ty
+                return tile_center(found_tx, found_ty)
+            end
+
+            -- No nearby resource tile; abort trace so scan can restart later
+            ps.survey_trace = nil
+            return nil
         end
 
         local next_ty = ty - 1 -- due north in Factorio coords
