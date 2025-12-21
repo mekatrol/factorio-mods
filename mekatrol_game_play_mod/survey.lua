@@ -4,6 +4,7 @@ local config = require("configuration")
 local positioning = require("positioning")
 local state = require("state")
 local util = require("util")
+local visual = require("visual")
 
 local BOT = config.bot
 
@@ -64,6 +65,40 @@ local function is_boundary_tile(surface, entity_name, tx, ty)
     end -- west
 
     return false
+end
+
+local function ensure_entity_groups(ps)
+    ps.entity_groups = ps.entity_groups or {}
+end
+
+local function polygon_center(points)
+    if not points or #points == 0 then
+        return nil
+    end
+
+    local minx, maxx = points[1].x, points[1].x
+    local miny, maxy = points[1].y, points[1].y
+
+    for i = 2, #points do
+        local p = points[i]
+        if p.x < minx then
+            minx = p.x
+        end
+        if p.x > maxx then
+            maxx = p.x
+        end
+        if p.y < miny then
+            miny = p.y
+        end
+        if p.y > maxy then
+            maxy = p.y
+        end
+    end
+
+    return {
+        x = (minx + maxx) * 0.5,
+        y = (miny + maxy) * 0.5
+    }
 end
 
 ----------------------------------------------------------------------
@@ -180,7 +215,8 @@ local function start_trace_from_found(ps, bot_pos)
         -- closure:
         p1_tx = nil,
         p1_ty = nil,
-        started_edge = false
+        started_edge = false,
+        boundary = {}
     }
 end
 
@@ -269,6 +305,7 @@ local function trace_step(player, ps, bot)
         tr.p_ty = tr.start_ty
         tr.b_tx = tr.p_tx - 1 -- backtrack = west of start
         tr.b_ty = tr.p_ty
+        tr.boundary = {tile_center(tr.p_tx, tr.p_ty)}
 
         tr.started_edge = false
         tr.p1_tx = nil
@@ -287,6 +324,10 @@ local function trace_step(player, ps, bot)
 
         -- Advance state to first step
         tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty = nx, ny, nbx, nby
+
+        -- Record boundary point for rendering/storage
+        tr.boundary[#tr.boundary + 1] = tile_center(tr.p_tx, tr.p_ty)
+
         return tile_center(tr.p_tx, tr.p_ty)
     end
 
@@ -299,7 +340,38 @@ local function trace_step(player, ps, bot)
         end
 
         if tr.started_edge and tr.p_tx == tr.start_tx and tr.p_ty == tr.start_ty and nx == tr.p1_tx and ny == tr.p1_ty then
-            -- Completed loop.
+            -- Completed loop: persist + render group.
+            ensure_entity_groups(ps)
+
+            local boundary = tr.boundary or {}
+
+            -- Use a stable id for this traced cluster
+            local group_id = tostring(name) .. "@" .. tostring(tr.start_tx) .. "," .. tostring(tr.start_ty)
+
+            if #boundary >= 2 then
+                local first = boundary[1]
+                local last = boundary[#boundary]
+                if first.x ~= last.x or first.y ~= last.y then
+                    boundary[#boundary + 1] = {
+                        x = first.x,
+                        y = first.y
+                    }
+                end
+            end
+
+            local center = polygon_center(boundary)
+
+            ps.entity_groups[group_id] = {
+                name = name,
+                surface_index = surf.index,
+                boundary = boundary,
+                center = center
+            }
+
+            -- Draw polygon + label (clears any prior render for this group_id)
+            visual.draw_entity_group(player, ps, group_id, name, boundary, center)
+
+            -- Cleanup and exit survey mode
             ps.survey_trace = nil
             state.set_player_bot_mode(player, ps, "follow")
             ps.survey_entity_type_name = nil
@@ -307,6 +379,10 @@ local function trace_step(player, ps, bot)
         end
 
         tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty = nx, ny, nbx, nby
+
+        -- Record boundary point for rendering/storage
+        tr.boundary[#tr.boundary + 1] = tile_center(tr.p_tx, tr.p_ty)
+
         return tile_center(tr.p_tx, tr.p_ty)
     end
 

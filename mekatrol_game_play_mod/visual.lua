@@ -47,6 +47,11 @@ local function ensure_lines_table(ps)
     ps.visual.lines = ps.visual.lines or {}
 end
 
+local function ensure_entity_groups_table(ps)
+    ps.visual = ps.visual or {}
+    ps.visual.entity_groups = ps.visual.entity_groups or {}
+end
+
 ----------------------------------------------------------------------
 -- CLEAR HELPERS
 --
@@ -258,6 +263,58 @@ function visual.clear_overlay(player_state)
     player_state.overlay_texts = {}
 end
 
+function visual.clear_entity_groups(player_state)
+    if not (player_state and player_state.visual) then
+        return
+    end
+
+    local groups = player_state.visual.entity_groups
+    if not groups then
+        return
+    end
+
+    for _, g in pairs(groups) do
+        if g.lines then
+            for _, line_obj in pairs(g.lines) do
+                if line_obj and line_obj.valid then
+                    line_obj:destroy()
+                end
+            end
+        end
+
+        if g.label and g.label.valid then
+            g.label:destroy()
+        end
+    end
+
+    player_state.visual.entity_groups = {}
+end
+
+function visual.clear_entity_group(player_state, group_id)
+    if not (player_state and player_state.visual and player_state.visual.entity_groups) then
+        return
+    end
+
+    local g = player_state.visual.entity_groups[group_id]
+    if not g then
+        return
+    end
+
+    if g.lines then
+        for _, line_obj in pairs(g.lines) do
+            if line_obj and line_obj.valid then
+                line_obj:destroy()
+            end
+        end
+    end
+
+    if g.label and g.label.valid then
+        g.label:destroy()
+    end
+
+    player_state.visual.entity_groups[group_id] = nil
+end
+
 ---------------------------------------------------
 -- FUNCTION: clear_all(player_state)
 --
@@ -286,6 +343,7 @@ function visual.clear_all(player_state)
     visual.clear_mapped_entities(player_state)
     visual.clear_survey_frontier(player_state)
     visual.clear_survey_done(player_state)
+    visual.clear_entity_groups(player_state)
 end
 
 ----------------------------------------------------------------------
@@ -459,7 +517,7 @@ function visual.draw_radius_circle(player, player_state, bot_entity, radius, col
         filled = false,
         target = bot_entity,
         surface = bot_entity.surface,
-        players = {player},
+        players = {player.index},
         draw_on_ground = true
     }
 
@@ -550,7 +608,7 @@ function visual.draw_bot_highlight(player, player_state)
         surface = bot_entity.surface,
         draw_on_ground = true,
         only_in_alt_mode = false,
-        players = {player}
+        players = {player.index}
     }
 end
 
@@ -650,7 +708,7 @@ function visual.draw_lines(player, player_state, bot_entity, target_pos, line_co
             surface = bot_entity.surface,
             draw_on_ground = true,
             only_in_alt_mode = false,
-            players = {player}
+            players = {player.index}
         }
 
         player_state.visual.lines[#player_state.visual.lines + 1] = line
@@ -690,7 +748,7 @@ function visual.draw_survey_frontier(player, player_state, bot_entity)
             surface = bot_entity.surface,
             draw_on_ground = true,
             only_in_alt_mode = false,
-            players = {player}
+            players = {player.index}
         }
 
         player_state.visual.survey_frontier[#player_state.visual.survey_frontier + 1] = frontier
@@ -730,7 +788,7 @@ function visual.draw_survey_done(player, player_state, bot_entity)
             surface = bot_entity.surface,
             draw_on_ground = true,
             only_in_alt_mode = false,
-            players = {player}
+            players = {player.index}
         }
 
         player_state.visual.survey_done[#player_state.visual.survey_done + 1] = done
@@ -781,11 +839,72 @@ function visual.draw_mapped_entity_box(player, player_state, entity)
         left_top = box.left_top,
         right_bottom = box.right_bottom,
         surface = entity.surface,
-        players = {player},
+        players = {player.index},
         draw_on_ground = false
     }
 
     return box_render
+end
+
+function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
+    if not (player and player.valid and ps) then
+        return
+    end
+
+    ensure_entity_groups_table(ps)
+
+    -- Replace existing visuals for this group id
+    visual.clear_entity_group(ps, group_id)
+
+    local lines = {}
+    if boundary and #boundary >= 2 then
+        for i = 1, #boundary do
+            local a = boundary[i]
+            local b = boundary[(i % #boundary) + 1]
+
+            lines[#lines + 1] = rendering.draw_line {
+                surface = player.surface,
+                from = a,
+                to = b,
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 1,
+                    a = 0.8
+                },
+                width = 2,
+                draw_on_ground = true,
+                only_in_alt_mode = false,
+                players = {player.index}
+            }
+        end
+    end
+
+    local label = nil
+    if center then
+        label = rendering.draw_text {
+            text = name,
+            surface = player.surface,
+            target = center,
+            color = {
+                r = 1,
+                g = 1,
+                b = 1,
+                a = 0.9
+            },
+            scale = 1.5,
+            alignment = "center",
+            vertical_alignment = "middle",
+            draw_on_ground = false,
+            only_in_alt_mode = false,
+            players = {player.index}
+        }
+    end
+
+    ps.visual.entity_groups[group_id] = {
+        lines = lines,
+        label = label
+    }
 end
 
 ----------------------------------------------------------------------
