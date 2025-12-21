@@ -12,6 +12,19 @@ local BOT = config.bot
 -- Wander mode
 ----------------------------------------------------------------------
 
+local function is_survey_ignore_target(e)
+    if not e or not e.valid then
+        return true
+    end
+
+    -- cliffs are their own type; trees are type "tree"
+    if e.type == "cliff" or e.type == "tree" then
+        return true
+    end
+
+    return false
+end
+
 local function is_in_any_entity_group(ps, surface_index, pos)
     local groups = ps.entity_groups
     if not groups then
@@ -137,7 +150,7 @@ function wander.update(player, ps, bot)
 
     local char = player.character
     for _, e in ipairs(found) do
-        if e.valid and e ~= bot and e ~= char then
+        if e.valid and e ~= bot and e ~= char and not is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
             if not is_in_any_entity_group(ps, surf.index, e.position) then
                 ps.survey_entity_type_name = e.name
