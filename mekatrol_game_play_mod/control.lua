@@ -121,8 +121,11 @@ local function update_bot_for_player(player, ps, tick)
     end
     local hull_line = string.format("hull job phase→%s", phase)
 
-    local survey_entity_name = ps.survey_entity_type_name or "nil"
-    local survey_entity_name_line = string.format("survey entity name→%s", survey_entity_name)
+    local survey_entity = ps.survey_entity or {
+        name = "nil",
+        type = "nil"
+    }
+    local survey_entity_name_line = string.format("survey entity→%s [%s]", survey_entity.name, survey_entity.type)
 
     local hull_algorithm_name = ps.hull_algorithm
     local hull_algorithm_name_line = string.format("hull algorithm→%s", hull_algorithm_name)

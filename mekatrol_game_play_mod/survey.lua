@@ -251,14 +251,20 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     local surf = bot.surface
     local bpos = bot.position
 
-    if not ps.survey_entity_type_name then
+    if not ps.survey_entity then
         return false
+    end
+
+    local find_name = nil
+
+    if ps.survey_entity then
+        find_name = ps.survey_entity.name
     end
 
     local found = surf.find_entities_filtered {
         position = bpos,
         radius = BOT.survey.radius,
-        name = ps.survey_entity_type_name
+        name = find_name
     }
 
     if #found == 0 then
@@ -276,7 +282,7 @@ end
 
 local function trace_step(player, ps, bot)
     local surf = bot.surface
-    local name = ps.survey_entity_type_name
+    local name = ps.survey_entity.name
     local tr = ps.survey_trace
     if not tr or not name then
         return nil
@@ -422,7 +428,7 @@ local function trace_step(player, ps, bot)
             -- Cleanup and exit survey mode
             ps.survey_trace = nil
             state.set_player_bot_mode(player, ps, "wander")
-            ps.survey_entity_type_name = nil
+            ps.survey_entity = nil
             return nil
         end
 

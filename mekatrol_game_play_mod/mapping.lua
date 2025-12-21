@@ -120,13 +120,19 @@ function mapping.add_frontier_node(player, state, ps, bot, x, y)
     local surf = bot.surface
     local char = player.character
 
+    local find_name = nil
+
+    if ps.survey_entity then
+        find_name = ps.survey_entity.name
+    end
+
     local found = surf.find_entities_filtered {
         position = {
             x = x,
             y = y
         },
         radius = 0.49,
-        name = ps.survey_entity_type_name
+        name = find_name
     }
 
     local discovered_any = false
@@ -410,7 +416,7 @@ function mapping.step_hull_job(player, ps, tick)
 
     local step_budget = BOT.hull_steps_per_tick or 25
     local done, hull = polygon.step_concave_hull_job(player, ps.hull_job, step_budget)
-    
+
     if not done then
         return
     end

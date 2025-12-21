@@ -38,7 +38,7 @@ function state.ensure_survey_sets(ps)
     ps.survey_done = ps.survey_done or {}
     ps.survey_seen = ps.survey_seen or {}
     ps.survey_mapped_positions = ps.survey_mapped_positions or {}
-    ps.survey_entity_type_name = ps.survey_entity_type_name or nil
+    ps.survey_entity = ps.survey_entity or nil
 end
 
 function state.get_player_state(player_index)
@@ -72,7 +72,7 @@ function state.get_player_state(player_index)
             survey_frontier = {},
             survey_done = {},
             survey_seen = {},
-            survey_entity_type_name = nil,
+            survey_entity = nil,
 
             -- Hull data
             hull = nil,
@@ -120,7 +120,7 @@ function state.get_player_state(player_index)
     ps.survey_frontier = ps.survey_frontier or {}
     ps.survey_done = ps.survey_done or {}
     ps.survey_seen = ps.survey_seen or {}
-    ps.survey_entity_type_name = ps.survey_entity_type_name or nil
+    ps.survey_entity = ps.survey_entity or nil
 
     ps.hull = ps.hull or nil
     ps.hull_job = ps.hull_job or nil
@@ -213,7 +213,7 @@ function state.destroy_player_bot(player, silent)
     ps.survey_frontier = {}
     ps.survey_done = {}
     ps.survey_seen = {}
-    ps.survey_entity_type_name = nil
+    ps.survey_entity = nil
 
     -- Clear ALL hull state.
     ps.hull = nil

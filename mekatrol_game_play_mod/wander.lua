@@ -164,7 +164,10 @@ function wander.update(player, ps, bot)
         if e.valid and e ~= bot and e ~= char and not is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
             if not is_in_any_entity_group(ps, surf.index, e.position) then
-                ps.survey_entity_type_name = e.name
+                ps.survey_entity = {
+                    name = e.name,
+                    type = e.type
+                }
                 state.set_player_bot_mode(player, ps, "survey")
                 ps.wander_spiral = nil
                 return
