@@ -421,7 +421,7 @@ local function trace_step(player, ps, bot)
 
             -- Cleanup and exit survey mode
             ps.survey_trace = nil
-            state.set_player_bot_mode(player, ps, "follow")
+            state.set_player_bot_mode(player, ps, "wander")
             ps.survey_entity_type_name = nil
             return nil
         end

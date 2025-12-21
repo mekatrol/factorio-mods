@@ -1,6 +1,7 @@
 local wander = {}
 
 local config = require("configuration")
+local polygon = require("polygon")
 local positioning = require("positioning")
 local state = require("state")
 local util = require("util")
@@ -10,6 +11,22 @@ local BOT = config.bot
 ----------------------------------------------------------------------
 -- Wander mode
 ----------------------------------------------------------------------
+
+local function is_in_any_entity_group(ps, surface_index, pos)
+    local groups = ps.entity_groups
+    if not groups then
+        return false
+    end
+
+    for _, g in pairs(groups) do
+        if g and g.surface_index == surface_index and g.boundary and #g.boundary >= 3 and
+            polygon.point_in_poly(g.boundary, pos) then
+            return true
+        end
+    end
+
+    return false
+end
 
 local function init_spiral(ps, bpos)
     ps.wander_spiral = {
@@ -121,15 +138,16 @@ function wander.update(player, ps, bot)
     local char = player.character
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char then
-            -- set entity type to survey (the first found in list)
-            ps.survey_entity_type_name = e.name
-
-            -- return on first entity that is not bot nor player character
-            state.set_player_bot_mode(player, ps, "survey")
-            ps.wander_spiral = nil
-            return
+            -- Ignore entities already covered by an existing entity_group polygon
+            if not is_in_any_entity_group(ps, surf.index, e.position) then
+                ps.survey_entity_type_name = e.name
+                state.set_player_bot_mode(player, ps, "survey")
+                ps.wander_spiral = nil
+                return
+            end
         end
     end
+
 end
 
 return wander
