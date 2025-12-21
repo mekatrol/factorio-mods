@@ -207,24 +207,19 @@ local function step_hull_job_inner(player, job, step_budget)
                         local closing = (#job.hull >= 3 and polygon.points_equal(cand, job.start))
 
                         if closing then
-                            -- Closing segment must not intersect existing hull edges.
-                            local intersects = false
                             local a = job.hull[#job.hull]
                             local b = job.start
-                            for e = 1, #job.hull - 2 do
-                                local c = job.hull[e]
-                                local d = job.hull[e + 1]
-                                if polygon.segments_intersect(a, b, c, d) then
-                                    intersects = true
-                                    break
-                                end
-                            end
+
+                            local exclude_edge_1 = 1
+                            local exclude_edge_last = #job.hull - 1
+
+                            local intersects = polygon.segment_intersects_hull(a, b, job.hull, exclude_edge_1,
+                                exclude_edge_last)
                             if not intersects then
                                 next = job.start
                                 break
                             end
                         else
-                            -- Standard candidate must not self-intersect.
                             if not polygon.would_self_intersect(job.hull, cand) then
                                 next = cand
                                 break

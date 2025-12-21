@@ -125,6 +125,87 @@ function polygon.would_self_intersect(hull, candidate)
     return false
 end
 
+-- True if segment (a->b) intersects any edge of hull, excluding edges adjacent to a or b,
+-- and ignoring intersections only when they occur exactly at shared endpoints.
+function polygon.segment_intersects_hull(a, b, hull, exclude_start_idx, exclude_end_idx)
+    local n = #hull
+    if n < 3 then
+        return false
+    end
+
+    local function is_shared_endpoint(p, q)
+        return polygon.points_equal(p, q)
+    end
+
+    for i = 1, n - 1 do
+        -- edge hull[i] -> hull[i+1]
+        if i ~= exclude_start_idx and i ~= exclude_end_idx then
+            local c = hull[i]
+            local d = hull[i + 1]
+
+            if polygon.segments_intersect(a, b, c, d) then
+                -- If intersection is only at a shared endpoint, allow it; otherwise reject.
+                -- This also rejects collinear overlaps because there is no single endpoint intersection.
+                local ip = polygon.segment_intersection_point(a, b, c, d)
+
+                if not ip then
+                    -- parallel/collinear overlap or unhandled case -> treat as intersection (reject)
+                    return true
+                end
+
+                local at_ab_endpoint = is_shared_endpoint(ip, a) or is_shared_endpoint(ip, b)
+                local at_cd_endpoint = is_shared_endpoint(ip, c) or is_shared_endpoint(ip, d)
+
+                -- Allow only if it's exactly at a shared endpoint
+                if not (at_ab_endpoint and at_cd_endpoint) then
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+-- Returns intersection point of segments AB and CD, or nil if none / parallel / collinear.
+-- Includes endpoint intersections; you can filter those out if you want.
+function polygon.segment_intersection_point(a, b, c, d)
+    local r = {
+        x = b.x - a.x,
+        y = b.y - a.y
+    }
+    local s = {
+        x = d.x - c.x,
+        y = d.y - c.y
+    }
+
+    local function cross2(u, v)
+        return u.x * v.y - u.y * v.x
+    end
+
+    local denom = cross2(r, s)
+    if denom == 0 then
+        -- Parallel or collinear: return nil so caller can treat as overlap/ambiguous.
+        return nil
+    end
+
+    local cma = {
+        x = c.x - a.x,
+        y = c.y - a.y
+    }
+    local t = cross2(cma, s) / denom
+    local u = cross2(cma, r) / denom
+
+    if t < 0 or t > 1 or u < 0 or u > 1 then
+        return nil
+    end
+
+    return {
+        x = a.x + t * r.x,
+        y = a.y + t * r.y
+    }
+end
+
 function polygon.angle_ccw(prev_dir, from, to)
     -- Returns CCW turn angle [0, 2pi) from prev_dir to vector from->to.
     local vx = to.x - from.x
@@ -172,7 +253,7 @@ function polygon.point_in_poly(poly, p)
         if intersect then
             inside = not inside
         end
-        
+
         j = i
     end
 
@@ -352,18 +433,15 @@ function polygon.concave_hull(points, k, opts)
                 local closing = (#hull >= 3 and polygon.points_equal(cand, start))
 
                 if closing then
-                    local intersects = false
                     local a = hull[#hull]
                     local b = start
 
-                    -- FIX: skip edges adjacent to start and end
-                    for e = 2, #hull - 2 do
-                        if polygon.segments_intersect(a, b, hull[e], hull[e + 1]) then
-                            intersects = true
-                            break
-                        end
-                    end
+                    -- Exclude edge 1 (start->hull[2]) and edge (#hull-1) (hull[#hull-1]->hull[#hull])
+                    -- because they are adjacent to the closing segment endpoints.
+                    local exclude_edge_1 = 1
+                    local exclude_edge_last = #hull - 1
 
+                    local intersects = polygon.segment_intersects_hull(a, b, hull, exclude_edge_1, exclude_edge_last)
                     if not intersects then
                         next = start
                         next_idx = start_idx
