@@ -299,12 +299,25 @@ local function step_hull_job_inner(player, job, step_budget)
 end
 
 local function step_hull_job(player, ps, tick)
-    if not ps.map_visited_hull_job then
+    local job = ps.map_visited_hull_job
+
+    if not job then
         return
     end
 
-    local step_budget = BOT.hull_steps_per_tick or 25
-    local done, hull = step_hull_job_inner(player, ps.map_visited_hull_job, step_budget)
+    local done = false
+    local hull = nil
+
+    if ps.hull_algorithm == "convex" then
+
+        hull = polygon.convex_hull(job.pts)
+        set_job_phase(player, job, "fallback_done")
+
+        done = true
+    else
+        local step_budget = BOT.hull_steps_per_tick or 25
+        done, hull = step_hull_job_inner(player, job, step_budget)
+    end
 
     if not done then
         return

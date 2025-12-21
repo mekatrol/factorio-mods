@@ -81,6 +81,7 @@ function state.get_player_state(player_index)
             hull_tick = 0,
             hull_last_eval_tick = 0,
             hull_point_set = {}, -- set: "x,y" => true
+            hull_algorithm = "convex",
 
             visual = {
                 bot_highlight = nil,
@@ -125,6 +126,7 @@ function state.get_player_state(player_index)
     ps.hull_tick = ps.hull_tick or 0
     ps.hull_last_eval_tick = ps.hull_last_eval_tick or 0
     ps.hull_point_set = ps.hull_point_set or {}
+    ps.hull_algorithm = ps.hull_algorithm or "convex"
 
     ensure_visuals_table(ps)
 

@@ -120,7 +120,10 @@ local function update_bot_for_player(player, ps, tick)
     local survey_entity_name = ps.survey_entity_type_name or "nil"
     local survey_entity_name_line = string.format("survey entity name→%s", survey_entity_name)
 
-    local lines = {"State:", hull_line, survey_entity_name_line}
+    local hull_algorithm_name = ps.hull_algorithm
+    local hull_algorithm_name_line = string.format("hull algorithm→%s", hull_algorithm_name)
+
+    local lines = {"State:", hull_line, survey_entity_name_line, hull_algorithm_name_line}
     visual.update_overlay(player, ps, lines)
 end
 
