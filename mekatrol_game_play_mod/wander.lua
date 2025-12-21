@@ -159,6 +159,24 @@ function wander.update(player, ps, bot)
         radius = BOT.wander.detection_radius
     }
 
+    -- sort from nearest to bot to farthest from bot
+    table.sort(found, function(a, b)
+        -- Put invalids at the end
+        if not (a and a.valid) then
+            return false
+        end
+        if not (b and b.valid) then
+            return true
+        end
+
+        local ax = a.position.x - bpos.x
+        local ay = a.position.y - bpos.y
+        local bx = b.position.x - bpos.x
+        local by = b.position.y - bpos.y
+
+        return (ax * ax + ay * ay) < (bx * bx + by * by)
+    end)
+
     local char = player.character
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char and not is_survey_ignore_target(e) then
