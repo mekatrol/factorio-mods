@@ -234,7 +234,12 @@ local function start_trace_from_found(ps, bot_pos)
         p1_tx = nil,
         p1_ty = nil,
         started_edge = false,
-        boundary = {}
+        boundary = {},
+
+        -- unstick guard
+        north_stuck_attempts = 0,
+        north_last_tx = tx,
+        north_last_ty = ty
     }
 end
 
@@ -280,6 +285,21 @@ local function trace_step(player, ps, bot)
     if tr.phase == "north" then
         -- Walk due north until the next tile does NOT contain the resource.
         local tx, ty = tile_xy_from_pos(bot.position)
+
+        local MAX_NORTH_STUCK = 30 -- adjust (30 attempts is usually enough)
+
+        if tx == tr.north_last_tx and ty == tr.north_last_ty then
+            tr.north_stuck_attempts = (tr.north_stuck_attempts or 0) + 1
+            if tr.north_stuck_attempts >= MAX_NORTH_STUCK then
+                -- Abort trace; survey will restart when it finds the resource again
+                ps.survey_trace = nil
+                return nil
+            end
+        else
+            tr.north_last_tx = tx
+            tr.north_last_ty = ty
+            tr.north_stuck_attempts = 0
+        end
 
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
         if not tile_has_name(surf, name, tx, ty) then
