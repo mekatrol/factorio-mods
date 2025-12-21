@@ -11,7 +11,70 @@ local BOT = config.bot
 -- Wander mode
 ----------------------------------------------------------------------
 
-function wander.pick_new_wander_target(bpos)
+local function init_spiral(ps, bpos)
+    ps.wander_spiral = {
+        origin = {
+            x = bpos.x,
+            y = bpos.y
+        },
+
+        -- square spiral state
+        dir = 0, -- 0=E,1=N,2=W,3=S
+        leg_len = 1, -- how many steps in current leg
+        leg_progress = 0, -- steps taken in current leg
+        legs_done = 0, -- completed legs (every 2 legs, leg_len++)
+        offset_x = 0,
+        offset_y = 0
+    }
+end
+
+local function spiral_advance(ps)
+    local s = ps.wander_spiral
+    if not s then
+        return
+    end
+
+    -- move one cell in current direction
+    if s.dir == 0 then
+        s.offset_x = s.offset_x + 1
+    elseif s.dir == 1 then
+        s.offset_y = s.offset_y - 1
+    elseif s.dir == 2 then
+        s.offset_x = s.offset_x - 1
+    else
+        s.offset_y = s.offset_y + 1
+    end
+
+    s.leg_progress = s.leg_progress + 1
+
+    -- if finished this leg, turn right; every 2 legs increase length
+    if s.leg_progress >= s.leg_len then
+        s.leg_progress = 0
+        s.dir = (s.dir + 1) % 4
+        s.legs_done = s.legs_done + 1
+        if (s.legs_done % 2) == 0 then
+            s.leg_len = s.leg_len + 1
+        end
+    end
+end
+
+function wander.pick_new_wander_target_spiral(ps, bpos)
+    if not ps.wander_spiral then
+        init_spiral(ps, bpos)
+    end
+
+    spiral_advance(ps)
+
+    local s = ps.wander_spiral
+    local step = BOT.wander.step_distance
+
+    return {
+        x = s.origin.x + s.offset_x * step,
+        y = s.origin.y + s.offset_y * step
+    }
+end
+
+function wander.pick_new_wander_target_random(ps, bpos)
     local angle = math.random() * 2 * math.pi
     local step = BOT.wander.step_distance
     local min_d = step * 0.4
@@ -33,7 +96,7 @@ function wander.update(player, ps, bot)
     local target = ps.bot_target_position
 
     if not target then
-        target = wander.pick_new_wander_target(bot.position)
+        target = wander.pick_new_wander_target_spiral(ps, bot.position)
         ps.bot_target_position = target
     end
 
@@ -63,6 +126,7 @@ function wander.update(player, ps, bot)
 
             -- return on first entity that is not bot nor player character
             state.set_player_bot_mode(player, ps, "survey")
+            ps.wander_spiral = nil
             return
         end
     end

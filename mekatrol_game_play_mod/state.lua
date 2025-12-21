@@ -55,6 +55,7 @@ function state.get_player_state(player_index)
             last_player_side_offset_x = -BOT.movement.side_offset_distance,
 
             bot_target_position = nil,
+            wander_spiral = nil,
 
             -- The quantized polygon hull already visited on the map
             map_visited_poly = {},
@@ -108,6 +109,8 @@ function state.get_player_state(player_index)
         ps.survey_render_points = true
     end
 
+    ps.wander_spiral = ps.wander_spiral or nil
+
     ps.map_visited_poly = ps.map_visited_poly or {}
     ps.map_visited_hull_job = ps.map_visited_hull_job or nil
     ps.map_visited_queued_positions = ps.map_visited_queued_positions or {}
@@ -148,7 +151,6 @@ function state.set_player_bot_mode(player, ps, new_mode)
     end
 
     ps.bot_mode = new_mode
-    util.print_bot_message(player, "green", "mode set to %s", new_mode)
 
     -- Follow mode: no fixed target.
     if new_mode == "follow" then
