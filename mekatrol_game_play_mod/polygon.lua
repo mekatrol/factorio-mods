@@ -556,4 +556,72 @@ function polygon.contains_point(poly, p)
     return polygon.point_in_poly(poly, p)
 end
 
+-- Squared distance from point p to segment a-b
+function polygon.point_segment_dist2(p, a, b)
+    local abx = b.x - a.x
+    local aby = b.y - a.y
+    local apx = p.x - a.x
+    local apy = p.y - a.y
+
+    local ab_len2 = abx * abx + aby * aby
+    if ab_len2 == 0 then
+        -- a==b
+        return apx * apx + apy * apy
+    end
+
+    local t = (apx * abx + apy * aby) / ab_len2
+    if t < 0 then
+        t = 0
+    elseif t > 1 then
+        t = 1
+    end
+
+    local cx = a.x + t * abx
+    local cy = a.y + t * aby
+    local dx = p.x - cx
+    local dy = p.y - cy
+    return dx * dx + dy * dy
+end
+
+-- True if inside polygon OR within 'margin' (in tiles/world units) of its boundary.
+-- Works whether poly is "closed" (last point equals first) or not.
+function polygon.contains_point_buffered(poly, p, margin)
+    if not poly or #poly < 3 then
+        return false
+    end
+
+    if polygon.point_in_poly(poly, p) then
+        return true
+    end
+
+    local m2 = (margin or 0) * (margin or 0)
+    if m2 <= 0 then
+        return false
+    end
+
+    local n = #poly
+
+    -- If the polygon is closed (last == first), ignore the last point for edge iteration
+    local last = poly[n]
+    local first = poly[1]
+    local closed = polygon.points_equal(last, first)
+
+    local edge_n = closed and (n - 1) or n
+
+    for i = 1, edge_n do
+        local a = poly[i]
+        local b = (i == edge_n) and (closed and poly[1] or poly[1]) or poly[i + 1]
+        -- If not closed, last edge wraps to poly[1]
+        if not closed and i == edge_n then
+            b = poly[1]
+        end
+
+        if polygon.point_segment_dist2(p, a, b) <= m2 then
+            return true
+        end
+    end
+
+    return false
+end
+
 return polygon

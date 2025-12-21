@@ -31,10 +31,21 @@ local function is_in_any_entity_group(ps, surface_index, pos)
         return false
     end
 
+    local margin = 1.0 -- tiles (world units)
+
     for _, g in pairs(groups) do
-        if g and g.surface_index == surface_index and g.boundary and #g.boundary >= 3 and
-            polygon.point_in_poly(g.boundary, pos) then
-            return true
+        if g and g.surface_index == surface_index and g.boundary and #g.boundary >= 3 then
+            -- Treat points within 1 tile outside the boundary as "inside"
+            if polygon.contains_point_buffered then
+                if polygon.contains_point_buffered(g.boundary, pos, margin) then
+                    return true
+                end
+            else
+                -- Fallback if you haven't added contains_point_buffered yet
+                if polygon.point_in_poly(g.boundary, pos) then
+                    return true
+                end
+            end
         end
     end
 
