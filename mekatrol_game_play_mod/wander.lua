@@ -3,6 +3,7 @@ local wander = {}
 local config = require("configuration")
 local positioning = require("positioning")
 local state = require("state")
+local util = require("util")
 
 local BOT = config.bot
 
@@ -57,6 +58,9 @@ function wander.update(player, ps, bot)
     local char = player.character
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char then
+            -- set entity type to survey (the first found in list)
+            ps.survey_entity_type_name = e.name
+
             -- return on first entity that is not bot nor player character
             state.set_player_bot_mode(player, ps, "survey")
             return

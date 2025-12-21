@@ -4,6 +4,7 @@ local config = require("configuration")
 local mapping = require("mapping")
 local positioning = require("positioning")
 local state = require("state")
+local util = require("util")
 
 local BOT = config.bot
 
@@ -18,7 +19,8 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 
     local found = surf.find_entities_filtered {
         position = bpos,
-        radius = BOT.survey.radius
+        radius = BOT.survey.radius,
+        name = ps.survey_entity_type_name
     }
 
     local discovered_any = false
@@ -45,6 +47,7 @@ function survey.update(player, ps, bot, tick)
 
     if not target then
         state.set_player_bot_mode(player, ps, "follow")
+        ps.survey_entity_type_name = nil
         return
     end
 

@@ -101,25 +101,26 @@ local function update_bot_for_player(player, ps, tick)
         visual.draw_survey_done(player, ps, bot)
     end
 
-    -- Build the value we want/entities might change every tick
-    local phase = "[no job]"
-    if ps.map_visited_hull_job then
-        phase = ps.map_visited_hull_job.phase or "[nil phase]"
-    end
-    local hull_line = string.format("hull job phase→%s", phase)
-
     -- Throttle overlay updates
     local next_tick = ps.overlay_next_tick or 0
-    local last_line = ps.overlay_last_hull_phase
 
     if tick < next_tick then
         return
     end
 
     ps.overlay_next_tick = tick + OVERLAY_UPDATE_TICKS
-    ps.overlay_last_hull_phase = hull_line
 
-    local lines = {"State:", hull_line}
+    -- Build the value we want/entities might change every tick
+    local phase = "nil"
+    if ps.map_visited_hull_job then
+        phase = ps.map_visited_hull_job.phase or "nil"
+    end
+    local hull_line = string.format("hull job phase→%s", phase)
+
+    local survey_entity_name = ps.survey_entity_type_name or "nil"
+    local survey_entity_name_line = string.format("survey entity name→%s", survey_entity_name)
+
+    local lines = {"State:", hull_line, survey_entity_name_line}
     visual.update_overlay(player, ps, lines)
 end
 

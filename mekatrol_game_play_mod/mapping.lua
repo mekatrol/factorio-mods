@@ -125,7 +125,8 @@ function mapping.add_frontier_node(player, state, ps, bot, x, y)
             x = x,
             y = y
         },
-        radius = 0.49
+        radius = 0.49,
+        name = ps.survey_entity_type_name
     }
 
     local discovered_any = false

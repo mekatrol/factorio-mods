@@ -133,7 +133,7 @@ local function evaluate_hull_need(player, ps, points)
 
     -- start a new job to find concave hull
     ps.map_visited_hull_job = start_concave_hull_job(player, ps.map_visited_poly, 8, {
-        max_k = 1200
+        max_k = 60
     })
 end
 
