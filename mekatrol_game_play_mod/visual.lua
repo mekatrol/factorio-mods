@@ -867,10 +867,10 @@ function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
                 from = a,
                 to = b,
                 color = {
-                    r = 1,
-                    g = 1,
-                    b = 1,
-                    a = 0.8
+                    r = 0.1,
+                    g = 1.0,
+                    b = 0.2,
+                    a = 0.95
                 },
                 width = 2,
                 draw_on_ground = true,
@@ -887,12 +887,12 @@ function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
             surface = player.surface,
             target = center,
             color = {
-                r = 1,
-                g = 1,
-                b = 1,
-                a = 0.9
+                r = 0.1,
+                g = 1.0,
+                b = 0.2,
+                a = 0.95
             },
-            scale = 1.5,
+            scale = 2,
             alignment = "center",
             vertical_alignment = "middle",
             draw_on_ground = false,
