@@ -90,6 +90,15 @@ function polygon.segments_intersect(a, b, c, d)
     return false
 end
 
+----------------------------------------------------------------------
+-- Self-intersection check (endpoint-safe)
+----------------------------------------------------------------------
+
+local function shares_endpoint(a, b, c, d)
+    return polygon.points_equal(a, c) or polygon.points_equal(a, d) or polygon.points_equal(b, c) or
+               polygon.points_equal(b, d)
+end
+
 function polygon.would_self_intersect(hull, candidate)
     -- Checks whether adding segment (last hull point -> candidate)
     -- would intersect any existing hull edge excluding adjacent edges.
@@ -101,12 +110,15 @@ function polygon.would_self_intersect(hull, candidate)
     local a = hull[n]
     local b = candidate
 
-    -- Check against edges hull[i] -> hull[i+1] for i=1..n-2
     for i = 1, n - 2 do
         local c = hull[i]
         local d = hull[i + 1]
-        if polygon.segments_intersect(a, b, c, d) then
-            return true
+
+        -- ignore shared endpoints so touching is not treated as intersection
+        if not shares_endpoint(a, b, c, d) then
+            if polygon.segments_intersect(a, b, c, d) then
+                return true
+            end
         end
     end
 
@@ -160,7 +172,7 @@ function polygon.point_in_poly(poly, p)
         if intersect then
             inside = not inside
         end
-
+        
         j = i
     end
 
@@ -183,17 +195,15 @@ end
 function polygon.copy_points(points)
     local out = {}
     for i = 1, #points do
-        local p = points[i]
         out[i] = {
-            x = p.x,
-            y = p.y
+            x = points[i].x,
+            y = points[i].y
         }
     end
     return out
 end
 
 function polygon.dedupe_points(points)
-    -- Exact dedupe. Works well if caller already quantizes.
     local seen = {}
     local out = {}
 
@@ -213,7 +223,6 @@ function polygon.dedupe_points(points)
 end
 
 function polygon.lowest_point(points)
-    -- Lowest Y, then lowest X.
     local idx = 1
     for i = 2, #points do
         local p = points[i]
@@ -225,9 +234,11 @@ function polygon.lowest_point(points)
     return idx
 end
 
+----------------------------------------------------------------------
+-- k-nearest helpers
+----------------------------------------------------------------------
+
 function polygon.k_nearest(points, from, k, used)
-    -- Returns up to k nearest points to "from" that are not used.
-    -- "used" is a boolean array indexed by point index.
     local arr = {}
 
     for i = 1, #points do
@@ -248,346 +259,46 @@ function polygon.k_nearest(points, from, k, used)
     end)
 
     local out = {}
-    local lim = math.min(k, #arr)
-    for i = 1, lim do
+    for i = 1, math.min(k, #arr) do
         out[#out + 1] = points[arr[i].idx]
     end
     return out
 end
 
--- Returns intersection point of segments AB and CD, or nil if none / parallel / collinear.
--- Includes endpoint intersections; you can filter those out if you want.
-function polygon.segment_intersection_point(a, b, c, d)
-    local r = {
-        x = b.x - a.x,
-        y = b.y - a.y
-    }
-    local s = {
-        x = d.x - c.x,
-        y = d.y - c.y
-    }
-
-    local function cross2(u, v)
-        return u.x * v.y - u.y * v.x
-    end
-
-    local denom = cross2(r, s)
-    if denom == 0 then
-        -- Parallel or collinear: skip (handling full overlap is more work; convex-hull recompute doesn’t need it).
-        return nil
-    end
-
-    local cma = {
-        x = c.x - a.x,
-        y = c.y - a.y
-    }
-    local t = cross2(cma, s) / denom
-    local u = cross2(cma, r) / denom
-
-    -- Intersection occurs within both segments if t,u in [0,1]
-    if t < 0 or t > 1 or u < 0 or u > 1 then
-        return nil
-    end
-
-    return {
-        x = a.x + t * r.x,
-        y = a.y + t * r.y
-    }
-end
-
--- Given a polygon vertex list (closed implicitly), returns a list of intersection points.
--- Skips adjacent edges and the first/last adjacency.
-function polygon.collect_self_intersections(poly)
-    local out = {}
-    local n = #poly
-    if n < 4 then
-        return out
-    end
-
-    local function edge(i)
-        local a = poly[i]
-        local b = poly[i % n + 1]
-        return a, b
-    end
-
-    for i = 1, n do
-        local a, b = edge(i)
-        for j = i + 1, n do
-            -- skip same edge and adjacent edges (including wrap adjacency)
-            if j == i then
-                goto continue
-            end
-            if j == i + 1 then
-                goto continue
-            end
-            if i == 1 and j == n then
-                goto continue
-            end
-
-            local c, d = edge(j)
-
-            -- quick boolean check first
-            if polygon.segments_intersect(a, b, c, d) then
-                local p = polygon.segment_intersection_point(a, b, c, d)
-                if p then
-                    out[#out + 1] = p
-                end
-            end
-
-            ::continue::
-        end
-    end
-
-    return out
-end
-
--- Adds edge/edge intersection points to the point set, then recomputes convex hull.
--- `points` is your original point cloud; `poly` is the polygon you want to heal (often the hull you just got).
--- If you don't have the original point cloud anymore, pass `poly` for both args.
-function polygon.recalc_convex_with_intersections(points, poly)
-    local ints = polygon.collect_self_intersections(poly)
-    if #ints == 0 then
-        return poly
-    end
-
-    local all = {}
-    for i = 1, #points do
-        all[#all + 1] = points[i]
-    end
-    for i = 1, #ints do
-        all[#all + 1] = ints[i]
-    end
-
-    all = polygon.dedupe_points(all)
-    return polygon.convex_hull(all)
-end
-
-----------------------------------------------------------------------
--- Incremental concave hull job API
---
--- The job is a plain Lua table so it can be stored in mod persistent state.
--- Each step call advances the algorithm by a bounded number of “micro-steps”.
-----------------------------------------------------------------------
-
-function polygon.set_job_phase(player, job, phase)
-    job.phase = phase
-end
-
-function polygon.start_concave_hull_job(player, points, k, opts)
-    opts = opts or {}
-
-    local pts = polygon.dedupe_points(points)
-    local n = #pts
-
-    local job = {
-        -- frozen input for this job attempt
-        pts = pts,
-        n = n,
-
-        -- k parameters
-        k0 = (k and math.max(3, k)) or 3,
-        max_k = opts.max_k or math.min(25, n),
-
-        -- attempt state (set by init_attempt)
-        kk = nil,
-        used = nil,
-        start_idx = nil,
-        start = nil,
-        hull = nil,
-        prev_dir = nil,
-        current = nil,
-        guard = 0,
-
-        -- validation progress (incremental)
-        validate_i = 1,
-        validated_ok = true,
-
-        -- final output
-        result = nil
-    }
-
-    -- phases:
-    --   init_attempt -> build -> validate -> done
-    -- or fallback_done (convex hull)
-    polygon.set_job_phase(player, job, "init_attempt")
-
-    if n < 3 then
-        polygon.set_job_phase(player, job, "done")
-        job.result = pts
-        return job
-    end
-
-    if job.k0 > n then
-        job.k0 = n
-    end
-
-    job.kk = job.k0
-    return job
-end
-
-function polygon.step_concave_hull_job(player, job, step_budget)
-    if not job or job.phase == "done" or job.phase == "fallback_done" then
-        return true, job and job.result or nil
-    end
-
-    local steps_left = step_budget or 10
-    if steps_left < 1 then
-        steps_left = 1
-    end
-
-    while steps_left > 0 do
-        steps_left = steps_left - 1
-
-        if job.phase == "init_attempt" then
-            -- If k has escalated too far, fall back to convex hull.
-            if job.kk > job.max_k then
-                job.result = polygon.convex_hull(polygon.copy_points(job.pts))
-                polygon.set_job_phase(player, job, "fallback_done")
-                return true, job.result
-            end
-
-            -- Reset attempt state.
-            job.used = {}
-            job.start_idx = polygon.lowest_point(job.pts)
-            job.start = job.pts[job.start_idx]
-            job.used[job.start_idx] = true
-
-            job.hull = {job.start}
-            job.prev_dir = {
-                x = -1,
-                y = 0
-            } -- initial “west” direction
-            job.current = job.start
-            job.guard = 0
-
-            polygon.set_job_phase(player, job, "build")
-
-        elseif job.phase == "build" then
-            -- Guard against infinite loops.
-            job.guard = job.guard + 1
-            if job.guard >= 10000 then
-                -- Treat as failed attempt; increase k and restart.
-                job.kk = job.kk + 1
-                polygon.set_job_phase(player, job, "init_attempt")
-            else
-                local candidates = polygon.k_nearest(job.pts, job.current, job.kk, job.used)
-                if #candidates == 0 then
-                    job.kk = job.kk + 1
-                    polygon.set_job_phase(player, job, "init_attempt")
-                else
-                    -- Pick candidate with smallest CCW turn; break ties by distance.
-                    table.sort(candidates, function(a, b)
-                        local aa = polygon.angle_ccw(job.prev_dir, job.current, a)
-                        local ab = polygon.angle_ccw(job.prev_dir, job.current, b)
-                        if aa == ab then
-                            return polygon.dist2(job.current, a) < polygon.dist2(job.current, b)
-                        end
-                        return aa < ab
-                    end)
-
-                    local next = nil
-
-                    for i = 1, #candidates do
-                        local cand = candidates[i]
-
-                        -- Allow closing to start only when hull is long enough.
-                        local closing = (#job.hull >= 3 and polygon.points_equal(cand, job.start))
-
-                        if closing then
-                            -- Closing segment must not intersect existing hull edges.
-                            local intersects = false
-                            local a = job.hull[#job.hull]
-                            local b = job.start
-                            for e = 1, #job.hull - 2 do
-                                local c = job.hull[e]
-                                local d = job.hull[e + 1]
-                                if polygon.segments_intersect(a, b, c, d) then
-                                    intersects = true
-                                    break
-                                end
-                            end
-                            if not intersects then
-                                next = job.start
-                                break
-                            end
-                        else
-                            -- Standard candidate must not self-intersect.
-                            if not polygon.would_self_intersect(job.hull, cand) then
-                                next = cand
-                                break
-                            end
-                        end
-                    end
-
-                    if not next then
-                        -- No candidate can extend hull without intersection: failed attempt.
-                        job.kk = job.kk + 1
-                        polygon.set_job_phase(player, job, "init_attempt")
-                    elseif polygon.points_equal(next, job.start) then
-                        -- Closed polygon; validate point containment.
-                        polygon.set_job_phase(player, job, "validate")
-                        job.validate_i = 1
-                        job.validated_ok = true
-                    else
-                        -- Mark used by index (points in job.pts are stable).
-                        for i = 1, job.n do
-                            if job.pts[i] == next then
-                                job.used[i] = true
-                                break
-                            end
-                        end
-
-                        -- Advance.
-                        job.prev_dir = {
-                            x = next.x - job.current.x,
-                            y = next.y - job.current.y
-                        }
-                        job.current = next
-                        job.hull[#job.hull + 1] = next
-
-                        -- If we’ve used all points, stop and validate.
-                        if #job.hull >= job.n then
-                            polygon.set_job_phase(player, job, "validate")
-                            job.validate_i = 1
-                            job.validated_ok = true
-                        end
-                    end
-                end
-            end
-
-        elseif job.phase == "validate" then
-            -- Validate incrementally: one point per micro-step.
-            if #job.hull < 3 then
-                job.kk = job.kk + 1
-                polygon.set_job_phase(player, job, "init_attempt")
-            else
-                if job.validate_i > job.n then
-                    if job.validated_ok then
-                        job.result = job.hull
-                        polygon.set_job_phase(player, job, "done")
-                        return true, job.result
-                    end
-
-                    -- Failed validation; increase k and retry.
-                    job.kk = job.kk + 1
-                    polygon.set_job_phase(player, job, "init_attempt")
-                else
-                    local p = job.pts[job.validate_i]
-                    if not polygon.point_in_poly(job.hull, p) then
-                        job.validated_ok = false
-                    end
-                    job.validate_i = job.validate_i + 1
-                end
+function polygon.k_nearest_indexed(pts, current, k, used)
+    local cands = {}
+    for i = 1, #pts do
+        if not used[i] then
+            local p = pts[i]
+            -- FIX: exclude current point to avoid zero-length edges
+            if not polygon.points_equal(p, current) then
+                cands[#cands + 1] = {
+                    idx = i,
+                    p = p,
+                    d2 = polygon.dist2(current, p)
+                }
             end
         end
     end
 
-    return false, nil
+    table.sort(cands, function(a, b)
+        if a.d2 == b.d2 then
+            return a.idx < b.idx
+        end
+        return a.d2 < b.d2
+    end)
+
+    if #cands > k then
+        for i = #cands, k + 1, -1 do
+            cands[i] = nil
+        end
+    end
+
+    return cands
 end
 
 ----------------------------------------------------------------------
 -- Synchronous concave hull
--- (Optional: keep for offline use, tests, or if you still call it elsewhere.)
 ----------------------------------------------------------------------
 
 function polygon.concave_hull(points, k, opts)
@@ -600,14 +311,7 @@ function polygon.concave_hull(points, k, opts)
     end
 
     local max_k = opts.max_k or math.min(25, n)
-
-    k = k or 3
-    if k < 3 then
-        k = 3
-    end
-    if k > n then
-        k = n
-    end
+    k = math.max(3, math.min(k or 3, n))
 
     for kk = k, max_k do
         local used = {}
@@ -626,63 +330,59 @@ function polygon.concave_hull(points, k, opts)
         while guard < 10000 do
             guard = guard + 1
 
-            local candidates = polygon.k_nearest(pts, current, kk, used)
+            local candidates = polygon.k_nearest_indexed(pts, current, kk, used)
             if #candidates == 0 then
                 break
             end
 
             table.sort(candidates, function(a, b)
-                local aa = polygon.angle_ccw(prev_dir, current, a)
-                local ab = polygon.angle_ccw(prev_dir, current, b)
+                local aa = polygon.angle_ccw(prev_dir, current, a.p)
+                local ab = polygon.angle_ccw(prev_dir, current, b.p)
                 if aa == ab then
-                    return polygon.dist2(current, a) < polygon.dist2(current, b)
+                    return polygon.dist2(current, a.p) < polygon.dist2(current, b.p)
                 end
                 return aa < ab
             end)
 
-            local next = nil
+            local next, next_idx = nil, nil
+
             for i = 1, #candidates do
-                local cand = candidates[i]
+                local cand = candidates[i].p
+                local cand_idx = candidates[i].idx
                 local closing = (#hull >= 3 and polygon.points_equal(cand, start))
 
                 if closing then
                     local intersects = false
                     local a = hull[#hull]
                     local b = start
-                    for e = 1, #hull - 2 do
-                        local c = hull[e]
-                        local d = hull[e + 1]
-                        if polygon.segments_intersect(a, b, c, d) then
+
+                    -- FIX: skip edges adjacent to start and end
+                    for e = 2, #hull - 2 do
+                        if polygon.segments_intersect(a, b, hull[e], hull[e + 1]) then
                             intersects = true
                             break
                         end
                     end
+
                     if not intersects then
                         next = start
+                        next_idx = start_idx
                         break
                     end
                 else
                     if not polygon.would_self_intersect(hull, cand) then
                         next = cand
+                        next_idx = cand_idx
                         break
                     end
                 end
             end
 
-            if not next then
+            if not next or polygon.points_equal(next, start) then
                 break
             end
 
-            if polygon.points_equal(next, start) then
-                break -- closed
-            end
-
-            for i = 1, n do
-                if pts[i] == next then
-                    used[i] = true
-                    break
-                end
-            end
+            used[next_idx] = true
 
             prev_dir = {
                 x = next.x - current.x,
@@ -701,7 +401,6 @@ function polygon.concave_hull(points, k, opts)
         end
     end
 
-    -- Fallback: convex hull of the same point set we attempted.
     return polygon.convex_hull(polygon.copy_points(pts))
 end
 
@@ -717,12 +416,10 @@ function polygon.convex_hull(points)
 
     local pts = polygon.copy_points(points)
 
-    -- 1) pivot: lowest Y, then lowest X
     local pivot_idx = polygon.lowest_point(pts)
     pts[1], pts[pivot_idx] = pts[pivot_idx], pts[1]
     local pivot = pts[1]
 
-    -- 2) sort by polar angle around pivot
     table.sort(pts, function(a, b)
         if a == pivot then
             return true
@@ -730,7 +427,6 @@ function polygon.convex_hull(points)
         if b == pivot then
             return false
         end
-
         local c = polygon.cross(pivot, a, b)
         if c == 0 then
             return polygon.dist2(pivot, a) < polygon.dist2(pivot, b)
@@ -738,7 +434,6 @@ function polygon.convex_hull(points)
         return c > 0
     end)
 
-    -- 3) remove intermediate collinear points (keep extremes)
     local filtered = {pts[1]}
     for i = 2, n do
         while #filtered >= 2 do
@@ -747,12 +442,9 @@ function polygon.convex_hull(points)
             if polygon.cross(prev, last, pts[i]) ~= 0 then
                 break
             end
-
-            -- Keep the farthest collinear point from prev.
             if polygon.dist2(prev, pts[i]) > polygon.dist2(prev, last) then
                 filtered[#filtered] = pts[i]
             end
-
             goto continue
         end
         filtered[#filtered + 1] = pts[i]
@@ -763,7 +455,6 @@ function polygon.convex_hull(points)
         return filtered
     end
 
-    -- 4) build hull stack
     local hull = {filtered[1], filtered[2], filtered[3]}
     for i = 4, #filtered do
         while #hull >= 2 do
@@ -780,11 +471,7 @@ function polygon.convex_hull(points)
     return hull
 end
 
--- Public: true if point is inside OR on the boundary of the polygon.
--- poly: { {x=,y=}, ... } (not necessarily closed)
--- p: {x=,y=}
 function polygon.contains_point(poly, p)
-    -- If your hull can be nil or degenerate:
     if not poly or #poly < 3 then
         return false
     end

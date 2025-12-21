@@ -25,6 +25,7 @@ local wander = require("wander")
 -- Config aliases.
 local BOT = config.bot
 local MODES = config.modes
+local HULL_ALGORITHMS = config.hull_algorithms
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
 
@@ -182,6 +183,24 @@ local function on_toggle_render_survey_mode(event)
     util.print_bot_message(p, "green", "survey render: %s", ps.survey_render_mapped)
 end
 
+local function on_cycle_hull_algorithm(event)
+    local p = game.get_player(event.player_index)
+    if not (p and p.valid) then
+        return
+    end
+
+    local ps = state.get_player_state(p.index)
+    local cur = ps.hull_algorithm or "concave"
+    local idx = HULL_ALGORITHMS.index[cur] or 1
+
+    idx = idx + 1
+    if idx > #HULL_ALGORITHMS.list then
+        idx = 1
+    end
+
+    ps.hull_algorithm = HULL_ALGORITHMS.list[idx]
+end
+
 ----------------------------------------------------------------------
 -- Event: Entity died
 ----------------------------------------------------------------------
@@ -253,6 +272,7 @@ end)
 script.on_event("mekatrol-game-play-bot-toggle", on_toggle_bot)
 script.on_event("mekatrol-game-play-bot-next-mode", on_cycle_bot_mode)
 script.on_event("mekatrol-game-play-bot-render-survey-mode", on_toggle_render_survey_mode)
+script.on_event("mekatrol-game-play-bot-render-hull-algorithm", on_cycle_hull_algorithm)
 
 script.on_event(defines.events.on_entity_died, on_entity_died)
 script.on_event(defines.events.on_player_removed, on_player_removed)

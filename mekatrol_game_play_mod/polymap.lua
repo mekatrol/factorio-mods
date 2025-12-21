@@ -311,10 +311,15 @@ local function step_hull_job(player, ps, tick)
     if ps.hull_algorithm == "convex" then
 
         hull = polygon.convex_hull(job.pts)
-        set_job_phase(player, job, "fallback_done")
-
+        set_job_phase(player, job, "done")
         done = true
-    else
+    elseif ps.hull_algorithm == "concave" then
+        hull = polygon.concave_hull(job.pts, 8, {
+            max_k = 60
+        })
+        set_job_phase(player, job, "done")
+        done = true
+    else -- do background task concave
         local step_budget = BOT.hull_steps_per_tick or 25
         done, hull = step_hull_job_inner(player, job, step_budget)
     end

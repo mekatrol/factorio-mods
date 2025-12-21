@@ -61,6 +61,17 @@ data:extend({{
     key_sequence = "CONTROL + SHIFT + R",
 
     consuming = "none"
+}, {
+    -- Fourth hotkey: change hull algorithm.
+    --
+    -- This hotkey is used to change the change hull algorithm
+    type = "custom-input",
+    name = "mekatrol-game-play-bot-render-hull-algorithm",
+
+    -- Default key combination: Ctrl + Shift + L
+    key_sequence = "CONTROL + SHIFT + L",
+
+    consuming = "none"
 }})
 
 ----------------------------------------------------------------------

@@ -42,6 +42,19 @@ for i, mode in ipairs(config.modes.list) do
 end
 
 ----------------------------------------------------------------------
+-- HULL ALGORITHMS
+----------------------------------------------------------------------
+
+config.hull_algorithms = {
+    list = {"convex", "concave", "concave_job"},
+    index = {}
+}
+
+for i, mode in ipairs(config.hull_algorithms.list) do
+    config.hull_algorithms.index[mode] = i
+end
+
+----------------------------------------------------------------------
 -- NON-MAPPABLE TYPES
 ----------------------------------------------------------------------
 
