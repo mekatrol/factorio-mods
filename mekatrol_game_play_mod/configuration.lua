@@ -19,7 +19,7 @@ config.bot = {
 
     wander = {
         step_distance = 5.0,
-        detection_radius = 5.0
+        detection_radius = 32.0
     },
 
     survey = {
@@ -33,7 +33,7 @@ config.bot = {
 ----------------------------------------------------------------------
 
 config.modes = {
-    list = {"follow", "wander", "survey"},
+    list = {"follow", "wander", "survey", "move_to"},
     index = {}
 }
 

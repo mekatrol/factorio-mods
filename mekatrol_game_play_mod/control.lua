@@ -14,6 +14,7 @@
 local config = require("configuration")
 local follow = require("follow")
 local mapping = require("mapping")
+local move_to = require("move_to")
 local polygon = require("polygon")
 local polymap = require("polymap")
 local state = require("state")
@@ -92,6 +93,8 @@ local function update_bot_for_player(player, ps, tick)
         wander.update(player, ps, bot)
     elseif ps.bot_mode == "survey" then
         survey.update(player, ps, bot, tick)
+    elseif ps.bot_mode == "move_to" then
+        move_to.update(player, ps, bot)
     end
 
     -- mapping.update(player, ps, tick)

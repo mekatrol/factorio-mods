@@ -18,7 +18,7 @@ local function is_survey_ignore_target(e)
     end
 
     -- cliffs are their own type; trees are type "tree"
-    if e.type == "cliff" or e.type == "tree" or e.type == "simple-entity" then
+    if e.type == "cliff" or e.type == "tree" or e.type == "simple-entity" or e.type == "simple-entity-with-owner" then
         return true
     end
 
@@ -164,14 +164,26 @@ function wander.update(player, ps, bot)
         if e.valid and e ~= bot and e ~= char and not is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
             if not is_in_any_entity_group(ps, surf.index, e.position) then
+                -- record what we found (optional, but useful for overlay/debug)
                 ps.survey_entity = {
                     name = e.name,
                     type = e.type
                 }
-                state.set_player_bot_mode(player, ps, "survey")
+
+                -- move to the entity
+                ps.bot_target_position = {
+                    x = e.position.x,
+                    y = e.position.y
+                }
+
+                -- switch to move_to mode
+                state.set_player_bot_mode(player, ps, "move_to")
+
+                -- reset wander spiral so wandering restarts cleanly after
                 ps.wander_spiral = nil
                 return
             end
+
         end
     end
 
