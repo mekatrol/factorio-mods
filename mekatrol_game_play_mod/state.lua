@@ -158,6 +158,7 @@ function state.set_player_bot_mode(player, ps, new_mode)
         ps.bot_target_position = nil
         ps.wander_spiral = nil
         ps.survey_entity = nil
+        ps.next_survey_entities = {}
         return
     end
 

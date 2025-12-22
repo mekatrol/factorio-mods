@@ -93,6 +93,19 @@ function wander.pick_new_wander_target_random(ps, bpos)
 end
 
 local function find_entity(player, ps, bot, pos, surf)
+    ps.next_survey_entities = ps.next_survey_entities or {}
+
+    local next_entities = ps.next_survey_entities
+
+    -- if there are any queued then remove until a valid one is found
+    while #next_entities > 0 do
+        local e = table.remove(next_entities, 1)
+
+        if e and e.valid then
+            return e
+        end
+    end
+
     local found = surf.find_entities_filtered {
         position = pos,
         radius = BOT.wander.detection_radius
@@ -123,25 +136,23 @@ local function find_entity(player, ps, bot, pos, surf)
     end)
 
     local char = player.character
+    local next_found_entity = nil
+
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char and not entitygroup.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
             if not entitygroup.is_in_any_entity_group(ps, surf.index, e) then
-                -- record what we found (optional, but useful for overlay/debug)
-                ps.survey_entity = e
-
-                -- move to the entity
-                ps.bot_target_position = {
-                    x = e.position.x,
-                    y = e.position.y
-                }
-
-                return e
+                if not next_found_entity then
+                    next_found_entity = e
+                else
+                    -- Add it to next set to be found
+                    next_entities[#next_entities + 1] = e
+                end
             end
         end
     end
 
-    return nil
+    return next_found_entity
 end
 
 function wander.update(player, ps, bot)
@@ -154,9 +165,18 @@ function wander.update(player, ps, bot)
     local bpos = bot.position
 
     if not target then
-        local found = find_entity(player, ps, bot, bpos, surf)
+        local entity = find_entity(player, ps, bot, bpos, surf)
 
-        if found then
+        if entity then
+            -- record what we found (optional, but useful for overlay/debug)
+            ps.survey_entity = entity
+
+            -- move to the entity
+            ps.bot_target_position = {
+                x = entity.position.x,
+                y = entity.position.y
+            }
+
             -- switch to move_to mode
             state.set_player_bot_mode(player, ps, "move_to")
 
