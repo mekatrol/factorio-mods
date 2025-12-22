@@ -556,6 +556,37 @@ function polygon.contains_point(poly, p)
     return polygon.point_in_poly(poly, p)
 end
 
+function polygon.polygon_center(points)
+    if not points or #points == 0 then
+        return nil
+    end
+
+    local minx, maxx = points[1].x, points[1].x
+    local miny, maxy = points[1].y, points[1].y
+
+    for i = 2, #points do
+        local p = points[i]
+        if p.x < minx then
+            minx = p.x
+        end
+        if p.x > maxx then
+            maxx = p.x
+        end
+        if p.y < miny then
+            miny = p.y
+        end
+        if p.y > maxy then
+            maxy = p.y
+        end
+    end
+
+    return {
+        x = (minx + maxx) * 0.5,
+        y = (miny + maxy) * 0.5
+    }
+end
+
+
 -- Squared distance from point p to segment a-b
 function polygon.point_segment_dist2(p, a, b)
     local abx = b.x - a.x

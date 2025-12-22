@@ -155,6 +155,8 @@ function state.set_player_bot_mode(player, ps, new_mode)
     -- Follow mode: no fixed target.
     if new_mode == "follow" then
         ps.bot_target_position = nil
+        ps.wander_spiral = nil
+        ps.survey_entity = nil
         return
     end
 
@@ -165,6 +167,7 @@ function state.set_player_bot_mode(player, ps, new_mode)
         -- Start a fresh frontier queue for this pass.
         ps.survey_frontier = {}
         ps.survey_seen = {}
+        ps.survey_entity = nil
 
         local bot = ps.bot_entity
         if bot and bot.valid then

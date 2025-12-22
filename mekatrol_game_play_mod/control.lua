@@ -162,15 +162,16 @@ local function on_cycle_bot_mode(event)
     end
 
     local ps = state.get_player_state(p.index)
-    local cur = ps.bot_mode or "follow"
-    local idx = MODES.index[cur] or 1
 
-    idx = idx + 1
-    if idx > #MODES.list then
-        idx = 1
+    -- default to wander
+    local new_mode = "wander"
+
+    -- if not in follow mode then set to follow mode
+    if not (ps.bot_mode == "follow") then
+        new_mode = "follow"
     end
 
-    state.set_player_bot_mode(p, ps, MODES.list[idx])
+    state.set_player_bot_mode(p, ps, new_mode)
 end
 
 local function on_toggle_render_survey_mode(event)

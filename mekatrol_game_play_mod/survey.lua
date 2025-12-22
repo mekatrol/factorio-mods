@@ -1,6 +1,7 @@
 local survey = {}
 
 local config = require("configuration")
+local polygon = require("polygon")
 local positioning = require("positioning")
 local state = require("state")
 local util = require("util")
@@ -69,36 +70,6 @@ end
 
 local function ensure_entity_groups(ps)
     ps.entity_groups = ps.entity_groups or {}
-end
-
-local function polygon_center(points)
-    if not points or #points == 0 then
-        return nil
-    end
-
-    local minx, maxx = points[1].x, points[1].x
-    local miny, maxy = points[1].y, points[1].y
-
-    for i = 2, #points do
-        local p = points[i]
-        if p.x < minx then
-            minx = p.x
-        end
-        if p.x > maxx then
-            maxx = p.x
-        end
-        if p.y < miny then
-            miny = p.y
-        end
-        if p.y > maxy then
-            maxy = p.y
-        end
-    end
-
-    return {
-        x = (minx + maxx) * 0.5,
-        y = (miny + maxy) * 0.5
-    }
 end
 
 local function find_nearby_resource_tile(surface, name, pos, max_r)
@@ -281,7 +252,7 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 end
 
 local function trace_step(player, ps, bot)
-    local name = "nil"
+    local name = nil
     if ps.survey_entity then
         name = ps.survey_entity.name
     end
@@ -418,7 +389,7 @@ local function trace_step(player, ps, bot)
                 end
             end
 
-            local center = polygon_center(boundary)
+            local center = polygon.polygon_center(boundary)
 
             ps.entity_groups[group_id] = {
                 name = name,
