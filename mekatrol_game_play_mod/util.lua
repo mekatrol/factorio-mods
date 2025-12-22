@@ -4,17 +4,20 @@ local util = {}
 -- Print helpers
 ----------------------------------------------------------------------
 
-function util.print_bot_message(player, color, fmt, ...)
-    if not (player and player.valid) then
-        return
-    end
-
+function util.print(player_or_game, color, fmt, ...)
     local ok, msg = pcall(string.format, fmt, ...)
     if not ok then
         msg = "<format error>"
     end
 
-    player.print({"", string.format("[color=%s][Game Play Bot][/color] ", color), msg})
+    local text = {"", string.format("[color=%s][Game Play Bot][/color] ", color), msg}
+
+    -- game and LuaPlayer both have .print, but be explicit and safe
+    if player_or_game == game then
+        game.print(text)
+    elseif player_or_game and player_or_game.valid then
+        player_or_game.print(text)
+    end
 end
 
 -- Simple, fast, order-independent hash combiner.

@@ -242,7 +242,7 @@ function state.destroy_player_bot(player, silent)
     }
 
     if not silent then
-        util.print_bot_message(player, "yellow", "deactivated")
+        util.print(player, "yellow", "deactivated")
     end
 end
 
@@ -263,7 +263,7 @@ function state.create_player_bot(player)
     }
 
     if not ent then
-        util.print_bot_message(player, "red", "create failed")
+        util.print(player, "red", "create failed")
         return nil
     end
 
@@ -271,7 +271,7 @@ function state.create_player_bot(player)
     ps.bot_enabled = true
     ent.destructible = true
 
-    util.print_bot_message(player, "green", "created")
+    util.print(player, "green", "created")
     return ent
 end
 

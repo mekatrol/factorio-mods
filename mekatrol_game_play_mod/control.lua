@@ -190,7 +190,7 @@ local function on_toggle_render_survey_mode(event)
         visual.clear_mapped_entities(ps)
     end
 
-    util.print_bot_message(p, "green", "survey render: %s", ps.survey_render_mapped)
+    util.print(p, "green", "survey render: %s", ps.survey_render_mapped)
 end
 
 local function on_cycle_hull_algorithm(event)
@@ -226,7 +226,7 @@ local function on_entity_died(event)
             local pl = game.get_player(idx)
             if pl and pl.valid then
                 destroy_player_bot(pl, true)
-                util.print_bot_message(pl, "yellow", "destroyed")
+                util.print(pl, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
                 visual.clear_all(ps)

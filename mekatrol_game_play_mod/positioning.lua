@@ -33,7 +33,7 @@ function positioning.move_bot_towards(player, bot, target)
 
     local pos, err = positioning.resolve_target_position(target)
     if not pos then
-        util.print_bot_message(player, "red", "invalid target: %s", err or "?")
+        util.print(player, "red", "invalid target: %s", err or "?")
         return
     end
 

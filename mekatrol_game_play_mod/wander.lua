@@ -1,10 +1,12 @@
 local wander = {}
 
 local config = require("configuration")
+local mapping = require("mapping")
 local polygon = require("polygon")
 local positioning = require("positioning")
 local state = require("state")
 local util = require("util")
+local visual = require("visual")
 
 local BOT = config.bot
 
@@ -50,37 +52,42 @@ local function is_survey_single_target(e)
     return false
 end
 
-local function add_single_tile_entity_group(ps, surface_index, entity)
+local function add_single_tile_entity_group(player, ps, surface_index, entity)
     ps.entity_groups = ps.entity_groups or {}
 
     local pos = entity.position
 
-    -- 1x1 tile square around the tile center (Factorio positions are in tile units)
-    local half = 0.5
+    -- 2x2 tile square around the tile center (Factorio positions are in tile units)
+    local size = 1
     local boundary = {{
-        x = pos.x - half,
-        y = pos.y - half
+        x = pos.x - size,
+        y = pos.y - size
     }, {
-        x = pos.x + half,
-        y = pos.y - half
+        x = pos.x + size,
+        y = pos.y - size
     }, {
-        x = pos.x + half,
-        y = pos.y + half
+        x = pos.x + size,
+        y = pos.y + size
     }, {
-        x = pos.x - half,
-        y = pos.y + half
+        x = pos.x - size,
+        y = pos.y + size
     }}
+
+    local name = entity.name
 
     -- Use a stable id for this traced poly
     local group_id = tostring(name) .. "@" .. tostring(pos.x) .. "," .. tostring(pos.y)
     local center = polygon.polygon_center(boundary)
 
     ps.entity_groups[group_id] = {
-        name = entity.name,
+        name = name,
         surface_index = surface_index,
         boundary = boundary,
         center = center
     }
+
+    -- Draw polygon + label (clears any prior render for this group_id)
+    visual.draw_entity_group(player, ps, group_id, name, boundary, center)
 end
 
 local function is_in_any_entity_group(ps, surface_index, pos)
@@ -248,7 +255,7 @@ function wander.update(player, ps, bot)
 
                 -- For single-tile survey targets (e.g. crude-oil), just mark it as covered.
                 if is_survey_single_target(e) then
-                    add_single_tile_entity_group(ps, surf.index, e)
+                    add_single_tile_entity_group(player, ps, surf.index, e)
 
                     ps.bot_target_position = e.position
 
