@@ -91,34 +91,9 @@ function wander.pick_new_wander_target_random(ps, bpos)
     }
 end
 
-function wander.update(player, ps, bot)
-    if not (player and player.valid and bot and bot.valid) then
-        return
-    end
-
-    local surf = bot.surface
-    local target = ps.bot_target_position
-
-    if not target then
-        target = wander.pick_new_wander_target_spiral(ps, bot.position)
-        ps.bot_target_position = target
-    end
-
-    positioning.move_bot_towards(player, bot, target)
-
-    local bpos = bot.position
-    local dx = target.x - bpos.x
-    local dy = target.y - bpos.y
-    local step = BOT.movement.step_distance
-
-    if dx * dx + dy * dy > step * step then
-        return
-    end
-
-    ps.bot_target_position = nil
-
+local function find_entity(player, ps, pos, surf)
     local found = surf.find_entities_filtered {
-        position = bpos,
+        position = pos,
         radius = BOT.wander.detection_radius
     }
 
@@ -132,10 +107,10 @@ function wander.update(player, ps, bot)
             return true
         end
 
-        local ax = a.position.x - bpos.x
-        local ay = a.position.y - bpos.y
-        local bx = b.position.x - bpos.x
-        local by = b.position.y - bpos.y
+        local ax = a.position.x - pos.x
+        local ay = a.position.y - pos.y
+        local bx = b.position.x - pos.x
+        local by = b.position.y - pos.y
 
         return (ax * ax + ay * ay) < (bx * bx + by * by)
     end)
@@ -154,15 +129,51 @@ function wander.update(player, ps, bot)
                     y = e.position.y
                 }
 
-                -- switch to move_to mode
-                state.set_player_bot_mode(player, ps, "move_to")
-
-                -- reset wander spiral so wandering restarts cleanly after
-                ps.wander_spiral = nil
-                return
+                return e
             end
         end
     end
+
+    return nil
+end
+
+function wander.update(player, ps, bot)
+    if not (player and player.valid and bot and bot.valid) then
+        return
+    end
+
+    local surf = bot.surface
+    local target = ps.bot_target_position
+    local bpos = bot.position
+
+    if not target then
+        local found = find_entity(player, ps, bpos, surf)
+
+        if found then
+            -- switch to move_to mode
+            state.set_player_bot_mode(player, ps, "move_to")
+
+            -- reset wander spiral so wandering restarts cleanly after
+            ps.wander_spiral = nil
+
+            return
+        end
+
+        target = wander.pick_new_wander_target_spiral(ps, bot.position)
+        ps.bot_target_position = target
+    end
+
+    positioning.move_bot_towards(player, bot, target)
+
+    local dx = target.x - bpos.x
+    local dy = target.y - bpos.y
+    local step = BOT.movement.step_distance
+
+    if dx * dx + dy * dy > step * step then
+        return
+    end
+
+    ps.bot_target_position = nil
 end
 
 return wander

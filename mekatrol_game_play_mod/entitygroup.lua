@@ -17,7 +17,6 @@ function entitygroup.is_survey_ignore_target(e)
     end
 
     local ignore_types = {
-        ["container"] = true,
         ["fish"] = true,
         ["unit"] = true
     }
@@ -48,6 +47,7 @@ function entitygroup.is_survey_single_target(entity)
     end
 
     local single_target_types = {
+        ["container"] = true,
         ["cliff"] = true,
         ["tree"] = true,
         ["simple-entity-with-owner"] = true
