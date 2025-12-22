@@ -17,9 +17,17 @@ local function is_survey_ignore_target(e)
         return true
     end
 
-    -- cliffs are their own type; trees are type "tree"
-    if e.type == "cliff" or e.type == "tree" or e.type == "simple-entity" or e.type == "simple-entity-with-owner" or
-        e.type == "container" then
+    local valid_types = {
+        ["cliff"] = true,
+        ["tree"] = true,
+        ["simple-entity"] = true,
+        ["simple-entity-with-owner"] = true,
+        ["container"] = true,
+        ["fish"] = true,
+        ["unit"] = true
+    }
+
+    if valid_types[e.type] then
         return true
     end
 
