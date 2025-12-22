@@ -223,11 +223,7 @@ function survey.perform_survey_scan(player, ps, bot, tick)
         return false
     end
 
-    local find_name = nil
-
-    if ps.survey_entity then
-        find_name = ps.survey_entity.name
-    end
+    local find_name = ps.survey_entity.name
 
     local found = surf.find_entities_filtered {
         position = bpos,
@@ -428,10 +424,13 @@ function survey.update(player, ps, bot, tick)
         return
     end
 
-    -- For single-tile survey targets (e.g. crude-oil), just mark it as covered.
-    if ps.survey_entity and entitygroup.is_survey_single_target(ps.survey_entity.name) then
-        entitygroup.add_single_tile_entity_group(player, ps, bot.surface_index, ps.survey_entity.name,
-            ps.bot_target_position)
+    if not ps.survey_entity then
+        return
+    end
+
+    -- For single-tile survey targets (e.g. crude-oil), just add it as self contained polygon
+    if entitygroup.is_survey_single_target(ps.survey_entity) then
+        entitygroup.add_single_tile_entity_group(player, ps, bot.surface_index, ps.survey_entity)
     else
         -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
         survey.perform_survey_scan(player, ps, bot, tick)

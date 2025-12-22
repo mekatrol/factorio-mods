@@ -33,8 +33,8 @@ function entitygroup.is_survey_ignore_target(e)
     return false
 end
 
-function entitygroup.is_survey_single_target(entity_name)
-    if not entity_name or not entity_name.valid then
+function entitygroup.is_survey_single_target(entity)
+    if not entity or not entity.valid then
         return true
     end
 
@@ -42,7 +42,7 @@ function entitygroup.is_survey_single_target(entity_name)
         ["crude-oil"] = true
     }
 
-    if single_target_names[entity_name] then
+    if single_target_names[entity.name] then
         return true
     end
 
@@ -110,8 +110,10 @@ function entitygroup.add_boundary(player, ps, boundary, entity_name, surface_ind
     visual.draw_entity_group(player, ps, group_id, entity_name, boundary, center)
 end
 
-function entitygroup.add_single_tile_entity_group(player, ps, surface_index, entity_name, pos)
+function entitygroup.add_single_tile_entity_group(player, ps, surface_index, entity)
     entitygroup.ensure_entity_groups(ps)
+
+    local pos = entity.position
 
     -- tile square around the tile center (Factorio positions are in tile units)
     local size = 1
@@ -130,7 +132,7 @@ function entitygroup.add_single_tile_entity_group(player, ps, surface_index, ent
     }}
 
     -- add to boundary group
-    entitygroup.add_boundary(player, ps, boundary, entity_name, surface_index)
+    entitygroup.add_boundary(player, ps, boundary, entity.name, surface_index)
 end
 
 return entitygroup
