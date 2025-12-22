@@ -6,6 +6,7 @@
 local state = {}
 
 local config = require("configuration")
+local entitygroup = require("entitygroup")
 local mapping = require("mapping")
 local util = require("util")
 local visual = require("visual")
@@ -210,6 +211,9 @@ function state.destroy_player_bot(player, silent)
     ps.map_visited_hull_job = nil
     ps.map_visited_queued_positions = {}
 
+    -- clear entity groups
+    entitygroup.clear_entity_groups(ps)
+
     -- Clear ALL survey / mapping sets.
     ps.survey_mapped_entities = {}
     ps.survey_mapped_positions = {}
@@ -270,6 +274,9 @@ function state.create_player_bot(player)
     ps.bot_entity = ent
     ps.bot_enabled = true
     ent.destructible = true
+
+    -- clear entity groups
+    entitygroup.clear_entity_groups(ps)
 
     util.print(player, "green", "created")
     return ent

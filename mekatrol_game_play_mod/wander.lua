@@ -1,6 +1,7 @@
 local wander = {}
 
 local config = require("configuration")
+local entitygroup = require("entitygroup")
 local mapping = require("mapping")
 local polygon = require("polygon")
 local positioning = require("positioning")
@@ -13,109 +14,6 @@ local BOT = config.bot
 ----------------------------------------------------------------------
 -- Wander mode
 ----------------------------------------------------------------------
-
-local function is_survey_ignore_target(e)
-    if not e or not e.valid then
-        return true
-    end
-
-    local ignore_types = {
-        ["cliff"] = true,
-        ["tree"] = true,
-        ["simple-entity"] = true,
-        ["simple-entity-with-owner"] = true,
-        ["container"] = true,
-        ["fish"] = true,
-        ["unit"] = true
-    }
-
-    if ignore_types[e.type] then
-        return true
-    end
-
-    return false
-end
-
-local function is_survey_single_target(e)
-    if not e or not e.valid then
-        return true
-    end
-
-    local single_target_names = {
-        ["crude-oil"] = true
-    }
-
-    if single_target_names[e.name] then
-        return true
-    end
-
-    return false
-end
-
-local function add_single_tile_entity_group(player, ps, surface_index, entity)
-    ps.entity_groups = ps.entity_groups or {}
-
-    local pos = entity.position
-
-    -- 2x2 tile square around the tile center (Factorio positions are in tile units)
-    local size = 1
-    local boundary = {{
-        x = pos.x - size,
-        y = pos.y - size
-    }, {
-        x = pos.x + size,
-        y = pos.y - size
-    }, {
-        x = pos.x + size,
-        y = pos.y + size
-    }, {
-        x = pos.x - size,
-        y = pos.y + size
-    }}
-
-    local name = entity.name
-
-    -- Use a stable id for this traced poly
-    local group_id = tostring(name) .. "@" .. tostring(pos.x) .. "," .. tostring(pos.y)
-    local center = polygon.polygon_center(boundary)
-
-    ps.entity_groups[group_id] = {
-        name = name,
-        surface_index = surface_index,
-        boundary = boundary,
-        center = center
-    }
-
-    -- Draw polygon + label (clears any prior render for this group_id)
-    visual.draw_entity_group(player, ps, group_id, name, boundary, center)
-end
-
-local function is_in_any_entity_group(ps, surface_index, pos)
-    local groups = ps.entity_groups
-    if not groups then
-        return false
-    end
-
-    local margin = 1.0 -- tiles (world units)
-
-    for _, g in pairs(groups) do
-        if g and g.surface_index == surface_index and g.boundary and #g.boundary >= 3 then
-            -- Treat points within 1 tile outside the boundary as "inside"
-            if polygon.contains_point_buffered then
-                if polygon.contains_point_buffered(g.boundary, pos, margin) then
-                    return true
-                end
-            else
-                -- Fallback if you haven't added contains_point_buffered yet
-                if polygon.point_in_poly(g.boundary, pos) then
-                    return true
-                end
-            end
-        end
-    end
-
-    return false
-end
 
 local function init_spiral(ps, bpos)
     ps.wander_spiral = {
@@ -244,37 +142,24 @@ function wander.update(player, ps, bot)
 
     local char = player.character
     for _, e in ipairs(found) do
-        if e.valid and e ~= bot and e ~= char and not is_survey_ignore_target(e) then
+        if e.valid and e ~= bot and e ~= char and not entitygroup.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
-            if not is_in_any_entity_group(ps, surf.index, e.position) then
+            if not entitygroup.is_in_any_entity_group(ps, surf.index, e.position) then
                 -- record what we found (optional, but useful for overlay/debug)
-                ps.survey_entity = {
-                    name = e.name,
-                    type = e.type
+                ps.survey_entity = e
+
+                -- move to the entity
+                ps.bot_target_position = {
+                    x = e.position.x,
+                    y = e.position.y
                 }
 
-                -- For single-tile survey targets (e.g. crude-oil), just mark it as covered.
-                if is_survey_single_target(e) then
-                    add_single_tile_entity_group(player, ps, surf.index, e)
+                -- switch to move_to mode
+                state.set_player_bot_mode(player, ps, "move_to")
 
-                    ps.bot_target_position = e.position
-
-                    -- switch to move_to mode
-                    state.set_player_bot_mode(player, ps, "move_to")
-                else
-                    -- move to the entity
-                    ps.bot_target_position = {
-                        x = e.position.x,
-                        y = e.position.y
-                    }
-
-                    -- switch to move_to mode
-                    state.set_player_bot_mode(player, ps, "move_to")
-
-                    -- reset wander spiral so wandering restarts cleanly after
-                    ps.wander_spiral = nil
-                    return
-                end
+                -- reset wander spiral so wandering restarts cleanly after
+                ps.wander_spiral = nil
+                return
             end
         end
     end

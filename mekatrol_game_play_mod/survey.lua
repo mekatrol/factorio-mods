@@ -1,6 +1,7 @@
 local survey = {}
 
 local config = require("configuration")
+local entitygroup = require("entitygroup")
 local polygon = require("polygon")
 local positioning = require("positioning")
 local state = require("state")
@@ -66,10 +67,6 @@ local function is_boundary_tile(surface, entity_name, tx, ty)
     end -- west
 
     return false
-end
-
-local function ensure_entity_groups(ps)
-    ps.entity_groups = ps.entity_groups or {}
 end
 
 local function find_nearby_resource_tile(surface, name, pos, max_r)
@@ -371,35 +368,12 @@ local function trace_step(player, ps, bot)
 
         if tr.started_edge and tr.p_tx == tr.start_tx and tr.p_ty == tr.start_ty and nx == tr.p1_tx and ny == tr.p1_ty then
             -- Completed loop: persist + render group.
-            ensure_entity_groups(ps)
+            entitygroup.ensure_entity_groups(ps)
 
             local boundary = tr.boundary or {}
 
-            -- Use a stable id for this traced cluster
-            local group_id = tostring(name) .. "@" .. tostring(tr.start_tx) .. "," .. tostring(tr.start_ty)
-
-            if #boundary >= 2 then
-                local first = boundary[1]
-                local last = boundary[#boundary]
-                if first.x ~= last.x or first.y ~= last.y then
-                    boundary[#boundary + 1] = {
-                        x = first.x,
-                        y = first.y
-                    }
-                end
-            end
-
-            local center = polygon.polygon_center(boundary)
-
-            ps.entity_groups[group_id] = {
-                name = name,
-                surface_index = surf.index,
-                boundary = boundary,
-                center = center
-            }
-
-            -- Draw polygon + label (clears any prior render for this group_id)
-            visual.draw_entity_group(player, ps, group_id, name, boundary, center)
+            -- add to boundary group
+            entitygroup.add_boundary(player, ps, boundary, name, surf.index)
 
             -- Cleanup and exit survey mode
             ps.survey_trace = nil
@@ -454,8 +428,14 @@ function survey.update(player, ps, bot, tick)
         return
     end
 
-    -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
-    survey.perform_survey_scan(player, ps, bot, tick)
+    -- For single-tile survey targets (e.g. crude-oil), just mark it as covered.
+    if ps.survey_entity and entitygroup.is_survey_single_target(ps.survey_entity.name) then
+        entitygroup.add_single_tile_entity_group(player, ps, bot.surface_index, ps.survey_entity.name,
+            ps.bot_target_position)
+    else
+        -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
+        survey.perform_survey_scan(player, ps, bot, tick)
+    end
 end
 
 return survey
