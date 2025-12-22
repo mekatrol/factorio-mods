@@ -281,12 +281,17 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 end
 
 local function trace_step(player, ps, bot)
-    local surf = bot.surface
-    local name = ps.survey_entity.name
+    local name = "nil"
+    if ps.survey_entity then
+        name = ps.survey_entity.name
+    end
+
     local tr = ps.survey_trace
-    if not tr or not name then
+    if not tr then
         return nil
     end
+
+    local surf = bot.surface
 
     if tr.phase == "north" then
         -- Walk due north until the next tile does NOT contain the resource.
