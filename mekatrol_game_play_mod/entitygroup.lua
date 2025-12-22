@@ -17,10 +17,6 @@ function entitygroup.is_survey_ignore_target(e)
     end
 
     local ignore_types = {
-        ["cliff"] = true,
-        ["tree"] = true,
-        ["simple-entity"] = true,
-        ["simple-entity-with-owner"] = true,
         ["container"] = true,
         ["fish"] = true,
         ["unit"] = true
@@ -39,10 +35,25 @@ function entitygroup.is_survey_single_target(entity)
     end
 
     local single_target_names = {
+        ["big-sand-rock"] = true,
+        ["huge-rock"] = true,
+        ["cliff"] = true,
+        ["tree"] = true,
+        ["simple-entity-with-owner"] = true,
         ["crude-oil"] = true
     }
 
     if single_target_names[entity.name] then
+        return true
+    end
+
+    local single_target_types = {
+        ["cliff"] = true,
+        ["tree"] = true,
+        ["simple-entity-with-owner"] = true
+    }
+
+    if single_target_types[entity.type] then
         return true
     end
 
