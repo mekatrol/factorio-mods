@@ -10,6 +10,7 @@ local util = require("util")
 local visual = require("visual")
 
 local BOT = config.bot
+local DETECTION_RADIUS = BOT.wander.detection_radius / 3
 
 ----------------------------------------------------------------------
 -- Wander mode
@@ -38,15 +39,15 @@ local function spiral_advance(ps)
         return
     end
 
-    -- move one cell in current direction
+    -- move DETECTION_RADIUS cells in current direction
     if s.dir == 0 then
-        s.offset_x = s.offset_x + 1
+        s.offset_x = s.offset_x + DETECTION_RADIUS
     elseif s.dir == 1 then
-        s.offset_y = s.offset_y - 1
+        s.offset_y = s.offset_y - DETECTION_RADIUS
     elseif s.dir == 2 then
-        s.offset_x = s.offset_x - 1
+        s.offset_x = s.offset_x - DETECTION_RADIUS
     else
-        s.offset_y = s.offset_y + 1
+        s.offset_y = s.offset_y + DETECTION_RADIUS
     end
 
     s.leg_progress = s.leg_progress + 1
@@ -99,11 +100,17 @@ local function find_entity(player, ps, bot, pos, surf)
 
     -- sort from nearest to bot to farthest from bot
     table.sort(found, function(a, b)
-        -- Put invalids at the end
-        if not (a and a.valid) then
+        local a_valid = a and a.valid
+        local b_valid = b and b.valid
+
+        -- Invalids always go last
+        if not a_valid and not b_valid then
             return false
         end
-        if not (b and b.valid) then
+        if not a_valid then
+            return false
+        end
+        if not b_valid then
             return true
         end
 

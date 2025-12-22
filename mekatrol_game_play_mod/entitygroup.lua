@@ -51,6 +51,7 @@ function entitygroup.is_survey_single_target(entity)
         ["container"] = true,
         ["cliff"] = true,
         ["tree"] = true,
+        ["simple-entity"] = true,
         ["simple-entity-with-owner"] = true
     }
 
