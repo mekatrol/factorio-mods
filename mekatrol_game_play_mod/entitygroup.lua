@@ -1,6 +1,7 @@
 local entitygroup = {}
 
 local polygon = require("polygon")
+local util = require("util")
 local visual = require("visual")
 
 function entitygroup.clear_entity_groups(ps)
@@ -126,23 +127,54 @@ function entitygroup.add_single_tile_entity_group(player, ps, surface_index, ent
 
     local pos = entity.position
 
-    -- tile square around the tile center (Factorio positions are in tile units)
-    local size = 1
+    -- Prefer selection_box (matches what players consider the entity's "size"),
+    -- fall back to collision_box if needed.
+    local box = entity.selection_box or entity.collision_box
+
+    if not box then
+        -- last-resort fallback: 1x1 tile-ish
+        local size = 0.5
+        local boundary = {{
+            x = pos.x - size,
+            y = pos.y - size
+        }, {
+            x = pos.x + size,
+            y = pos.y - size
+        }, {
+            x = pos.x + size,
+            y = pos.y + size
+        }, {
+            x = pos.x - size,
+            y = pos.y + size
+        }}
+
+        entitygroup.add_boundary(player, ps, boundary, entity.name, surface_index)
+
+        return
+    end
+
+    -- selection_box/collision_box are relative to the entity origin.
+    -- convert to world coords by adding entity.position.
+    local left_top = box.left_top
+    local right_bottom = box.right_bottom
+
+    local width = (right_bottom.x - left_top.x) / 2
+    local height = (right_bottom.y - left_top.y) / 2
+
     local boundary = {{
-        x = pos.x - size,
-        y = pos.y - size
+        x = pos.x - width,
+        y = pos.y - height
     }, {
-        x = pos.x + size,
-        y = pos.y - size
+        x = pos.x + width,
+        y = pos.y - height
     }, {
-        x = pos.x + size,
-        y = pos.y + size
+        x = pos.x + width,
+        y = pos.y + height
     }, {
-        x = pos.x - size,
-        y = pos.y + size
+        x = pos.x - width,
+        y = pos.y + height
     }}
 
-    -- add to boundary group
     entitygroup.add_boundary(player, ps, boundary, entity.name, surface_index)
 end
 

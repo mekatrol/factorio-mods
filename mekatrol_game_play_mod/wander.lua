@@ -91,7 +91,7 @@ function wander.pick_new_wander_target_random(ps, bpos)
     }
 end
 
-local function find_entity(player, ps, pos, surf)
+local function find_entity(player, ps, bot, pos, surf)
     local found = surf.find_entities_filtered {
         position = pos,
         radius = BOT.wander.detection_radius
@@ -147,7 +147,7 @@ function wander.update(player, ps, bot)
     local bpos = bot.position
 
     if not target then
-        local found = find_entity(player, ps, bpos, surf)
+        local found = find_entity(player, ps, bot, bpos, surf)
 
         if found then
             -- switch to move_to mode
