@@ -62,17 +62,19 @@ function entitygroup.is_survey_single_target(entity)
     return false
 end
 
-function entitygroup.is_in_any_entity_group(ps, surface_index, pos)
+function entitygroup.is_in_any_entity_group(ps, surface_index, entity)
     local groups = ps.entity_groups
 
     if not groups then
         return false
     end
 
+    local pos = entity.position
+
     local margin = 1.0 -- tiles (world units)
 
     for _, g in pairs(groups) do
-        if g and g.surface_index == surface_index and g.boundary and #g.boundary >= 3 then
+        if g and g.name == entity.name and g.surface_index == surface_index and g.boundary and #g.boundary >= 3 then
             -- Treat points within 1 tile outside the boundary as "inside"
             if polygon.contains_point_buffered then
                 if polygon.contains_point_buffered(g.boundary, pos, margin) then

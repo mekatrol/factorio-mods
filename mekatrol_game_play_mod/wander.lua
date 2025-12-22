@@ -126,7 +126,7 @@ local function find_entity(player, ps, bot, pos, surf)
     for _, e in ipairs(found) do
         if e.valid and e ~= bot and e ~= char and not entitygroup.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
-            if not entitygroup.is_in_any_entity_group(ps, surf.index, e.position) then
+            if not entitygroup.is_in_any_entity_group(ps, surf.index, e) then
                 -- record what we found (optional, but useful for overlay/debug)
                 ps.survey_entity = e
 
