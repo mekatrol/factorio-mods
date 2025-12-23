@@ -315,6 +315,19 @@ function visual.clear_entity_group(player_state, group_id)
     player_state.visual.entity_groups[group_id] = nil
 end
 
+function visual.clear_bot_light(ps)
+    if not (ps and ps.visual) then
+        return
+    end
+
+    local obj = ps.visual.bot_light
+    if obj then
+        obj.destroy() -- safe even when obj.valid == false :contentReference[oaicite:2]{index=2}
+    end
+
+    ps.visual.bot_light = nil
+end
+
 ---------------------------------------------------
 -- FUNCTION: clear_all(player_state)
 --
@@ -344,6 +357,7 @@ function visual.clear_all(player_state)
     visual.clear_survey_frontier(player_state)
     visual.clear_survey_done(player_state)
     visual.clear_entity_groups(player_state)
+    visual.clear_bot_light(player_state)
 end
 
 ----------------------------------------------------------------------
@@ -905,6 +919,30 @@ function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
         lines = lines,
         label = label
     }
+end
+
+function visual.draw_bot_light(player, ps, bot)
+    if not (player and player.valid and ps and ps.visual and bot and bot.valid) then
+        return
+    end
+
+    local obj = ps.visual.bot_light
+    if obj and obj.valid then
+        return -- already exists; stays attached to target :contentReference[oaicite:3]{index=3}
+    end
+
+    ps.visual.bot_light = rendering.draw_light {
+        sprite = "utility/light_medium",
+        target = bot,
+        surface = bot.surface,
+
+        scale = 10,
+        intensity = 1.8,
+        minimum_darkness = 0.15,
+
+        players = {player.index},
+        render_mode = "game"
+    } -- returns LuaRenderObject :contentReference[oaicite:4]{index=4}
 end
 
 ----------------------------------------------------------------------

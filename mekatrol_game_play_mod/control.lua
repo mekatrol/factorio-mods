@@ -135,6 +135,8 @@ local function update_bot_for_player(player, ps, tick)
 
     local lines = {"State:", bot_mode_name_line, hull_line, survey_entity_name_line, hull_algorithm_name_line}
     visual.update_overlay(player, ps, lines)
+
+    visual.draw_bot_light(player, ps, bot)
 end
 
 ----------------------------------------------------------------------
