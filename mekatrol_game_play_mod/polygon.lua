@@ -1,25 +1,3 @@
-----------------------------------------------------------------------
--- polygon.lua
---
--- Geometry utilities:
---   - Convex hull (Graham scan)
---   - Concave hull (k-nearest neighbors heuristic)
---   - Incremental concave hull job (state machine) so long hull builds
---     can be spread over multiple ticks without freezing the game.
---
--- Point format:
---   { x = number, y = number }
---
--- Public API:
---   polygon.convex_hull(points) -> hull_points
---   polygon.concave_hull(points, k, opts) -> hull_points
---   polygon.start_concave_hull_job(points, k, opts) -> job
---   polygon.step_concave_hull_job(job, step_budget) -> done, hull_or_nil
---
--- Notes:
--- - Hull outputs are CCW point lists, WITHOUT repeating the first point at end.
--- - Functions copy input points where needed to avoid mutating caller data.
-----------------------------------------------------------------------
 local polygon = {}
 
 local util = require("util")
@@ -99,20 +77,20 @@ local function shares_endpoint(a, b, c, d)
                polygon.points_equal(b, d)
 end
 
-function polygon.would_self_intersect(hull, candidate)
-    -- Checks whether adding segment (last hull point -> candidate)
-    -- would intersect any existing hull edge excluding adjacent edges.
-    local n = #hull
+function polygon.would_self_intersect(poly, candidate)
+    -- Checks whether adding segment (last poly point -> candidate)
+    -- would intersect any existing poly edge excluding adjacent edges.
+    local n = #poly
     if n < 3 then
         return false
     end
 
-    local a = hull[n]
+    local a = poly[n]
     local b = candidate
 
     for i = 1, n - 2 do
-        local c = hull[i]
-        local d = hull[i + 1]
+        local c = poly[i]
+        local d = poly[i + 1]
 
         -- ignore shared endpoints so touching is not treated as intersection
         if not shares_endpoint(a, b, c, d) then
@@ -125,10 +103,10 @@ function polygon.would_self_intersect(hull, candidate)
     return false
 end
 
--- True if segment (a->b) intersects any edge of hull, excluding edges adjacent to a or b,
+-- True if segment (a->b) intersects any edge of poly, excluding edges adjacent to a or b,
 -- and ignoring intersections only when they occur exactly at shared endpoints.
-function polygon.segment_intersects_hull(a, b, hull, exclude_start_idx, exclude_end_idx)
-    local n = #hull
+function polygon.segment_intersects_polygon(a, b, poly, exclude_start_idx, exclude_end_idx)
+    local n = #poly
     if n < 3 then
         return false
     end
@@ -138,10 +116,10 @@ function polygon.segment_intersects_hull(a, b, hull, exclude_start_idx, exclude_
     end
 
     for i = 1, n - 1 do
-        -- edge hull[i] -> hull[i+1]
+        -- edge poly[i] -> poly[i+1]
         if i ~= exclude_start_idx and i ~= exclude_end_idx then
-            local c = hull[i]
-            local d = hull[i + 1]
+            local c = poly[i]
+            local d = poly[i + 1]
 
             if polygon.segments_intersect(a, b, c, d) then
                 -- If intersection is only at a shared endpoint, allow it; otherwise reject.
@@ -260,9 +238,9 @@ function polygon.point_in_poly(poly, p)
     return inside
 end
 
-function polygon.all_points_inside_or_on(hull, points)
+function polygon.all_points_inside_or_on(poly, points)
     for i = 1, #points do
-        if not polygon.point_in_poly(hull, points[i]) then
+        if not polygon.point_in_poly(poly, points[i]) then
             return false
         end
     end
@@ -469,7 +447,7 @@ function polygon.k_nearest_indexed(pts, current, k, used)
 end
 
 ----------------------------------------------------------------------
--- Synchronous concave hull
+-- Synchronous concave hull algorithm
 ----------------------------------------------------------------------
 
 function polygon.concave_hull(points, k, opts)
@@ -490,7 +468,7 @@ function polygon.concave_hull(points, k, opts)
         local start = pts[start_idx]
         used[start_idx] = true
 
-        local hull = {start}
+        local poly = {start}
         local prev_dir = {
             x = -1,
             y = 0
@@ -520,25 +498,25 @@ function polygon.concave_hull(points, k, opts)
             for i = 1, #candidates do
                 local cand = candidates[i].p
                 local cand_idx = candidates[i].idx
-                local closing = (#hull >= 3 and polygon.points_equal(cand, start))
+                local closing = (#poly >= 3 and polygon.points_equal(cand, start))
 
                 if closing then
-                    local a = hull[#hull]
+                    local a = poly[#poly]
                     local b = start
 
-                    -- Exclude edge 1 (start->hull[2]) and edge (#hull-1) (hull[#hull-1]->hull[#hull])
+                    -- Exclude edge 1 (start->poly[2]) and edge (#poly-1) (poly[#poly-1]->poly[#poly])
                     -- because they are adjacent to the closing segment endpoints.
                     local exclude_edge_1 = 1
-                    local exclude_edge_last = #hull - 1
+                    local exclude_edge_last = #poly - 1
 
-                    local intersects = polygon.segment_intersects_hull(a, b, hull, exclude_edge_1, exclude_edge_last)
+                    local intersects = polygon.segment_intersects_polygon(a, b, poly, exclude_edge_1, exclude_edge_last)
                     if not intersects then
                         next = start
                         next_idx = start_idx
                         break
                     end
                 else
-                    if not polygon.would_self_intersect(hull, cand) then
+                    if not polygon.would_self_intersect(poly, cand) then
                         next = cand
                         next_idx = cand_idx
                         break
@@ -557,15 +535,15 @@ function polygon.concave_hull(points, k, opts)
                 y = next.y - current.y
             }
             current = next
-            hull[#hull + 1] = next
+            poly[#poly + 1] = next
 
-            if #hull >= n then
+            if #poly >= n then
                 break
             end
         end
 
-        if #hull >= 3 and polygon.all_points_inside_or_on(hull, pts) then
-            return hull
+        if #poly >= 3 and polygon.all_points_inside_or_on(poly, pts) then
+            return poly
         end
     end
 
@@ -573,7 +551,7 @@ function polygon.concave_hull(points, k, opts)
 end
 
 ----------------------------------------------------------------------
--- Convex hull (Graham scan)
+-- Convex hull algorithm (Graham scan)
 ----------------------------------------------------------------------
 
 function polygon.convex_hull(points)
@@ -623,20 +601,20 @@ function polygon.convex_hull(points)
         return filtered
     end
 
-    local hull = {filtered[1], filtered[2], filtered[3]}
+    local poly = {filtered[1], filtered[2], filtered[3]}
     for i = 4, #filtered do
-        while #hull >= 2 do
-            local top = hull[#hull]
-            local next_to_top = hull[#hull - 1]
+        while #poly >= 2 do
+            local top = poly[#poly]
+            local next_to_top = poly[#poly - 1]
             if polygon.cross(next_to_top, top, filtered[i]) > 0 then
                 break
             end
-            table.remove(hull)
+            table.remove(poly)
         end
-        hull[#hull + 1] = filtered[i]
+        poly[#poly + 1] = filtered[i]
     end
 
-    return hull
+    return poly
 end
 
 function polygon.contains_point(poly, p)

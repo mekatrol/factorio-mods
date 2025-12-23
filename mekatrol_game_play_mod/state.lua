@@ -51,16 +51,6 @@ function state.get_player_state(player_index)
 
             survey_entity = nil,
 
-            -- Hull data
-            hull = nil,
-            hull_job = nil,
-            hull_quantized_count = 0,
-            hull_quantized_hash = 0,
-            hull_tick = 0,
-            hull_last_eval_tick = 0,
-            hull_point_set = {}, -- set: "x,y" => true
-            hull_algorithm = "convex",
-
             visual = {
                 bot_highlight = nil,
                 lines = nil,
