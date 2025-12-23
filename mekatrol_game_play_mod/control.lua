@@ -101,10 +101,6 @@ local function update_bot_for_player(player, ps, tick)
         move_to.update(player, ps, bot)
     end
 
-    if ps.survey_render_points then
-        visual.draw_survey_frontier(player, ps, bot)
-    end
-
     -- Throttle overlay updates
     local next_tick = ps.overlay_next_tick or 0
 
@@ -167,24 +163,6 @@ local function on_cycle_bot_mode(event)
     end
 
     state.set_player_bot_mode(p, ps, new_mode)
-end
-
-local function on_toggle_render_survey_mode(event)
-    local p = game.get_player(event.player_index)
-    if not (p and p.valid) then
-        return
-    end
-
-    local ps = state.get_player_state(p.index)
-    ps.survey_render_mapped = not ps.survey_render_mapped
-    ps.survey_render_points = ps.survey_render_mapped -- just follows mapped state
-
-    if not ps.survey_render_mapped then
-        visual.clear_survey_frontier(ps)
-        visual.clear_mapped_entities(ps)
-    end
-
-    util.print(p, "green", "survey render: %s", ps.survey_render_mapped)
 end
 
 local function on_cycle_hull_algorithm(event)
@@ -275,7 +253,6 @@ end)
 
 script.on_event("mekatrol-game-play-bot-toggle", on_toggle_bot)
 script.on_event("mekatrol-game-play-bot-next-mode", on_cycle_bot_mode)
-script.on_event("mekatrol-game-play-bot-render-survey-mode", on_toggle_render_survey_mode)
 script.on_event("mekatrol-game-play-bot-render-hull-algorithm", on_cycle_hull_algorithm)
 
 script.on_event(defines.events.on_entity_died, on_entity_died)

@@ -56,13 +56,6 @@ function state.get_player_state(player_index)
             },
             search_spiral = nil,
 
-            -- Render toggles (defaults ON)
-            survey_render_mapped = true,
-            survey_render_points = true,
-
-            -- Survey data
-            survey_mapped_entities = {},
-            survey_frontier = {},
             survey_entity = nil,
 
             -- Hull data
@@ -90,15 +83,6 @@ function state.get_player_state(player_index)
         return ps
     end
 
-    -- Defensive initialization for upgrades / older saves.
-    -- IMPORTANT: use `== nil` for booleans so default "true" is preserved.
-    if ps.survey_render_mapped == nil then
-        ps.survey_render_mapped = true
-    end
-    if ps.survey_render_points == nil then
-        ps.survey_render_points = true
-    end
-
     ps.target = ps.target or {
         position = nil,
         mode = "follow"
@@ -106,8 +90,6 @@ function state.get_player_state(player_index)
 
     ps.search_spiral = ps.search_spiral or nil
 
-    ps.survey_mapped_entities = ps.survey_mapped_entities or {}
-    ps.survey_frontier = ps.survey_frontier or {}
     ps.survey_entity = ps.survey_entity or nil
 
     ps.hull = ps.hull or nil
@@ -199,9 +181,7 @@ function state.destroy_player_bot(player, silent)
     -- clear entity groups
     entitygroup.clear_entity_groups(ps)
 
-    -- Clear ALL survey / mapping sets.
-    ps.survey_mapped_entities = {}
-    ps.survey_frontier = {}
+    -- Clear survey entity
     ps.survey_entity = nil
 
     -- Clear ALL hull state.
@@ -212,10 +192,6 @@ function state.destroy_player_bot(player, silent)
     ps.hull_quantized_hash = 0
     ps.hull_tick = 0
     ps.hull_last_eval_tick = 0
-
-    -- Keep render toggles as defaults ON (or change if you prefer persisting user preference).
-    ps.survey_render_mapped = true
-    ps.survey_render_points = true
 
     -- Reset bookkeeping for render IDs.
     ps.visual = {
