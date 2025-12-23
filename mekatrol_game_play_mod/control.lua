@@ -121,13 +121,6 @@ local function update_bot_for_player(player, ps, tick)
     local bot_mode_name = ps.bot_mode or "nil"
     local bot_mode_name_line = string.format("bot mode→%s", bot_mode_name)
 
-    -- Build the value we want/entities might change every tick
-    local phase = "nil"
-    if ps.map_visited_hull_job then
-        phase = ps.map_visited_hull_job.phase or "nil"
-    end
-    local hull_line = string.format("hull job phase→%s", phase)
-
     local survey_entity = ps.survey_entity or {
         name = "nil",
         type = "nil"
@@ -137,7 +130,7 @@ local function update_bot_for_player(player, ps, tick)
     local hull_algorithm_name = ps.hull_algorithm
     local hull_algorithm_name_line = string.format("hull algorithm→%s", hull_algorithm_name)
 
-    local lines = {"State:", bot_mode_name_line, hull_line, survey_entity_name_line, hull_algorithm_name_line}
+    local lines = {"State:", bot_mode_name_line, survey_entity_name_line, hull_algorithm_name_line}
     visual.update_overlay(player, ps, lines)
 
     visual.draw_bot_light(player, ps, bot)
