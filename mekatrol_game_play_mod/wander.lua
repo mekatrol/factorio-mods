@@ -131,7 +131,11 @@ local function find_entity(player, ps, bot, pos, surf)
         local e = table.remove(next_entities, 1)
 
         if e and e.valid then
-            return e
+
+            -- recheck this entity may have been added prior to boundary for this area created
+            if not entitygroup.is_in_any_entity_group(ps, surf.index, e) then
+                return e
+            end
         end
     end
 
