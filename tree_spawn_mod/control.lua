@@ -52,7 +52,7 @@ local function place_tree_near_player(player)
     -- random direction and distance
     local distance = math.random(3, 10) -- 3–10 tiles
     local angle = math.random() * 2 * math.pi
-    local target = {
+    local target_pos = {
         x = pos.x + math.cos(angle) * distance,
         y = pos.y + math.sin(angle) * distance
     }
@@ -60,7 +60,7 @@ local function place_tree_near_player(player)
     local tree_name = "tree-01" -- you can randomize from a list if you like
 
     -- find a nearby non-colliding position
-    local position = surface.find_non_colliding_position(tree_name, target, 5, 0.5)
+    local position = surface.find_non_colliding_position(tree_name, target_pos, 5, 0.5)
     if position then
         surface.create_entity {
             name = tree_name,

@@ -53,12 +53,12 @@ function follow.update(player, ps, bot)
         return
     end
 
-    local target = {
+    local target_pos = {
         x = ppos.x + so,
         y = ppos.y - 2
     }
 
-    positioning.move_bot_towards(player, bot, target)
+    positioning.move_bot_towards(player, bot, target_pos)
 end
 
 return follow

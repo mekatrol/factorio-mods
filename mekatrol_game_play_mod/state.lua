@@ -55,7 +55,10 @@ function state.get_player_state(player_index)
             last_player_position = nil,
             last_player_side_offset_x = -BOT.movement.side_offset_distance,
 
-            bot_target_position = nil,
+            target = {
+                position = nil,
+                mode = "follow"
+            },
             search_spiral = nil,
 
             -- The quantized polygon hull already visited on the map
@@ -110,6 +113,11 @@ function state.get_player_state(player_index)
         ps.survey_render_points = true
     end
 
+    ps.target = ps.target or {
+        position = nil,
+        mode = "follow"
+    }
+
     ps.search_spiral = ps.search_spiral or nil
 
     ps.map_visited_poly = ps.map_visited_poly or {}
@@ -155,7 +163,10 @@ function state.set_player_bot_mode(player, ps, new_mode)
 
     -- Follow mode: no fixed target.
     if new_mode == "follow" then
-        ps.bot_target_position = nil
+        ps.target = {
+            position = nil,
+            mode = "follow"
+        }
         ps.search_spiral = nil
         ps.survey_entity = nil
         ps.next_survey_entities = {}
@@ -200,7 +211,10 @@ function state.destroy_player_bot(player, silent)
 
     -- Return to follow mode.
     ps.bot_mode = "follow"
-    ps.bot_target_position = nil
+    ps.target = {
+        position = nil,
+        mode = "follow"
+    }
 
     -- Movement bookkeeping.
     ps.last_player_position = nil

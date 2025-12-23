@@ -172,20 +172,23 @@ function search.update(player, ps, bot)
     end
 
     local surf = bot.surface
-    local target = ps.bot_target_position
+    local target_pos = ps.target.position
     local bpos = bot.position
 
-    if not target then
+    if not target_pos then
         local entity = find_entity(player, ps, bot, bpos, surf)
 
         if entity then
             -- record what we found (optional, but useful for overlay/debug)
             ps.survey_entity = entity
 
-            -- move to the entity
-            ps.bot_target_position = {
-                x = entity.position.x,
-                y = entity.position.y
+            -- move to the entity and then swtich to survey mode
+            ps.target = {
+                position = {
+                    x = entity.position.x,
+                    y = entity.position.y
+                },
+                mode = "survey"
             }
 
             -- switch to move_to mode
@@ -197,21 +200,28 @@ function search.update(player, ps, bot)
             return
         end
 
-        target = search.pick_new_search_target_spiral(ps, bot.position)
-        ps.bot_target_position = target
+        target_pos = search.pick_new_search_target_spiral(ps, bot.position)
+        -- move to the entity and then swtich to survey mode
+        ps.target = {
+            position = target_pos,
+            mode = "survey"
+        }
     end
 
-    positioning.move_bot_towards(player, bot, target)
+    positioning.move_bot_towards(player, bot, target_pos)
 
-    local dx = target.x - bpos.x
-    local dy = target.y - bpos.y
+    local dx = target_pos.x - bpos.x
+    local dy = target_pos.y - bpos.y
     local step = BOT.movement.step_distance
 
     if dx * dx + dy * dy > step * step then
         return
     end
 
-    ps.bot_target_position = nil
+    ps.target = {
+        position = nil,
+        mode = "search"
+    }
 end
 
 return search

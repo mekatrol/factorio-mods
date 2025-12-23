@@ -397,21 +397,21 @@ function survey.update(player, ps, bot, tick)
     -- If we are tracing, drive movement purely from the trace state machine.
     ensure_trace(ps)
     if ps.survey_trace then
-        local target = ps.bot_target_position
-        if not target then
-            target = trace_step(player, ps, bot)
-            ps.bot_target_position = target
+        local target_pos = ps.target.position
+        if not target_pos then
+            target_pos = trace_step(player, ps, bot)
+            ps.target.position = target_pos
         end
 
-        if not target then
+        if not target_pos then
             return
         end
 
-        positioning.move_bot_towards(player, bot, target)
+        positioning.move_bot_towards(player, bot, target_pos)
 
         local bpos = bot.position
-        local dx = target.x - bpos.x
-        local dy = target.y - bpos.y
+        local dx = target_pos.x - bpos.x
+        local dy = target_pos.y - bpos.y
         local d2 = dx * dx + dy * dy
 
         local thr = BOT.survey.arrival_threshold
@@ -420,7 +420,10 @@ function survey.update(player, ps, bot, tick)
         end
 
         -- Arrived; request next trace target next update.
-        ps.bot_target_position = nil
+        ps.target = {
+            position = nil,
+            mode = "survey"
+        }
         return
     end
 

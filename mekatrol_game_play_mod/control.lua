@@ -46,7 +46,13 @@ local function update_bot_for_player(player, ps, tick)
     local radius = nil
     local radius_color = nil
 
-    local target = ps.bot_target_position or player.position
+    -- default to targetting player
+    local target_pos = player.position
+
+    -- change to target position if defined
+    if ps.target.position then
+        target_pos = ps.target.position
+    end
 
     local line_color = {
         r = 0.3,
@@ -81,8 +87,8 @@ local function update_bot_for_player(player, ps, tick)
         visual.clear_radius_circle(ps)
     end
 
-    if target then
-        visual.draw_lines(player, ps, bot, target, line_color)
+    if target_pos then
+        visual.draw_lines(player, ps, bot, target_pos, line_color)
     end
 
     -- Mode behavior step.
