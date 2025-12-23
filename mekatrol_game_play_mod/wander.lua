@@ -92,27 +92,9 @@ function wander.pick_new_wander_target_random(ps, bpos)
     }
 end
 
-local function find_entity(player, ps, bot, pos, surf)
-    ps.next_survey_entities = ps.next_survey_entities or {}
-
-    local next_entities = ps.next_survey_entities
-
-    -- if there are any queued then remove until a valid one is found
-    while #next_entities > 0 do
-        local e = table.remove(next_entities, 1)
-
-        if e and e.valid then
-            return e
-        end
-    end
-
-    local found = surf.find_entities_filtered {
-        position = pos,
-        radius = BOT.wander.detection_radius
-    }
-
+local function sort_entities_by_position(entities, pos)
     -- sort from nearest to bot to farthest from bot
-    table.sort(found, function(a, b)
+    table.sort(entities, function(a, b)
         local a_valid = a and a.valid
         local b_valid = b and b.valid
 
@@ -134,6 +116,31 @@ local function find_entity(player, ps, bot, pos, surf)
 
         return (ax * ax + ay * ay) < (bx * bx + by * by)
     end)
+end
+
+local function find_entity(player, ps, bot, pos, surf)
+    ps.next_survey_entities = ps.next_survey_entities or {}
+
+    local next_entities = ps.next_survey_entities
+
+    -- if there are any queued then remove until a valid one is found
+    while #next_entities > 0 do
+        -- resort table as different entities may now be closer to bot position
+        sort_entities_by_position(next_entities, pos)
+
+        local e = table.remove(next_entities, 1)
+
+        if e and e.valid then
+            return e
+        end
+    end
+
+    local found = surf.find_entities_filtered {
+        position = pos,
+        radius = BOT.wander.detection_radius
+    }
+
+    sort_entities_by_position(found, pos)
 
     local char = player.character
     local next_found_entity = nil
