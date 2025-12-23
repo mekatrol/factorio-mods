@@ -27,7 +27,6 @@ local function ensure_visuals_table(ps)
     ps.visual.lines = ps.visual.lines or nil
     ps.visual.radius_circle = ps.visual.radius_circle or nil
     ps.visual.overlay_texts = ps.visual.overlay_texts or {}
-    ps.visual.overlay_next_tick = nil
 end
 
 function state.get_player_state(player_index)
@@ -52,11 +51,12 @@ function state.get_player_state(player_index)
 
             survey_entity = nil,
 
+            overlay_next_tick = nil,
+
             visual = {
                 bot_highlight = nil,
                 lines = nil,
                 radius_circle = nil,
-                overlay_next_tick = nil,
                 overlay_texts = {}
             }
         }
@@ -74,6 +74,8 @@ function state.get_player_state(player_index)
     ps.search_spiral = ps.search_spiral or nil
 
     ps.survey_entity = ps.survey_entity or nil
+
+    ps.overlay_next_tick = ps.overlay_next_tick or 0
 
     ensure_visuals_table(ps)
 
