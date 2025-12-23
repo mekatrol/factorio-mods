@@ -123,6 +123,8 @@ function entitygroup.add_boundary(player, ps, boundary, entity_name, surface_ind
 
     -- Draw polygon + label (clears any prior render for this group_id)
     visual.draw_entity_group(player, ps, group_id, entity_name, boundary, center)
+
+    entitygroup.merge_overlapping_groups(player, ps)
 end
 
 function entitygroup.add_single_tile_entity_group(player, ps, surface_index, entity)
@@ -179,6 +181,51 @@ function entitygroup.add_single_tile_entity_group(player, ps, surface_index, ent
     }}
 
     entitygroup.add_boundary(player, ps, boundary, entity.name, surface_index)
+end
+
+function entitygroup.merge_overlapping_groups(player, ps)
+    entitygroup.ensure_entity_groups(ps)
+
+    local groups = ps.entity_groups
+    local keys = {}
+
+    for k in pairs(groups) do
+        keys[#keys + 1] = k
+    end
+
+    local removed = {}
+
+    for i = 1, #keys do
+        local gi = groups[keys[i]]
+        if gi and not removed[keys[i]] then
+            for j = i + 1, #keys do
+                local gj = groups[keys[j]]
+
+                if gj and not removed[keys[j]] and gi.name == gj.name and gi.surface_index == gj.surface_index and
+                    polygon.polygons_intersect(gi.boundary, gj.boundary) then
+                    -- Merge boundaries
+                    gi.boundary = polygon.merge_polygons(gi.boundary, gj.boundary, {
+                        concave = false
+                    })
+
+                    gi.center = polygon.polygon_center(gi.boundary)
+
+                    removed[keys[j]] = true
+                end
+            end
+        end
+    end
+
+    -- Remove merged groups
+    for k in pairs(removed) do
+        visual.clear_entity_group(ps, k)
+        groups[k] = nil
+    end
+
+    -- Redraw merged groups
+    for id, g in pairs(groups) do
+        visual.draw_entity_group(player, ps, id, g.name, g.boundary, g.center)
+    end
 end
 
 return entitygroup

@@ -269,6 +269,96 @@ function polygon.all_points_inside_or_on(hull, points)
     return true
 end
 
+function polygon.aabb_of(poly)
+    local minx, maxx = poly[1].x, poly[1].x
+    local miny, maxy = poly[1].y, poly[1].y
+
+    for i = 2, #poly do
+        local p = poly[i]
+        if p.x < minx then
+            minx = p.x
+        end
+        if p.x > maxx then
+            maxx = p.x
+        end
+        if p.y < miny then
+            miny = p.y
+        end
+        if p.y > maxy then
+            maxy = p.y
+        end
+    end
+
+    return {
+        minx = minx,
+        miny = miny,
+        maxx = maxx,
+        maxy = maxy
+    }
+end
+
+function polygon.aabb_overlap(a, b)
+    return not (a.maxx < b.minx or a.minx > b.maxx or a.maxy < b.miny or a.miny > b.maxy)
+end
+
+function polygon.polygons_intersect(a, b)
+    local abox = polygon.aabb_of(a)
+    local bbox = polygon.aabb_of(b)
+
+    -- ealy out if no chance of overlap
+    if not polygon.aabb_overlap(abox, bbox) then
+        return false
+    end
+
+    local na = #a
+    local nb = #b
+
+    -- Edge intersections
+    for i = 1, na do
+        local a1 = a[i]
+        local a2 = a[(i % na) + 1]
+
+        for j = 1, nb do
+            local b1 = b[j]
+            local b2 = b[(j % nb) + 1]
+
+            if polygon.segments_intersect(a1, a2, b1, b2) then
+                return true
+            end
+        end
+    end
+
+    -- Containment checks
+    if polygon.point_in_poly(a, b[1]) then
+        return true
+    end
+    if polygon.point_in_poly(b, a[1]) then
+        return true
+    end
+
+    return false
+end
+
+function polygon.merge_polygons(a, b, opts)
+    opts = opts or {}
+    local points = {}
+
+    for i = 1, #a do
+        points[#points + 1] = a[i]
+    end
+    for i = 1, #b do
+        points[#points + 1] = b[i]
+    end
+
+    points = polygon.dedupe_points(points)
+
+    if opts.concave then
+        return polygon.concave_hull(points, opts.k or 6, opts)
+    end
+
+    return polygon.convex_hull(points)
+end
+
 ----------------------------------------------------------------------
 -- Point set helpers
 ----------------------------------------------------------------------
@@ -585,7 +675,6 @@ function polygon.polygon_center(points)
         y = (miny + maxy) * 0.5
     }
 end
-
 
 -- Squared distance from point p to segment a-b
 function polygon.point_segment_dist2(p, a, b)
