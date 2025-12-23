@@ -28,15 +28,12 @@ local function ensure_visuals_table(ps)
     ps.visual.radius_circle = ps.visual.radius_circle or nil
     ps.visual.mapped_entities = ps.visual.mapped_entities or {}
     ps.visual.survey_frontier = ps.visual.survey_frontier or {}
-    ps.visual.survey_done = ps.visual.survey_done or {}
     ps.visual.overlay_texts = ps.visual.overlay_texts or {}
     ps.visual.overlay_next_tick = nil
 end
 
 function state.ensure_survey_sets(ps)
     ps.survey_frontier = ps.survey_frontier or {}
-    ps.survey_done = ps.survey_done or {}
-    ps.survey_seen = ps.survey_seen or {}
     ps.survey_mapped_positions = ps.survey_mapped_positions or {}
     ps.survey_entity = ps.survey_entity or nil
 end
@@ -68,8 +65,6 @@ function state.get_player_state(player_index)
             survey_mapped_entities = {},
             survey_mapped_positions = {},
             survey_frontier = {},
-            survey_done = {},
-            survey_seen = {},
             survey_entity = nil,
 
             -- Hull data
@@ -88,7 +83,6 @@ function state.get_player_state(player_index)
                 radius_circle = nil,
                 mapped_entities = {},
                 survey_frontier = {},
-                survey_done = {},
                 overlay_next_tick = nil,
                 overlay_texts = {}
             }
@@ -117,8 +111,6 @@ function state.get_player_state(player_index)
     ps.survey_mapped_entities = ps.survey_mapped_entities or {}
     ps.survey_mapped_positions = ps.survey_mapped_positions or {}
     ps.survey_frontier = ps.survey_frontier or {}
-    ps.survey_done = ps.survey_done or {}
-    ps.survey_seen = ps.survey_seen or {}
     ps.survey_entity = ps.survey_entity or nil
 
     ps.hull = ps.hull or nil
@@ -174,7 +166,6 @@ function state.set_player_bot_mode(player, ps, new_mode)
 
         -- Start a fresh frontier queue for this pass.
         ps.survey_frontier = {}
-        ps.survey_seen = {}
     end
 end
 
@@ -215,8 +206,6 @@ function state.destroy_player_bot(player, silent)
     ps.survey_mapped_entities = {}
     ps.survey_mapped_positions = {}
     ps.survey_frontier = {}
-    ps.survey_done = {}
-    ps.survey_seen = {}
     ps.survey_entity = nil
 
     -- Clear ALL hull state.
@@ -239,7 +228,6 @@ function state.destroy_player_bot(player, silent)
         radius_circle = nil,
         mapped_entities = {},
         survey_frontier = {},
-        survey_done = {}
     }
 
     if not silent then

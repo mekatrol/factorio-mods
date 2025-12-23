@@ -114,25 +114,6 @@ function visual.clear_survey_frontier(player_state)
     player_state.visual.survey_frontier = {}
 end
 
-function visual.clear_survey_done(player_state)
-    if not (player_state and player_state.visual) then
-        return
-    end
-
-    local done = player_state.visual.survey_done
-    if not done then
-        return
-    end
-
-    for _, done_obj in pairs(done) do
-        if done_obj and done_obj.valid then
-            done_obj:destroy()
-        end
-    end
-
-    player_state.visual.survey_done = {}
-end
-
 ---------------------------------------------------
 -- FUNCTION: clear_lines(player_state)
 --
@@ -355,7 +336,6 @@ function visual.clear_all(player_state)
     visual.clear_radius_circle(player_state)
     visual.clear_mapped_entities(player_state)
     visual.clear_survey_frontier(player_state)
-    visual.clear_survey_done(player_state)
     visual.clear_entity_groups(player_state)
     visual.clear_bot_light(player_state)
 end
@@ -766,46 +746,6 @@ function visual.draw_survey_frontier(player, player_state, bot_entity)
         }
 
         player_state.visual.survey_frontier[#player_state.visual.survey_frontier + 1] = frontier
-    end
-end
-
-function visual.draw_survey_done(player, player_state, bot_entity)
-    if not (player and player.valid and bot_entity and bot_entity.valid) then
-        return
-    end
-
-    if not player_state then
-        return
-    end
-
-    local survey_done = player_state.survey_done
-    if #survey_done == 0 then
-        return
-    end
-
-    ------------------------------------------------------------------
-    -- Draw each survey done location
-    ------------------------------------------------------------------
-    local color = {
-        r = 0.1,
-        g = 1.0,
-        b = 0.1,
-        a = 1.0
-    }
-
-    for _, f in ipairs(survey_done) do
-        local done = rendering.draw_circle {
-            color = color,
-            radius = 0.15,
-            filled = true,
-            target = f,
-            surface = bot_entity.surface,
-            draw_on_ground = true,
-            only_in_alt_mode = false,
-            players = {player.index}
-        }
-
-        player_state.visual.survey_done[#player_state.visual.survey_done + 1] = done
     end
 end
 

@@ -103,7 +103,6 @@ local function update_bot_for_player(player, ps, tick)
 
     if ps.survey_render_points then
         visual.draw_survey_frontier(player, ps, bot)
-        visual.draw_survey_done(player, ps, bot)
     end
 
     -- Throttle overlay updates
@@ -182,7 +181,6 @@ local function on_toggle_render_survey_mode(event)
 
     if not ps.survey_render_mapped then
         visual.clear_survey_frontier(ps)
-        visual.clear_survey_done(ps)
         visual.clear_mapped_entities(ps)
     end
 
