@@ -1,4 +1,4 @@
-local wander = {}
+local search = {}
 
 local config = require("configuration")
 local entitygroup = require("entitygroup")
@@ -10,14 +10,14 @@ local util = require("util")
 local visual = require("visual")
 
 local BOT = config.bot
-local DETECTION_RADIUS = BOT.wander.detection_radius / 3
+local DETECTION_RADIUS = BOT.search.detection_radius / 3
 
 ----------------------------------------------------------------------
--- Wander mode
+-- Search mode
 ----------------------------------------------------------------------
 
 local function init_spiral(ps, bpos)
-    ps.wander_spiral = {
+    ps.search_spiral = {
         origin = {
             x = bpos.x,
             y = bpos.y
@@ -34,7 +34,7 @@ local function init_spiral(ps, bpos)
 end
 
 local function spiral_advance(ps)
-    local s = ps.wander_spiral
+    local s = ps.search_spiral
     if not s then
         return
     end
@@ -63,15 +63,15 @@ local function spiral_advance(ps)
     end
 end
 
-function wander.pick_new_wander_target_spiral(ps, bpos)
-    if not ps.wander_spiral then
+function search.pick_new_search_target_spiral(ps, bpos)
+    if not ps.search_spiral then
         init_spiral(ps, bpos)
     end
 
     spiral_advance(ps)
 
-    local s = ps.wander_spiral
-    local step = BOT.wander.step_distance
+    local s = ps.search_spiral
+    local step = BOT.search.step_distance
 
     return {
         x = s.origin.x + s.offset_x * step,
@@ -79,9 +79,9 @@ function wander.pick_new_wander_target_spiral(ps, bpos)
     }
 end
 
-function wander.pick_new_wander_target_random(ps, bpos)
+function search.pick_new_search_target_random(ps, bpos)
     local angle = math.random() * 2 * math.pi
-    local step = BOT.wander.step_distance
+    local step = BOT.search.step_distance
     local min_d = step * 0.4
     local max_d = step
     local dist = min_d + (max_d - min_d) * math.random()
@@ -141,7 +141,7 @@ local function find_entity(player, ps, bot, pos, surf)
 
     local found = surf.find_entities_filtered {
         position = pos,
-        radius = BOT.wander.detection_radius
+        radius = BOT.search.detection_radius
     }
 
     sort_entities_by_position(found, pos)
@@ -166,7 +166,7 @@ local function find_entity(player, ps, bot, pos, surf)
     return next_found_entity
 end
 
-function wander.update(player, ps, bot)
+function search.update(player, ps, bot)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
@@ -191,13 +191,13 @@ function wander.update(player, ps, bot)
             -- switch to move_to mode
             state.set_player_bot_mode(player, ps, "move_to")
 
-            -- reset wander spiral so wandering restarts cleanly after
-            ps.wander_spiral = nil
+            -- reset search spiral so searching restarts cleanly after
+            ps.search_spiral = nil
 
             return
         end
 
-        target = wander.pick_new_wander_target_spiral(ps, bot.position)
+        target = search.pick_new_search_target_spiral(ps, bot.position)
         ps.bot_target_position = target
     end
 
@@ -214,4 +214,4 @@ function wander.update(player, ps, bot)
     ps.bot_target_position = nil
 end
 
-return wander
+return search

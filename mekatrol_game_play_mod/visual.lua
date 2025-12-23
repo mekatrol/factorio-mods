@@ -23,7 +23,7 @@
 --
 --   player_state = {
 --       bot_entity = <LuaEntity or nil>,
---       bot_mode   = <string> or nil, -- e.g. "follow", "wander"
+--       bot_mode   = <string> or nil, -- e.g. "follow", "search"
 --       visual    = {
 --           bot_highlight   = <LuaRenderObject or nil>,
 --           lines           = <array of LuaRenderObject or nil>,

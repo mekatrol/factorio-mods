@@ -22,7 +22,7 @@
 --      - Toggle creation/destruction of the bot.
 -- 2) "mekatrol-game-play-bot-next-mode"
 --      - Cycle through behavior modes:
---          follow -> wander -> follow -> ...
+--          follow -> search -> follow -> ...
 ----------------------------------------------------------------------
 data:extend({{
     type = "custom-input",
@@ -39,7 +39,7 @@ data:extend({{
     -- This hotkey is used to change the bot's behavior mode
     -- without destroying/recreating the entity:
     --   * follow
-    --   * wander
+    --   * search
     --
     -- The control script will interpret this as "advance to the
     -- next mode in the list".

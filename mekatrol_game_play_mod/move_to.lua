@@ -19,7 +19,7 @@ function move_to.update(player, ps, bot)
 
     positioning.move_bot_towards(player, bot, target)
 
-    -- Optional: auto-exit when reached (same threshold as wander)
+    -- Optional: auto-exit when reached (same threshold as search)
     local bp = bot.position
     local dx = target.x - bp.x
     local dy = target.y - bp.y

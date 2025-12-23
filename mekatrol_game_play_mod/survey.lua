@@ -372,7 +372,7 @@ local function trace_step(player, ps, bot)
             entitygroup.add_boundary(player, ps, boundary, name, surf.index)
 
             -- Cleanup and exit survey mode
-            state.set_player_bot_mode(player, ps, "wander")
+            state.set_player_bot_mode(player, ps, "search")
             ps.survey_trace = nil
             ps.survey_entity = nil
             return nil
@@ -433,7 +433,7 @@ function survey.update(player, ps, bot, tick)
         entitygroup.add_single_tile_entity_group(player, ps, bot.surface_index, ps.survey_entity)
 
         -- Cleanup and exit survey mode
-        state.set_player_bot_mode(player, ps, "wander")
+        state.set_player_bot_mode(player, ps, "search")
         ps.survey_trace = nil
         ps.survey_entity = nil
     else

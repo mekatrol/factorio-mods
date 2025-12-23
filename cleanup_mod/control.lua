@@ -71,7 +71,7 @@ local STORAGE_KEY = "mekatrol_cleanup_mod"
 ----------------------------------------------------------------------
 -- MODE MEANING
 -- "idle"	    Bot just spawned or is enabled but has not selected any behavior yet.
--- "roam"	    Bot is wandering randomly within the player radius.
+-- "roam"	    Bot is searching randomly within the player radius.
 -- "pickup"	    Bot has located an item on the ground and is moving to pick it up.
 -- "returning"	Bot is carrying items and is moving to the storage chest to deposit.
 ----------------------------------------------------------------------

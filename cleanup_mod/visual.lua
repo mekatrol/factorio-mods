@@ -258,7 +258,7 @@ end
 -- mode is a string:
 --   "pickup"    – bot is heading for items
 --   "returning" – bot is heading back to chest
---   "roam"      – bot is wandering
+--   "roam"      – bot is searching
 --   "idle"      – bot is near the player with nothing to do
 ----------------------------------------------------------------------
 

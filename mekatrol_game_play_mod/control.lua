@@ -17,11 +17,11 @@ local mapping = require("mapping")
 local move_to = require("move_to")
 local polygon = require("polygon")
 local polymap = require("polymap")
+local search = require("search")
 local state = require("state")
 local survey = require("survey")
 local util = require("util")
 local visual = require("visual")
-local wander = require("wander")
 
 -- Config aliases.
 local BOT = config.bot
@@ -56,8 +56,8 @@ local function update_bot_for_player(player, ps, tick)
         a = 0.1
     }
 
-    if ps.bot_mode == "wander" then
-        radius = BOT.wander.detection_radius
+    if ps.bot_mode == "search" then
+        radius = BOT.search.detection_radius
         radius_color = {
             r = 0,
             g = 0.6,
@@ -89,8 +89,8 @@ local function update_bot_for_player(player, ps, tick)
     -- Mode behavior step.
     if ps.bot_mode == "follow" then
         follow.update(player, ps, bot)
-    elseif ps.bot_mode == "wander" then
-        wander.update(player, ps, bot)
+    elseif ps.bot_mode == "search" then
+        search.update(player, ps, bot)
     elseif ps.bot_mode == "survey" then
         survey.update(player, ps, bot, tick)
     elseif ps.bot_mode == "move_to" then
@@ -165,8 +165,8 @@ local function on_cycle_bot_mode(event)
 
     local ps = state.get_player_state(p.index)
 
-    -- default to wander
-    local new_mode = "wander"
+    -- default to search
+    local new_mode = "search"
 
     -- if not in follow mode then set to follow mode
     if not (ps.bot_mode == "follow") then

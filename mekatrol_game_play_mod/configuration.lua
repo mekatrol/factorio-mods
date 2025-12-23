@@ -17,7 +17,7 @@ config.bot = {
         side_offset_distance = 2.0
     },
 
-    wander = {
+    search = {
         step_distance = 5.0,
         detection_radius = 32.0
     },
@@ -33,7 +33,7 @@ config.bot = {
 ----------------------------------------------------------------------
 
 config.modes = {
-    list = {"follow", "wander", "survey", "move_to"},
+    list = {"follow", "search", "survey", "move_to"},
     index = {}
 }
 
