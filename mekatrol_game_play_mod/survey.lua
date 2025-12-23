@@ -244,6 +244,14 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     return true
 end
 
+local function switch_back_to_survey(player, ps)
+    state.set_player_bot_task(player, ps, "search")
+    ps.task.next_mode = nil
+    ps.task.target_position = nil
+    ps.survey_trace = nil
+    ps.survey_entity = nil
+end
+
 local function trace_step(player, ps, bot)
     local name = nil
     if ps.survey_entity then
@@ -371,10 +379,8 @@ local function trace_step(player, ps, bot)
             -- add to boundary group
             entitygroup.add_boundary(player, ps, boundary, name, surf.index)
 
-            -- Cleanup and exit survey mode
-            state.set_player_bot_mode(player, ps, "search")
-            ps.survey_trace = nil
-            ps.survey_entity = nil
+            -- Switch back to survey mode to find next entity
+            switch_back_to_survey(player, ps)
             return nil
         end
 
@@ -397,10 +403,10 @@ function survey.update(player, ps, bot, tick)
     -- If we are tracing, drive movement purely from the trace state machine.
     ensure_trace(ps)
     if ps.survey_trace then
-        local target_pos = ps.target.position
+        local target_pos = ps.task.target_position
         if not target_pos then
             target_pos = trace_step(player, ps, bot)
-            ps.target.position = target_pos
+            ps.task.target_position = target_pos
         end
 
         if not target_pos then
@@ -420,10 +426,8 @@ function survey.update(player, ps, bot, tick)
         end
 
         -- Arrived; request next trace target next update.
-        ps.target = {
-            position = nil,
-            mode = "survey"
-        }
+        ps.task.target_position = nil
+        ps.task.next_mode = nil
         return
     end
 
@@ -435,10 +439,8 @@ function survey.update(player, ps, bot, tick)
     if entitygroup.is_survey_single_target(ps.survey_entity) then
         entitygroup.add_single_tile_entity_group(player, ps, bot.surface_index, ps.survey_entity)
 
-        -- Cleanup and exit survey mode
-        state.set_player_bot_mode(player, ps, "search")
-        ps.survey_trace = nil
-        ps.survey_entity = nil
+        -- Switch back to survey mode to find next entity
+        switch_back_to_survey(player, ps)
     else
         -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
         survey.perform_survey_scan(player, ps, bot, tick)

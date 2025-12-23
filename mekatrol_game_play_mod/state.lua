@@ -39,14 +39,15 @@ function state.get_player_state(player_index)
             bot_entity = nil,
             bot_enabled = false,
 
-            bot_mode = "follow",
             last_player_position = nil,
             last_player_side_offset_x = -BOT.movement.side_offset_distance,
 
-            target = {
-                position = nil,
-                mode = "follow"
+            task = {
+                target_position = nil,
+                current_mode = "follow",
+                next_mode = nil
             },
+
             search_spiral = nil,
 
             survey_entity = nil,
@@ -64,10 +65,11 @@ function state.get_player_state(player_index)
         return ps
     end
 
-    ps.target = ps.target or {
-        position = nil,
-        mode = "follow"
-    }
+    ps.task = ps.task or {}
+
+    ps.task.current_mode = ps.task.current_mode or "follow"
+    ps.task.next_mode = ps.task.next_mode or nil
+    ps.task.target_position = ps.task.target_position or nil
 
     ps.search_spiral = ps.search_spiral or nil
 
@@ -82,39 +84,25 @@ end
 -- Mode setting
 ----------------------------------------------------------------------
 
-function state.set_player_bot_mode(player, ps, new_mode)
+function state.set_player_bot_task(player, ps, new_mode)
     -- Validate mode name.
     if not MODES.index[new_mode] then
         new_mode = "follow"
     end
 
-    if ps.bot_mode == new_mode then
-        return
-    end
-
-    ps.bot_mode = new_mode
+    -- set the new current_mode
+    ps.task.current_mode = new_mode
 
     -- Follow mode: no fixed target.
     if new_mode == "follow" then
-        ps.target = {
-            position = nil,
-            mode = "follow"
-        }
+        -- clear the next_mode and target position when switching modes
+        ps.task.next_mode = nil
+        ps.task.target_position = nil
 
         ps.search_spiral = nil
         ps.survey_entity = nil
         ps.next_survey_entities = {}
         return
-    end
-
-    -- Survey mode: create a new frontier ring around the bot.
-    if new_mode == "survey" then
-        ps.target = {
-            position = nil,
-            mode = "survey"
-        }
-
-        ps.survey_entity = ps.survey_entity or nil
     end
 end
 
@@ -137,12 +125,8 @@ function state.destroy_player_bot(player, silent)
     ps.bot_entity = nil
     ps.bot_enabled = false
 
-    -- Return to follow mode.
-    ps.bot_mode = "follow"
-    ps.target = {
-        position = nil,
-        mode = "follow"
-    }
+    -- Init to follow mode
+    state.set_player_bot_task(player, ps, "follow")
 
     -- Movement bookkeeping.
     ps.last_player_position = nil

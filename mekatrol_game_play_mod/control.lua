@@ -35,8 +35,8 @@ local function update_bot_for_player(player, ps, tick)
     local target_pos = player.position
 
     -- change to target position if defined
-    if ps.target.position then
-        target_pos = ps.target.position
+    if ps.task.target_position then
+        target_pos = ps.task.target_position
     end
 
     local line_color = {
@@ -46,7 +46,7 @@ local function update_bot_for_player(player, ps, tick)
         a = 0.1
     }
 
-    if ps.bot_mode == "search" then
+    if ps.task.current_mode == "search" then
         radius = BOT.search.detection_radius
         radius_color = {
             r = 0,
@@ -55,7 +55,7 @@ local function update_bot_for_player(player, ps, tick)
             a = 0.8
         }
         line_color = radius_color
-    elseif ps.bot_mode == "survey" then
+    elseif ps.task.current_mode == "survey" then
         radius = BOT.survey.radius
         radius_color = {
             r = 1.0,
@@ -77,13 +77,13 @@ local function update_bot_for_player(player, ps, tick)
     end
 
     -- Mode behavior step.
-    if ps.bot_mode == "follow" then
+    if ps.task.current_mode == "follow" then
         follow.update(player, ps, bot)
-    elseif ps.bot_mode == "search" then
+    elseif ps.task.current_mode == "search" then
         search.update(player, ps, bot)
-    elseif ps.bot_mode == "survey" then
+    elseif ps.task.current_mode == "survey" then
         survey.update(player, ps, bot, tick)
-    elseif ps.bot_mode == "move_to" then
+    elseif ps.task.current_mode == "move_to" then
         move_to.update(player, ps, bot)
     end
 
@@ -96,8 +96,9 @@ local function update_bot_for_player(player, ps, tick)
 
     ps.overlay_next_tick = tick + OVERLAY_UPDATE_TICKS
 
-    local bot_mode_name = ps.bot_mode or "nil"
-    local bot_mode_name_line = string.format("bot mode→%s", bot_mode_name)
+    local bot_current_mode_name = ps.task.current_mode or "nil"
+    local bot_next_mode_name = ps.task.next_mode or "nil"
+    local bot_mode_name_line = string.format("bot mode %s→%s", bot_current_mode_name, bot_next_mode_name)
 
         local survey_entity = ps.survey_entity or {
         name = "nil",
@@ -141,11 +142,11 @@ local function on_cycle_bot_mode(event)
     local new_mode = "search"
 
     -- if not in follow mode then set to follow mode
-    if not (ps.bot_mode == "follow") then
+    if not (ps.task.current_mode == "follow") then
         new_mode = "follow"
     end
 
-    state.set_player_bot_mode(p, ps, new_mode)
+    state.set_player_bot_task(p, ps, new_mode)
 end
 
 ----------------------------------------------------------------------

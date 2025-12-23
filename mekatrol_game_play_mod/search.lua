@@ -158,7 +158,7 @@ function search.update(player, ps, bot)
     end
 
     local surf = bot.surface
-    local target_pos = ps.target.position
+    local target_pos = ps.task.target_position
     local bpos = bot.position
 
     if not target_pos then
@@ -168,17 +168,17 @@ function search.update(player, ps, bot)
             -- record what we found (optional, but useful for overlay/debug)
             ps.survey_entity = entity
 
-            -- move to the entity and then swtich to survey mode
-            ps.target = {
-                position = {
-                    x = entity.position.x,
-                    y = entity.position.y
-                },
-                mode = "survey"
+            -- move to the entity and then switch to survey mode
+            -- to survey the entity group
+            ps.task.target_position = {
+                x = entity.position.x,
+                y = entity.position.y
             }
 
+            ps.task.next_mode = "survey"
+
             -- switch to move_to mode
-            state.set_player_bot_mode(player, ps, "move_to")
+            state.set_player_bot_task(player, ps, "move_to")
 
             -- reset search spiral so searching restarts cleanly after
             ps.search_spiral = nil
@@ -188,10 +188,8 @@ function search.update(player, ps, bot)
 
         target_pos = search.pick_new_search_target_spiral(ps, bot.position)
         -- move to the entity and then swtich to survey mode
-        ps.target = {
-            position = target_pos,
-            mode = "survey"
-        }
+        ps.task.target_position = target_pos
+        ps.task.next_mode = nil
     end
 
     positioning.move_bot_towards(player, bot, target_pos)
@@ -204,10 +202,8 @@ function search.update(player, ps, bot)
         return
     end
 
-    ps.target = {
-        position = nil,
-        mode = "search"
-    }
+    ps.task.target_position = nil
+    ps.task.next_mode = nil
 end
 
 return search

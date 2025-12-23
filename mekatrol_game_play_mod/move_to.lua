@@ -13,18 +13,19 @@ function move_to.update(player, ps, bot)
         return
     end
 
-    local target_pos = ps.target.position
+    local target_pos = ps.task.target_position
     if not target_pos then
         -- if there is no target position then we switch bot modes
-        local mode = ps.target.mode or ps.bot_mode
+        local mode = ps.task.next_mode or ps.task.current_mode
 
-        -- We don't want an endless loop if target.position is nil and mode is "move_to"
+        -- We don't want an endless loop if target position is nil and mode is "move_to"
         if mode == "move_to" then
             util.print(player, "red", "Switching from 'move_to' to 'follow' mode to stop endless 'move_to' loop...")
             mode = "follow"
         end
 
-        state.set_player_bot_mode(player, ps, mode)
+        state.set_player_bot_task(player, ps, mode)
+        ps.task.next_mode = nil
         return
     end
 
@@ -36,9 +37,11 @@ function move_to.update(player, ps, bot)
     local dy = target_pos.y - bp.y
     local step = BOT.movement.step_distance
 
+    -- reached target, if so move to next mode
     if dx * dx + dy * dy <= step * step then
-        state.set_player_bot_mode(player, ps, ps.target.mode)
-        ps.target.position = nil
+        local new_mode = ps.task.next_mode or "follow"        
+        state.set_player_bot_task(player, ps, new_mode)
+        ps.task.next_mode = nil
     end
 end
 
