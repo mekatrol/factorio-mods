@@ -175,8 +175,6 @@ function search.update(player, ps, bot)
                 y = entity.position.y
             }
 
-            ps.task.next_mode = "survey"
-
             -- switch to move_to mode
             state.set_player_bot_task(player, ps, "move_to")
 
@@ -189,7 +187,6 @@ function search.update(player, ps, bot)
         target_pos = search.pick_new_search_target_spiral(ps, bot.position)
         -- move to the entity and then swtich to survey mode
         ps.task.target_position = target_pos
-        ps.task.next_mode = nil
     end
 
     positioning.move_bot_towards(player, bot, target_pos)
@@ -203,7 +200,6 @@ function search.update(player, ps, bot)
     end
 
     ps.task.target_position = nil
-    ps.task.next_mode = nil
 end
 
 return search

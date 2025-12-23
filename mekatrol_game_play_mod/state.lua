@@ -87,7 +87,7 @@ end
 ----------------------------------------------------------------------
 
 function state.set_player_bot_task(player, ps, new_mode)
-    -- Validate mode name.
+    -- Validate mode
     if not MODES.index[new_mode] then
         new_mode = "follow"
     end
@@ -104,6 +104,11 @@ function state.set_player_bot_task(player, ps, new_mode)
         ps.search_spiral = nil
         ps.survey_entity = nil
         ps.next_survey_entities = {}
+        return
+    end
+
+    if new_mode == "search" then
+        ps.task.next_mode = "survey"
         return
     end
 
