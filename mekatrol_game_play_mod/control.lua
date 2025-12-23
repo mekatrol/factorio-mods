@@ -1,16 +1,3 @@
-----------------------------------------------------------------------
--- control.lua (Factorio 2.x / Space Age)
---
--- Goals of this version:
--- 1) Keep gameplay smooth by avoiding long single-tick work.
--- 2) Compute the concave hull incrementally over many ticks (state machine job),
---    instead of calling polygon.concave_hull(...) synchronously.
--- 3) Remove redundant hull calculations:
---    - Do NOT compute both the synchronous hull and the incremental hull.
---    - Do NOT recompute mapped points/hash every tick while a job is running.
---
--- Source base: your pasted control.lua. :contentReference[oaicite:0]{index=0}
-----------------------------------------------------------------------
 local config = require("configuration")
 local follow = require("follow")
 local move_to = require("move_to")
@@ -24,7 +11,6 @@ local visual = require("visual")
 -- Config aliases.
 local BOT = config.bot
 local MODES = config.modes
-local HULL_ALGORITHMS = config.hull_algorithms
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
 
@@ -119,10 +105,7 @@ local function update_bot_for_player(player, ps, tick)
     }
     local survey_entity_name_line = string.format("survey entity→%s [%s]", survey_entity.name, survey_entity.type)
 
-    local hull_algorithm_name = ps.hull_algorithm
-    local hull_algorithm_name_line = string.format("hull algorithm→%s", hull_algorithm_name)
-
-    local lines = {"State:", bot_mode_name_line, survey_entity_name_line, hull_algorithm_name_line}
+    local lines = {"State:", bot_mode_name_line, survey_entity_name_line}
     visual.update_overlay(player, ps, lines)
 
     visual.draw_bot_light(player, ps, bot)
@@ -163,24 +146,6 @@ local function on_cycle_bot_mode(event)
     end
 
     state.set_player_bot_mode(p, ps, new_mode)
-end
-
-local function on_cycle_hull_algorithm(event)
-    local p = game.get_player(event.player_index)
-    if not (p and p.valid) then
-        return
-    end
-
-    local ps = state.get_player_state(p.index)
-    local cur = ps.hull_algorithm or "concave"
-    local idx = HULL_ALGORITHMS.index[cur] or 1
-
-    idx = idx + 1
-    if idx > #HULL_ALGORITHMS.list then
-        idx = 1
-    end
-
-    ps.hull_algorithm = HULL_ALGORITHMS.list[idx]
 end
 
 ----------------------------------------------------------------------
@@ -253,7 +218,6 @@ end)
 
 script.on_event("mekatrol-game-play-bot-toggle", on_toggle_bot)
 script.on_event("mekatrol-game-play-bot-next-mode", on_cycle_bot_mode)
-script.on_event("mekatrol-game-play-bot-render-hull-algorithm", on_cycle_hull_algorithm)
 
 script.on_event(defines.events.on_entity_died, on_entity_died)
 script.on_event(defines.events.on_player_removed, on_player_removed)

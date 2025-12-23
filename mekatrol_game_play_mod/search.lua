@@ -78,19 +78,6 @@ function search.pick_new_search_target_spiral(ps, bpos)
     }
 end
 
-function search.pick_new_search_target_random(ps, bpos)
-    local angle = math.random() * 2 * math.pi
-    local step = BOT.search.step_distance
-    local min_d = step * 0.4
-    local max_d = step
-    local dist = min_d + (max_d - min_d) * math.random()
-
-    return {
-        x = bpos.x + math.cos(angle) * dist,
-        y = bpos.y + math.sin(angle) * dist
-    }
-end
-
 local function sort_entities_by_position(entities, pos)
     -- sort from nearest to bot to farthest from bot
     table.sort(entities, function(a, b)

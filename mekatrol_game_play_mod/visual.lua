@@ -28,7 +28,6 @@
 --           bot_highlight   = <LuaRenderObject or nil>,
 --           lines           = <array of LuaRenderObject or nil>,
 --           radius_circle   = <LuaRenderObject or nil>,
---           mapped_entities = <table<string, LuaRenderObject or nil>>
 --       },
 --       ...
 --   }
@@ -93,25 +92,6 @@ function visual.clear_bot_highlight(player_state)
     end
 
     player_state.visual.bot_highlight = nil
-end
-
-function visual.clear_survey_frontier(player_state)
-    if not (player_state and player_state.visual) then
-        return
-    end
-
-    local frontier = player_state.visual.survey_frontier
-    if not frontier then
-        return
-    end
-
-    for _, frontier_obj in pairs(frontier) do
-        if frontier_obj and frontier_obj.valid then
-            frontier_obj:destroy()
-        end
-    end
-
-    player_state.visual.survey_frontier = {}
 end
 
 ---------------------------------------------------
@@ -186,45 +166,6 @@ function visual.clear_radius_circle(player_state)
     end
 
     player_state.visual.radius_circle = nil
-end
-
----------------------------------------------------
--- FUNCTION: clear_mapped_entities(player_state)
---
--- Purpose:
---   Clears all mapping-related visual and resets the mapped_entities
---   tracking table for the player.
---
--- Parameters:
---   player_state : table
---       The per-player state containing:
---         * player_state.visual.mapped_entities — table of
---           entity-key -> LuaRenderObject id mappings.
---
--- Behavior:
---   * Calls rendering.clear(MOD_NAME) to remove all render objects
---     owned by this mod.
---   * Resets player_state.visual.mapped_entities to an empty table.
---
--- Notes:
---   * This is a coarse clear: it removes all render objects created
---     by this mod, not only mapped-entity boxes for this player.
---   * Intended for full visual reset (e.g. when destroying the bot).
----------------------------------------------------
-function visual.clear_mapped_entities(player_state)
-    if not player_state then
-        return
-    end
-
-    if not player_state.visual then
-        player_state.visual = {}
-    end
-
-    -- Wipe all rendering objects created by this mod.
-    pcall(rendering.clear, MOD_NAME)
-
-    -- Reset per-player mapping state.
-    player_state.visual.mapped_entities = {}
 end
 
 function visual.clear_overlay(player_state)
@@ -316,15 +257,6 @@ end
 --   Convenience helper that clears all known render objects belonging
 --   to the player's bot visual (highlight, lines, radius circle,
 --   mapped entities).
---
--- Parameters:
---   player_state : table
---
--- Behavior:
---   * Calls clear_lines(player_state).
---   * Calls clear_bot_highlight(player_state).
---   * Calls clear_radius_circle(player_state).
---   * Calls clear_mapped_entities(player_state).
 ---------------------------------------------------
 function visual.clear_all(player_state)
     if not player_state then
@@ -334,8 +266,6 @@ function visual.clear_all(player_state)
     visual.clear_lines(player_state)
     visual.clear_bot_highlight(player_state)
     visual.clear_radius_circle(player_state)
-    visual.clear_mapped_entities(player_state)
-    visual.clear_survey_frontier(player_state)
     visual.clear_entity_groups(player_state)
     visual.clear_bot_light(player_state)
 end
@@ -706,46 +636,6 @@ function visual.draw_lines(player, player_state, bot_entity, target_pos, line_co
         }
 
         player_state.visual.lines[#player_state.visual.lines + 1] = line
-    end
-end
-
-function visual.draw_survey_frontier(player, player_state, bot_entity)
-    if not (player and player.valid and bot_entity and bot_entity.valid) then
-        return
-    end
-
-    if not player_state then
-        return
-    end
-
-    local survey_frontier = player_state.survey_frontier
-    if #survey_frontier == 0 then
-        return
-    end
-
-    ------------------------------------------------------------------
-    -- Draw each frontier location
-    ------------------------------------------------------------------
-    local color = {
-        r = 1.0,
-        g = 0.1,
-        b = 0.1,
-        a = 1.0
-    }
-
-    for _, f in ipairs(survey_frontier) do
-        local frontier = rendering.draw_circle {
-            color = color,
-            radius = 0.15,
-            filled = true,
-            target = f,
-            surface = bot_entity.surface,
-            draw_on_ground = true,
-            only_in_alt_mode = false,
-            players = {player.index}
-        }
-
-        player_state.visual.survey_frontier[#player_state.visual.survey_frontier + 1] = frontier
     end
 end
 

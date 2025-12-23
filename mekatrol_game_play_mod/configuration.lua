@@ -6,10 +6,6 @@ local config = {}
 
 config.bot = {
     update_interval = 1,
-    update_hull_interval = 2,
-
-    -- limit hull work per tick to avoid long script updates
-    hull_steps_per_tick = 25,
 
     movement = {
         step_distance = 0.18,
@@ -39,19 +35,6 @@ config.modes = {
 
 for i, mode in ipairs(config.modes.list) do
     config.modes.index[mode] = i
-end
-
-----------------------------------------------------------------------
--- HULL ALGORITHMS
-----------------------------------------------------------------------
-
-config.hull_algorithms = {
-    list = {"convex", "concave", "concave_job"},
-    index = {}
-}
-
-for i, mode in ipairs(config.hull_algorithms.list) do
-    config.hull_algorithms.index[mode] = i
 end
 
 return config
