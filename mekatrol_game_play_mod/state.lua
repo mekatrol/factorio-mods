@@ -7,7 +7,6 @@ local state = {}
 
 local config = require("configuration")
 local entitygroup = require("entitygroup")
-local mapping = require("mapping")
 local util = require("util")
 local visual = require("visual")
 
@@ -166,18 +165,16 @@ function state.set_player_bot_mode(player, ps, new_mode)
 
     -- Survey mode: create a new frontier ring around the bot.
     if new_mode == "survey" then
+        ps.target = {
+            position = nil,
+            mode = "survey"
+        }
+
         state.ensure_survey_sets(ps)
 
         -- Start a fresh frontier queue for this pass.
         ps.survey_frontier = {}
         ps.survey_seen = {}
-
-        local bot = ps.bot_entity
-        if bot and bot.valid then
-            local bpos = bot.position
-            local start_a = mapping.ring_seed_for_center(bpos)
-            mapping.add_ring_frontiers(player, state, ps, bot, bpos, BOT.survey.radius, 24, start_a, 0)
-        end
     end
 end
 

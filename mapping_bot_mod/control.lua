@@ -109,69 +109,6 @@ local function get_player_data(idx)
 end
 
 ---------------------------------------------------
--- ENTITY KEY
----------------------------------------------------
-local function get_entity_key(entity)
-    if entity.unit_number then
-        return entity.unit_number
-    end
-
-    local p = entity.position
-    return entity.name .. "@" .. p.x .. "," .. p.y .. "#" .. entity.surface.index
-end
-
----------------------------------------------------
--- UPSERT MAPPED ENTITY
----------------------------------------------------
-local function upsert_mapped_entity(player, pdata, entity, tick)
-    local key = get_entity_key(entity)
-    if not key then
-        return
-    end
-
-    local root = ensure_root()
-    local shared = root.shared_mapped_entities
-    local info = shared[key]
-    local is_new = false
-
-    if not info then
-        is_new = true
-        -- Create new mapping entry
-        info = {
-            name = entity.name,
-            surface_index = entity.surface.index,
-            position = {
-                x = entity.position.x,
-                y = entity.position.y
-            },
-            force_name = entity.force and entity.force.name or nil,
-            last_seen_tick = tick,
-            discovered_by_player_index = player.index
-        }
-        shared[key] = info
-        pdata.mapped_entities[key] = true
-
-        -- Draw rectangle
-        if visual.add_mapped_entity_box then
-            local id = visual.add_mapped_entity_box(player, pdata, entity)
-            pdata.mapped_entity_visuals[key] = id
-        end
-    else
-        -- Update existing entry
-        info.position.x = entity.position.x
-        info.position.y = entity.position.y
-        info.last_seen_tick = tick
-    end
-
-    -- notify subscribers
-    local e = {
-        key = key,
-        info = info
-    }
-    script.raise_event(EVENT_on_entity_mapped, e)
-end
-
----------------------------------------------------
 -- BOT MANAGEMENT
 ---------------------------------------------------
 local function ensure_bot_for_player(player, pdata)
@@ -240,12 +177,6 @@ local function update_bot(player, pdata, tick)
         position = bot.position,
         radius = SEARCH_RADIUS
     }
-
-    for _, e in ipairs(found) do
-        if e ~= bot and e ~= player and is_static_mappable(e) then
-            upsert_mapped_entity(player, pdata, e, tick)
-        end
-    end
 end
 
 ---------------------------------------------------

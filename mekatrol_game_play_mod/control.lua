@@ -13,7 +13,6 @@
 ----------------------------------------------------------------------
 local config = require("configuration")
 local follow = require("follow")
-local mapping = require("mapping")
 local move_to = require("move_to")
 local polygon = require("polygon")
 local search = require("search")
@@ -102,8 +101,6 @@ local function update_bot_for_player(player, ps, tick)
         move_to.update(player, ps, bot)
     end
 
-    -- mapping.update(player, ps, tick)
-
     if ps.survey_render_points then
         visual.draw_survey_frontier(player, ps, bot)
         visual.draw_survey_done(player, ps, bot)
@@ -121,7 +118,7 @@ local function update_bot_for_player(player, ps, tick)
     local bot_mode_name = ps.bot_mode or "nil"
     local bot_mode_name_line = string.format("bot mode→%s", bot_mode_name)
 
-    local survey_entity = ps.survey_entity or {
+        local survey_entity = ps.survey_entity or {
         name = "nil",
         type = "nil"
     }

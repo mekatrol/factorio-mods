@@ -54,38 +54,5 @@ for i, mode in ipairs(config.hull_algorithms.list) do
     config.hull_algorithms.index[mode] = i
 end
 
-----------------------------------------------------------------------
--- NON-MAPPABLE TYPES
-----------------------------------------------------------------------
-
-config.non_static_types = {
-    character = true,
-    car = true,
-    ["spider-vehicle"] = true,
-    locomotive = true,
-    ["cargo-wagon"] = true,
-    ["fluid-wagon"] = true,
-    ["artillery-wagon"] = true,
-
-    unit = true,
-    ["unit-spawner"] = true,
-
-    corpse = true,
-    ["character-corpse"] = true,
-
-    fish = true,
-
-    ["combat-robot"] = true,
-    ["construction-robot"] = true,
-    ["logistic-robot"] = true,
-
-    projectile = true,
-    beam = true,
-    ["flying-text"] = true,
-    smoke = true,
-    fire = true,
-    stream = true,
-    decorative = true
-}
-
 return config
+
