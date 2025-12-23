@@ -34,7 +34,6 @@ end
 
 function state.ensure_survey_sets(ps)
     ps.survey_frontier = ps.survey_frontier or {}
-    ps.survey_mapped_positions = ps.survey_mapped_positions or {}
     ps.survey_entity = ps.survey_entity or nil
 end
 
@@ -63,7 +62,6 @@ function state.get_player_state(player_index)
 
             -- Survey data
             survey_mapped_entities = {},
-            survey_mapped_positions = {},
             survey_frontier = {},
             survey_entity = nil,
 
@@ -109,7 +107,6 @@ function state.get_player_state(player_index)
     ps.search_spiral = ps.search_spiral or nil
 
     ps.survey_mapped_entities = ps.survey_mapped_entities or {}
-    ps.survey_mapped_positions = ps.survey_mapped_positions or {}
     ps.survey_frontier = ps.survey_frontier or {}
     ps.survey_entity = ps.survey_entity or nil
 
@@ -204,7 +201,6 @@ function state.destroy_player_bot(player, silent)
 
     -- Clear ALL survey / mapping sets.
     ps.survey_mapped_entities = {}
-    ps.survey_mapped_positions = {}
     ps.survey_frontier = {}
     ps.survey_entity = nil
 
