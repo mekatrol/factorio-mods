@@ -25,7 +25,6 @@ function move_to.update(player, ps, bot)
         end
 
         state.set_player_bot_task(player, ps, mode)
-        ps.task.next_mode = nil
         return
     end
 
@@ -41,7 +40,6 @@ function move_to.update(player, ps, bot)
     if dx * dx + dy * dy <= step * step then
         local new_mode = ps.task.next_mode or "follow"        
         state.set_player_bot_task(player, ps, new_mode)
-        ps.task.next_mode = nil
     end
 end
 

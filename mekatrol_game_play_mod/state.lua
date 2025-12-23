@@ -106,6 +106,10 @@ function state.set_player_bot_task(player, ps, new_mode)
         ps.next_survey_entities = {}
         return
     end
+
+    if new_mode == "survey" then
+        ps.task.next_mode = "search"
+    end
 end
 
 ----------------------------------------------------------------------
