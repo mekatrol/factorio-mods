@@ -12,17 +12,22 @@ function entitygroup.ensure_entity_groups(ps)
     ps.entity_groups = ps.entity_groups or {}
 end
 
+local ignore_entities = {
+    ["mekatrol-game-play-bot"] = true,
+    ["fish"] = true,
+    ["unit"] = true
+}
+
 function entitygroup.is_survey_ignore_target(e)
     if not e or not e.valid then
         return true
     end
 
-    local ignore_types = {
-        ["fish"] = true,
-        ["unit"] = true
-    }
+    if ignore_entities[e.type] then
+        return true
+    end
 
-    if ignore_types[e.type] then
+    if ignore_entities[e.name] then
         return true
     end
 

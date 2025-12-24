@@ -6,6 +6,9 @@ local MOD_NAME = "mekatrol_game_play_mod"
 ---------------------------------------------------
 local visual = {}
 
+local state = require("state")
+local util = require("util")
+
 -- Each bot gets its own independent rendering objects (highlight, lines, radius circle, bot light).
 local function ensure_bot_visuals(ps)
     ps.visual = ps.visual or {}
@@ -537,7 +540,12 @@ function visual.draw_radius_circle(player, player_state, bot_name, bot_entity, r
 
     local bv = get_bot_visual(player_state, bot_name)
     bv.radius_circle = rendering.draw_circle {
-        color = color or {r = 1, g = 1, b = 1, a = 0.25},
+        color = color or {
+            r = 1,
+            g = 1,
+            b = 1,
+            a = 0.25
+        },
         radius = radius,
         width = 2,
         target = bot_entity,
@@ -548,34 +556,7 @@ function visual.draw_radius_circle(player, player_state, bot_name, bot_entity, r
     }
 end
 
----------------------------------------------------
--- FUNCTION: draw_bot_highlight(player, player_state)
---
--- Purpose:
---   Draws (or updates) a visual rectangle around the player's bot in
---   the world. This helps indicate its position visually.
---
--- Parameters:
---   player : LuaPlayer
---       The player who will see the highlight.
---
---   player_state : table
---       The per-player state containing:
---         * player_state.bot_entity             — the bot entity.
---         * player_state.visual.bot_highlight  — existing highlight
---           render object or nil.
---
--- Behavior:
---   1. Validates that a bot entity exists and is valid.
---   2. Computes a rectangular bounding area around the bot.
---   3. If an existing highlight exists:
---        * If still valid, its coordinates are updated in-place.
---        * If invalid, the reference is cleared and a new rectangle
---          is created.
---   4. If no highlight exists, a new rectangle is created with
---      rendering.draw_rectangle and stored.
----------------------------------------------------
-function visual.draw_bot_highlight(player, player_state)
+function visual.draw_bot_highlight(player, player_state, bot_name)
     if not (player and player.valid and player_state and player_state.visual) then
         return
     end
@@ -589,43 +570,44 @@ function visual.draw_bot_highlight(player, player_state)
         return
     end
 
-    for bot_name, bot_entity in pairs(player_state.bot_entities) do
-        if bot_entity and bot_entity.valid then
-            local bv = get_bot_visual(player_state, bot_name)
+    local bot_entity = state.get_bot_by_name(player, player_state, bot_name)
 
-            -- If a highlight object exists but is no longer valid, clear it.
-            if bv.bot_highlight and not bv.bot_highlight.valid then
-                bv.bot_highlight = nil
-            end
+    if bot_entity and bot_entity.valid then
+        local bv = get_bot_visual(player_state, bot_name)
 
-            -- If no highlight exists, create one.
-            if not bv.bot_highlight then
-                local left_top = {
-                    x = bot_entity.position.x - 0.5,
-                    y = bot_entity.position.y - 0.5
-                }
-                local right_bottom = {
-                    x = bot_entity.position.x + 0.5,
-                    y = bot_entity.position.y + 0.5
-                }
+        local left_top = {
+            x = bot_entity.position.x - 0.5,
+            y = bot_entity.position.y - 0.7
+        }
 
-                bv.bot_highlight = rendering.draw_rectangle {
-                    color = {
-                        r = 0.2,
-                        g = 0.2,
-                        b = 0.2,
-                        a = 0.1
-                    },
-                    filled = false,
-                    width = 2,
-                    left_top = left_top,
-                    right_bottom = right_bottom,
-                    surface = bot_entity.surface,
-                    draw_on_ground = true,
-                    only_in_alt_mode = false,
-                    players = {player.index}
-                }
-            end
+        local right_bottom = {
+            x = bot_entity.position.x + 0.5,
+            y = bot_entity.position.y + 0.3
+        }
+
+        if bv.bot_highlight and not bv.bot_highlight.valid then
+            bv.bot_highlight = nil
+        end
+
+        if not bv.bot_highlight then
+            bv.bot_highlight = rendering.draw_rectangle {
+                color = {
+                    r = 0.2,
+                    g = 0.2,
+                    b = 0.2,
+                    a = 0.1
+                },
+                filled = false,
+                width = 2,
+                left_top = left_top,
+                right_bottom = right_bottom,
+                surface = bot_entity.surface,
+                draw_on_ground = true,
+                only_in_alt_mode = false,
+                players = {player.index}
+            }
+        else
+            bv.bot_highlight.set_corners(left_top, right_bottom)
         end
     end
 end
@@ -703,7 +685,12 @@ function visual.draw_lines(player, player_state, bot_name, bot_entity, target_po
 
     -- Draw a simple two-segment line: bot -> target.
     bv.lines[1] = rendering.draw_line {
-        color = color or {r = 1, g = 1, b = 1, a = 1},
+        color = color or {
+            r = 1,
+            g = 1,
+            b = 1,
+            a = 1
+        },
         width = 2,
         from = bot_entity,
         to = target_pos,

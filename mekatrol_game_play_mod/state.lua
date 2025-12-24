@@ -6,9 +6,7 @@
 local state = {}
 
 local config = require("configuration")
-local entitygroup = require("entitygroup")
 local util = require("util")
-local visual = require("visual")
 
 local BOT_CONF = config.bot
 local MODES = config.modes
@@ -29,6 +27,31 @@ local function ensure_visuals_table(ps)
     ps.visual.lines = ps.visual.lines or nil
     ps.visual.radius_circle = ps.visual.radius_circle or nil
     ps.visual.overlay_texts = ps.visual.overlay_texts or {}
+end
+
+----------------------------------------------------------------------
+-- Returns a valid bot entity by role name for the given player.
+--
+-- @param ps        Player state table (from get_player_state)
+-- @param bot_name  string ("mapper", "repairer", "constructor", "cleaner")
+-- @return LuaEntity|nil
+----------------------------------------------------------------------
+function state.get_bot_by_name(player, ps, bot_name)
+    if not ps then
+        return nil
+    end
+
+    local bots = ps.bot_entities
+    if not bots then
+        return nil
+    end
+
+    local ent = bots[bot_name]
+    if ent and ent.valid then
+        return ent
+    end
+
+    return nil
 end
 
 function state.get_player_state(player_index)
@@ -125,7 +148,7 @@ end
 -- Bot lifecycle
 ----------------------------------------------------------------------
 
-function state.destroy_player_bot(player, silent)
+function state.destroy_player_bot(player, silent, clear_all, clear_entity_groups)
     local ps = state.get_player_state(player.index)
 
     -- Destroy all bot entities (if present).
@@ -140,7 +163,8 @@ function state.destroy_player_bot(player, silent)
     end
 
     -- Clear ALL render objects / visual.
-    visual.clear_all(ps)
+    clear_all(ps)
+    
     -- Disable + clear entity references.
     ps.bot_entities = {}
     ps.bot_enabled = false
@@ -153,7 +177,7 @@ function state.destroy_player_bot(player, silent)
     ps.last_player_side_offset_x = -BOT_CONF.movement.side_offset_distance
 
     -- clear entity groups
-    entitygroup.clear_entity_groups(ps)
+    clear_entity_groups(ps)
 
     -- Clear survey entity
     ps.survey_entity = nil
@@ -162,9 +186,9 @@ function state.destroy_player_bot(player, silent)
     ps.visual = {
         -- Per-bot render objects. Each role has its own set so visuals are independent.
         bots = {},
-    
+
         -- Overlay text objects are per-player, not per-bot.
-        overlay_texts = {},
+        overlay_texts = {}
     }
 
     if not silent then
@@ -172,7 +196,7 @@ function state.destroy_player_bot(player, silent)
     end
 end
 
-function state.create_player_bot(player)
+function state.create_player_bot(player, clear_entity_groups)
     local ps = state.get_player_state(player.index)
 
     -- If any bot already exists, just enable and keep references.
@@ -190,16 +214,31 @@ function state.create_player_bot(player)
 
     local pos = player.position
     local offsets = {
-        mapper = {x = -2, y = -2},
-        repairer = {x = -2, y = 2},
-        constructor = {x = 2, y = -2},
-        cleaner = {x = 2, y = 2}
+        mapper = {
+            x = -2,
+            y = -2
+        },
+        repairer = {
+            x = -2,
+            y = -0.666
+        },
+        constructor = {
+            x = -2,
+            y = 0.666
+        },
+        cleaner = {
+            x = -2,
+            y = 2
+        }
     }
 
     local created_any = false
 
     for _, name in ipairs(BOT_NAMES) do
-        local off = offsets[name] or {x = -2, y = -2}
+        local off = offsets[name] or {
+            x = -2,
+            y = -2
+        }
         local ent = player.surface.create_entity {
             name = "mekatrol-game-play-bot",
             position = {pos.x + off.x, pos.y + off.y},
@@ -230,7 +269,7 @@ function state.create_player_bot(player)
     ps.bot_enabled = true
 
     -- clear entity groups
-    entitygroup.clear_entity_groups(ps)
+    clear_entity_groups(ps)
 
     util.print(player, "green", "created (mapper/repairer/constructor/cleaner)")
     return ps.bot_entities
