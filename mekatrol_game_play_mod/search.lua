@@ -8,8 +8,8 @@ local state = require("state")
 local util = require("util")
 local visual = require("visual")
 
-local BOT = config.bot
-local DETECTION_RADIUS = BOT.search.detection_radius / 3
+local BOT_CONF = config.bot
+local DETECTION_RADIUS = BOT_CONF.search.detection_radius / 3
 
 ----------------------------------------------------------------------
 -- Search mode
@@ -70,7 +70,7 @@ function search.pick_new_search_target_spiral(ps, bpos)
     spiral_advance(ps)
 
     local s = ps.search_spiral
-    local step = BOT.search.step_distance
+    local step = BOT_CONF.search.step_distance
 
     return {
         x = s.origin.x + s.offset_x * step,
@@ -127,7 +127,7 @@ local function find_entity(player, ps, bot, pos, surf)
 
     local found = surf.find_entities_filtered {
         position = pos,
-        radius = BOT.search.detection_radius
+        radius = BOT_CONF.search.detection_radius
     }
 
     sort_entities_by_position(found, pos)
@@ -193,7 +193,7 @@ function search.update(player, ps, bot)
 
     local dx = target_pos.x - bpos.x
     local dy = target_pos.y - bpos.y
-    local step = BOT.movement.step_distance
+    local step = BOT_CONF.movement.step_distance
 
     if dx * dx + dy * dy > step * step then
         return

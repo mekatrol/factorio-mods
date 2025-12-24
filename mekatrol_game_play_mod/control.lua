@@ -9,7 +9,7 @@ local util = require("util")
 local visual = require("visual")
 
 -- Config aliases.
-local BOT = config.bot
+local BOT_CONF = config.bot
 local MODES = config.modes
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
@@ -50,7 +50,7 @@ local function update_bot_for_player(player, ps, bot_name, bot, tick, draw_visua
     }
 
     if ps.task.current_mode == "search" then
-        radius = BOT.search.detection_radius
+        radius = BOT_CONF.search.detection_radius
         radius_color = {
             r = 0,
             g = 0.6,
@@ -59,7 +59,7 @@ local function update_bot_for_player(player, ps, bot_name, bot, tick, draw_visua
         }
         line_color = radius_color
     elseif ps.task.current_mode == "survey" then
-        radius = BOT.survey.radius
+        radius = BOT_CONF.survey.radius
         radius_color = {
             r = 1.0,
             g = 0.95,
@@ -263,7 +263,7 @@ script.on_event(defines.events.on_player_removed, on_player_removed)
 ----------------------------------------------------------------------
 
 script.on_event(defines.events.on_tick, function(event)
-    if event.tick % BOT.update_interval ~= 0 then
+    if event.tick % BOT_CONF.update_interval ~= 0 then
         return
     end
 

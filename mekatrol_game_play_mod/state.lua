@@ -10,7 +10,7 @@ local entitygroup = require("entitygroup")
 local util = require("util")
 local visual = require("visual")
 
-local BOT = config.bot
+local BOT_CONF = config.bot
 local MODES = config.modes
 
 local BOT_NAMES = {"mapper", "repairer", "constructor", "cleaner"}
@@ -41,7 +41,7 @@ function state.get_player_state(player_index)
             bot_enabled = false,
 
             last_player_position = nil,
-            last_player_side_offset_x = -BOT.movement.side_offset_distance,
+            last_player_side_offset_x = -BOT_CONF.movement.side_offset_distance,
 
             task = {
                 target_position = nil,
@@ -150,7 +150,7 @@ function state.destroy_player_bot(player, silent)
 
     -- Movement bookkeeping.
     ps.last_player_position = nil
-    ps.last_player_side_offset_x = -BOT.movement.side_offset_distance
+    ps.last_player_side_offset_x = -BOT_CONF.movement.side_offset_distance
 
     -- clear entity groups
     entitygroup.clear_entity_groups(ps)

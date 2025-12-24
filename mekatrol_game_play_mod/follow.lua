@@ -3,7 +3,7 @@ local follow = {}
 local config = require("configuration")
 local positioning = require("positioning")
 
-local BOT = config.bot
+local BOT_CONF = config.bot
 
 ----------------------------------------------------------------------
 -- Follow mode
@@ -34,7 +34,7 @@ function follow.update(player, ps, bot)
         y = ppos.y
     }
 
-    local side = BOT.movement.side_offset_distance
+    local side = BOT_CONF.movement.side_offset_distance
     local so = ps.last_player_side_offset_x or -side
 
     if left and so ~= side then
@@ -45,7 +45,7 @@ function follow.update(player, ps, bot)
 
     ps.last_player_side_offset_x = so
 
-    local follow = BOT.movement.follow_distance
+    local follow = BOT_CONF.movement.follow_distance
     local dx = ppos.x - bpos.x
     local dy = ppos.y - bpos.y
 

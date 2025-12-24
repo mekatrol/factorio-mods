@@ -8,7 +8,7 @@ local state = require("state")
 local util = require("util")
 local visual = require("visual")
 
-local BOT = config.bot
+local BOT_CONF = config.bot
 
 ----------------------------------------------------------------------
 -- Tile helpers
@@ -227,7 +227,7 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 
     local found = surf.find_entities_filtered {
         position = bpos,
-        radius = BOT.survey.radius,
+        radius = BOT_CONF.survey.radius,
         name = find_name
     }
 
@@ -286,7 +286,7 @@ local function trace_step(player, ps, bot)
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
         if not tile_has_name(surf, name, tx, ty) then
             local found_tx, found_ty = find_nearby_resource_tile(surf, name, bot.position,
-                math.ceil(BOT.survey.radius) + 1)
+                math.ceil(BOT_CONF.survey.radius) + 1)
             if found_tx then
                 tr.origin_tx = found_tx
                 tr.origin_ty = found_ty
@@ -419,7 +419,7 @@ function survey.update(player, ps, bot, tick)
         local dy = target_pos.y - bpos.y
         local d2 = dx * dx + dy * dy
 
-        local thr = BOT.survey.arrival_threshold
+        local thr = BOT_CONF.survey.arrival_threshold
         if d2 > (thr * thr) then
             return
         end

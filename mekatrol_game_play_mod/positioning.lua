@@ -3,7 +3,7 @@ local positioning = {}
 local config = require("configuration")
 local util = require("util")
 
-local BOT = config.bot
+local BOT_CONF = config.bot
 
 ----------------------------------------------------------------------
 -- Movement and position helpers
@@ -37,7 +37,7 @@ function positioning.move_bot_towards(player, bot, target)
         return
     end
 
-    local step = BOT.movement.step_distance
+    local step = BOT_CONF.movement.step_distance
 
     local bp = bot.position
     local dx = pos.x - bp.x

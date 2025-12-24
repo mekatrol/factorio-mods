@@ -6,7 +6,7 @@ local positioning = require("positioning")
 local state = require("state")
 local util = require("util")
 
-local BOT = config.bot
+local BOT_CONF = config.bot
 
 function move_to.update(player, ps, bot)
     if not (player and player.valid and ps and bot and bot.valid) then
@@ -34,7 +34,7 @@ function move_to.update(player, ps, bot)
     local bp = bot.position
     local dx = target_pos.x - bp.x
     local dy = target_pos.y - bp.y
-    local step = BOT.movement.step_distance
+    local step = BOT_CONF.movement.step_distance
 
     -- reached target, if so move to next mode
     if dx * dx + dy * dy <= step * step then
