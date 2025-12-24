@@ -1,6 +1,6 @@
 local positioning = {}
 
-local config = require("configuration")
+local config = require("config")
 local util = require("util")
 
 local BOT_CONF = config.bot

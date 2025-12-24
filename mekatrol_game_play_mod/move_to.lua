@@ -1,7 +1,7 @@
 -- move_to.lua
 local move_to = {}
 
-local config = require("configuration")
+local config = require("config")
 local positioning = require("positioning")
 local state = require("state")
 local util = require("util")

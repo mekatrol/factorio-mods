@@ -6,6 +6,7 @@ local MOD_NAME = "mekatrol_game_play_mod"
 ---------------------------------------------------
 local visual = {}
 
+local config = require("config")
 local state = require("state")
 local util = require("util")
 
@@ -571,6 +572,7 @@ function visual.draw_bot_highlight(player, player_state, bot_name)
     end
 
     local bot_entity = state.get_bot_by_name(player, player_state, bot_name)
+    local bot_conf = config.get_bot_config(bot_name)
 
     if bot_entity and bot_entity.valid then
         local bv = get_bot_visual(player_state, bot_name)
@@ -589,39 +591,9 @@ function visual.draw_bot_highlight(player, player_state, bot_name)
             bv.bot_highlight = nil
         end
 
-        local color = {
-            r = 0.2,
-            g = 0.2,
-            b = 0.2,
-            a = 0.1
-        }
-
-        if bot_name == "repairer" then
-            color = {
-                r = 0.2,
-                g = 0.0,
-                b = 0.0,
-                a = 0.1
-            }
-        elseif bot_name == "constructor" then
-            color = {
-                r = 0.0,
-                g = 0.2,
-                b = 0.0,
-                a = 0.1
-            }
-        elseif bot_name == "cleaner" then
-            color = {
-                r = 0.0,
-                g = 0.0,
-                b = 0.2,
-                a = 0.1
-            }
-        end
-
         if not bv.bot_highlight then
             bv.bot_highlight = rendering.draw_rectangle {
-                color = color,
+                color = bot_conf.highlight_color,
                 filled = false,
                 width = 2,
                 left_top = left_top,

@@ -5,7 +5,7 @@
 --   - Provide helpers to create/destroy bot and change bot mode
 local state = {}
 
-local config = require("configuration")
+local config = require("config")
 local util = require("util")
 
 local BOT_CONF = config.bot
@@ -216,19 +216,19 @@ function state.create_player_bot(player, clear_entity_groups)
     local offsets = {
         mapper = {
             x = -2,
-            y = -2
+            y = BOT_CONF.mapper.follow_offset_y
         },
         repairer = {
             x = -2,
-            y = -0.666
+            y = BOT_CONF.repairer.follow_offset_y
         },
         constructor = {
             x = -2,
-            y = 0.666
+            y = BOT_CONF.constructor.follow_offset_y
         },
         cleaner = {
             x = -2,
-            y = 2
+            y = BOT_CONF.cleaner.follow_offset_y
         }
     }
 

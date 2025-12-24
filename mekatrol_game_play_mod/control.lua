@@ -1,4 +1,4 @@
-local config = require("configuration")
+local config = require("config")
 local entitygroup = require("entitygroup")
 local follow = require("follow")
 local move_to = require("move_to")
@@ -12,10 +12,9 @@ local visual = require("visual")
 -- Config aliases.
 local BOT_CONF = config.bot
 local MODES = config.modes
+local BOT_NAMES = config.bot_names
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
-
-local BOT_NAMES = {"mapper", "repairer", "constructor", "cleaner"}
 
 ----------------------------------------------------------------------
 -- Visuals and behavior dispatch
@@ -85,7 +84,7 @@ local function update_mapper_bot(player, ps, bot_name, bot, tick)
 
     -- Mode behavior step
     if ps.task.current_mode == "follow" then
-        follow.update(player, ps, bot, -2)
+        follow.update(player, ps, bot, BOT_CONF.mapper.follow_offset_y)
     elseif ps.task.current_mode == "search" then
         search.update(player, ps, bot)
     elseif ps.task.current_mode == "survey" then
@@ -126,10 +125,9 @@ local function update_repairer_bot(player, ps, bot_name, bot, tick)
     update_bot(player, ps, bot_name, bot, tick)
 
     if ps.task.current_mode == "follow" then
-        follow.update(player, ps, bot, -0.666)
+        follow.update(player, ps, bot, BOT_CONF.repairer.follow_offset_y)
     end
 end
-
 local function update_constructor_bot(player, ps, bot_name, bot, tick)
     if not (bot and bot.valid) then
         return
@@ -138,7 +136,7 @@ local function update_constructor_bot(player, ps, bot_name, bot, tick)
     update_bot(player, ps, bot_name, bot, tick)
 
     if ps.task.current_mode == "follow" then
-        follow.update(player, ps, bot, 0.666)
+        follow.update(player, ps, bot, BOT_CONF.constructor.follow_offset_y)
     end
 end
 
@@ -150,7 +148,7 @@ local function update_cleaner_bot(player, ps, bot_name, bot, tick)
     update_bot(player, ps, bot_name, bot, tick)
 
     if ps.task.current_mode == "follow" then
-        follow.update(player, ps, bot, 2)
+        follow.update(player, ps, bot, BOT_CONF.cleaner.follow_offset_y)
     end
 end
 

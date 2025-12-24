@@ -1,6 +1,6 @@
 local search = {}
 
-local config = require("configuration")
+local config = require("config")
 local entitygroup = require("entitygroup")
 local polygon = require("polygon")
 local positioning = require("positioning")

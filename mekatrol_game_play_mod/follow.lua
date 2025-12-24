@@ -1,6 +1,6 @@
 local follow = {}
 
-local config = require("configuration")
+local config = require("config")
 local positioning = require("positioning")
 
 local BOT_CONF = config.bot
