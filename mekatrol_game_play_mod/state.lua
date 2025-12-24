@@ -13,6 +13,8 @@ local visual = require("visual")
 local BOT = config.bot
 local MODES = config.modes
 
+local BOT_NAMES = {"mapper", "repairer", "constructor", "cleaner"}
+
 ----------------------------------------------------------------------
 -- Storage and player state
 ----------------------------------------------------------------------
@@ -35,7 +37,7 @@ function state.get_player_state(player_index)
     local ps = storage.game_bot[player_index]
     if not ps then
         ps = {
-            bot_entity = nil,
+            bot_entities = {},
             bot_enabled = false,
 
             last_player_position = nil,
@@ -64,6 +66,8 @@ function state.get_player_state(player_index)
         storage.game_bot[player_index] = ps
         return ps
     end
+
+    ps.bot_entities = ps.bot_entities or {}
 
     ps.task = ps.task or {}
 
@@ -124,16 +128,21 @@ end
 function state.destroy_player_bot(player, silent)
     local ps = state.get_player_state(player.index)
 
-    -- Destroy the bot entity (if present).
-    if ps.bot_entity and ps.bot_entity.valid then
-        ps.bot_entity.destroy()
+    -- Destroy all bot entities (if present).
+    if ps.bot_entities then
+        for _, name in ipairs(BOT_NAMES) do
+            local ent = ps.bot_entities[name]
+            if ent and ent.valid then
+                ent.destroy()
+            end
+            ps.bot_entities[name] = nil
+        end
     end
 
     -- Clear ALL render objects / visual.
     visual.clear_all(ps)
-
-    -- Disable + clear entity reference.
-    ps.bot_entity = nil
+    -- Disable + clear entity references.
+    ps.bot_entities = {}
     ps.bot_enabled = false
 
     -- Init to follow mode
@@ -151,9 +160,11 @@ function state.destroy_player_bot(player, silent)
 
     -- Reset bookkeeping for render IDs.
     ps.visual = {
-        bot_highlight = nil,
-        lines = nil,
-        radius_circle = nil
+        -- Per-bot render objects. Each role has its own set so visuals are independent.
+        bots = {},
+    
+        -- Overlay text objects are per-player, not per-bot.
+        overlay_texts = {},
     }
 
     if not silent then
@@ -164,33 +175,65 @@ end
 function state.create_player_bot(player)
     local ps = state.get_player_state(player.index)
 
-    if ps.bot_entity and ps.bot_entity.valid then
-        ps.bot_enabled = true
-        return ps.bot_entity
+    -- If any bot already exists, just enable and keep references.
+    if ps.bot_entities then
+        for _, name in ipairs(BOT_NAMES) do
+            local ent = ps.bot_entities[name]
+            if ent and ent.valid then
+                ps.bot_enabled = true
+                return ps.bot_entities
+            end
+        end
     end
 
+    ps.bot_entities = ps.bot_entities or {}
+
     local pos = player.position
-    local ent = player.surface.create_entity {
-        name = "mekatrol-game-play-bot",
-        position = {pos.x - 2, pos.y - 2},
-        force = player.force,
-        raise_built = true
+    local offsets = {
+        mapper = {x = -2, y = -2},
+        repairer = {x = -2, y = 2},
+        constructor = {x = 2, y = -2},
+        cleaner = {x = 2, y = 2}
     }
 
-    if not ent then
+    local created_any = false
+
+    for _, name in ipairs(BOT_NAMES) do
+        local off = offsets[name] or {x = -2, y = -2}
+        local ent = player.surface.create_entity {
+            name = "mekatrol-game-play-bot",
+            position = {pos.x + off.x, pos.y + off.y},
+            force = player.force,
+            raise_built = true
+        }
+
+        if not ent then
+            util.print(player, "red", "create failed (%s)", name)
+        else
+            -- Store by role name (the "name" the mod uses internally).
+            ps.bot_entities[name] = ent
+            ent.destructible = true
+
+            -- Some entity types support backer_name; set it when available.
+            if ent.backer_name ~= nil then
+                ent.backer_name = name
+            end
+
+            created_any = true
+        end
+    end
+
+    if not created_any then
         util.print(player, "red", "create failed")
         return nil
     end
-
-    ps.bot_entity = ent
     ps.bot_enabled = true
-    ent.destructible = true
 
     -- clear entity groups
     entitygroup.clear_entity_groups(ps)
 
-    util.print(player, "green", "created")
-    return ent
+    util.print(player, "green", "created (mapper/repairer/constructor/cleaner)")
+    return ps.bot_entities
 end
 
 return state

@@ -14,19 +14,22 @@ local MODES = config.modes
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
 
+local BOT_NAMES = {"mapper", "repairer", "constructor", "cleaner"}
+
 ----------------------------------------------------------------------
 -- Visuals and behavior dispatch
 ----------------------------------------------------------------------
 
-local function update_bot_for_player(player, ps, tick)
-    local bot = ps.bot_entity
+local function update_bot_for_player(player, ps, bot_name, bot, tick, draw_visuals)
     if not (bot and bot.valid) then
         return
     end
 
-    -- Clear transient visual each update; they are redrawn below.
-    visual.clear_lines(ps)
-    visual.draw_bot_highlight(player, ps)
+    -- Clear transient visual each update; they are redrawn below (mapper only).
+    if draw_visuals then
+        visual.clear_lines(ps, bot_name)
+        visual.draw_bot_highlight(player, ps)
+    end
 
     local radius = nil
     local radius_color = nil
@@ -66,25 +69,29 @@ local function update_bot_for_player(player, ps, tick)
         line_color = radius_color
     end
 
-    if radius and radius > 0 then
-        visual.draw_radius_circle(player, ps, bot, radius, radius_color)
-    else
-        visual.clear_radius_circle(ps)
+    if draw_visuals then
+        if radius and radius > 0 then
+            visual.draw_radius_circle(player, ps, bot_name, bot, radius, radius_color)
+        else
+            visual.clear_radius_circle(ps, bot_name)
+        end
+
+        if target_pos then
+            visual.draw_lines(player, ps, bot_name, bot, target_pos, line_color)
+        end
     end
 
-    if target_pos then
-        visual.draw_lines(player, ps, bot, target_pos, line_color)
-    end
-
-    -- Mode behavior step.
-    if ps.task.current_mode == "follow" then
-        follow.update(player, ps, bot)
-    elseif ps.task.current_mode == "search" then
-        search.update(player, ps, bot)
-    elseif ps.task.current_mode == "survey" then
-        survey.update(player, ps, bot, tick)
-    elseif ps.task.current_mode == "move_to" then
-        move_to.update(player, ps, bot)
+    -- Mode behavior step
+    if bot_name == "mapper" then
+        if ps.task.current_mode == "follow" then
+            follow.update(player, ps, bot)
+        elseif ps.task.current_mode == "search" then
+            search.update(player, ps, bot)
+        elseif ps.task.current_mode == "survey" then
+            survey.update(player, ps, bot, tick)
+        elseif ps.task.current_mode == "move_to" then
+            move_to.update(player, ps, bot)
+        end
     end
 
     -- Throttle overlay updates
@@ -107,9 +114,10 @@ local function update_bot_for_player(player, ps, tick)
     local survey_entity_name_line = string.format("survey entity→%s [%s]", survey_entity.name, survey_entity.type)
 
     local lines = {"State:", bot_mode_name_line, survey_entity_name_line}
-    visual.update_overlay(player, ps, lines)
-
-    visual.draw_bot_light(player, ps, bot)
+    if draw_visuals then
+        visual.update_overlay(player, ps, lines)
+        visual.draw_bot_light(player, ps, bot_name, bot)
+    end
 end
 
 ----------------------------------------------------------------------
@@ -123,7 +131,18 @@ local function on_toggle_bot(event)
     end
 
     local ps = state.get_player_state(p.index)
-    if ps.bot_entity and ps.bot_entity.valid then
+    local has_any = false
+    if ps.bot_entities then
+        for _, name in ipairs(BOT_NAMES) do
+            local ent = ps.bot_entities[name]
+            if ent and ent.valid then
+                has_any = true
+                break
+            end
+        end
+    end
+
+    if has_any then
         state.destroy_player_bot(p, false)
     else
         state.create_player_bot(p)
@@ -160,10 +179,20 @@ local function on_entity_died(event)
     end
 
     for idx, ps in pairs(storage.game_bot or {}) do
-        if ps.bot_entity == ent then
+        local match = false
+        if ps.bot_entities then
+            for _, name in ipairs(BOT_NAMES) do
+                if ps.bot_entities[name] == ent then
+                    match = true
+                    break
+                end
+            end
+        end
+
+        if match then
             local pl = game.get_player(idx)
             if pl and pl.valid then
-                destroy_player_bot(pl, true)
+                state.destroy_player_bot(pl, true)
                 util.print(pl, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
@@ -191,10 +220,16 @@ local function on_player_removed(event)
 
     local p = game.get_player(idx)
     if p and p.valid then
-        destroy_player_bot(p, true)
+        state.destroy_player_bot(p, true)
     else
-        if ps.bot_entity and ps.bot_entity.valid then
-            ps.bot_entity.destroy()
+        -- Player entity is gone; best-effort cleanup of any remaining bots.
+        if ps.bot_entities then
+            for _, name in ipairs(BOT_NAMES) do
+                local ent = ps.bot_entities[name]
+                if ent and ent.valid then
+                    ent.destroy()
+                end
+            end
         end
     end
 
@@ -246,7 +281,12 @@ script.on_event(defines.events.on_tick, function(event)
 
     visual.draw_player_light(player, ps)
 
-    if ps.bot_enabled and ps.bot_entity and ps.bot_entity.valid then
-        update_bot_for_player(player, ps, event.tick)
+    if ps.bot_enabled and ps.bot_entities then
+        -- Drive all bots; visuals are independent per bot (role).
+        for _, name in ipairs(BOT_NAMES) do
+            local bot = (ps.bot_entities and ps.bot_entities[name]) or nil
+            local draw_visuals = true
+            update_bot_for_player(player, ps, name, bot, event.tick, draw_visuals)
+        end
     end
 end)

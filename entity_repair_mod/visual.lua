@@ -6,41 +6,41 @@ local MOD_NAME = "entity_repair_mod"
 ----------------------------------------------------------------
 -- Wipe ALL rendering objects created by this mod
 ----------------------------------------------------------------
-function visual.force_clear_mod_objects(pdata)
-    if not pdata then
+function visual.force_clear_mod_objects(ps)
+    if not ps then
         return
     end
 
     pcall(rendering.clear, MOD_NAME)
 end
 
-function visual.clear_bot_health_bar(pdata)
-    if pdata.bot_health_bg and pdata.bot_health_bg.valid then
-        pdata.bot_health_bg:destroy()
+function visual.clear_bot_health_bar(ps)
+    if ps.bot_health_bg and ps.bot_health_bg.valid then
+        ps.bot_health_bg:destroy()
     end
-    if pdata.bot_health_fg and pdata.bot_health_fg.valid then
-        pdata.bot_health_fg:destroy()
+    if ps.bot_health_fg and ps.bot_health_fg.valid then
+        ps.bot_health_fg:destroy()
     end
-    if pdata.bot_health_text and pdata.bot_health_text.valid then
-        pdata.bot_health_text:destroy()
+    if ps.bot_health_text and ps.bot_health_text.valid then
+        ps.bot_health_text:destroy()
     end
-    pdata.bot_health_bg = nil
-    pdata.bot_health_fg = nil
-    pdata.bot_health_text = nil
+    ps.bot_health_bg = nil
+    ps.bot_health_fg = nil
+    ps.bot_health_text = nil
 end
 
-function visual.clear_bot_highlight(pdata)
-    if pdata.vis_bot_highlight and pdata.vis_bot_highlight.valid then
-        pdata.vis_bot_highlight:destroy()
+function visual.clear_bot_highlight(ps)
+    if ps.vis_bot_highlight and ps.vis_bot_highlight.valid then
+        ps.vis_bot_highlight:destroy()
     end
-    pdata.vis_bot_highlight = nil
+    ps.vis_bot_highlight = nil
 end
 
-function visual.clear_chest_highlight(pdata)
-    if pdata.vis_chest_highlight and pdata.vis_chest_highlight.valid then
-        pdata.vis_chest_highlight:destroy()
+function visual.clear_chest_highlight(ps)
+    if ps.vis_chest_highlight and ps.vis_chest_highlight.valid then
+        ps.vis_chest_highlight:destroy()
     end
-    pdata.vis_chest_highlight = nil
+    ps.vis_chest_highlight = nil
 end
 
 ---------------------------------------------------
@@ -81,40 +81,40 @@ local function get_screen_top_left_world(player)
     }
 end
 
-function visual.clear_destroyed_overlay(pdata)
-    if not pdata then
+function visual.clear_destroyed_overlay(ps)
+    if not ps then
         return
     end
 
     -- Backwards compatibility: single text object
-    if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
-        pdata.destroyed_overlay_text:destroy()
+    if ps.destroyed_overlay_text and ps.destroyed_overlay_text.valid then
+        ps.destroyed_overlay_text:destroy()
     end
-    pdata.destroyed_overlay_text = nil
+    ps.destroyed_overlay_text = nil
 
     -- New: multiple text objects, one per line
-    if pdata.destroyed_overlay_texts then
-        for _, obj in pairs(pdata.destroyed_overlay_texts) do
+    if ps.destroyed_overlay_texts then
+        for _, obj in pairs(ps.destroyed_overlay_texts) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
     end
-    pdata.destroyed_overlay_texts = nil
+    ps.destroyed_overlay_texts = nil
 
     -- Lines from player to destroyed entities
-    if pdata.destroyed_overlay_lines then
-        for _, obj in pairs(pdata.destroyed_overlay_lines) do
+    if ps.destroyed_overlay_lines then
+        for _, obj in pairs(ps.destroyed_overlay_lines) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
     end
-    pdata.destroyed_overlay_lines = nil
+    ps.destroyed_overlay_lines = nil
 end
 
 -- destroyed_list: array or map of {name=..., type=..., position=..., surface=...}
-function visual.update_destroyed_overlay(player, pdata, destroyed_list)
+function visual.update_destroyed_overlay(player, ps, destroyed_list)
     if not (player and player.valid) then
         return
     end
@@ -128,7 +128,7 @@ function visual.update_destroyed_overlay(player, pdata, destroyed_list)
         break
     end
     if not has_any then
-        visual.clear_destroyed_overlay(pdata)
+        visual.clear_destroyed_overlay(ps)
         return
     end
 
@@ -174,13 +174,13 @@ function visual.update_destroyed_overlay(player, pdata, destroyed_list)
     -- Draw or update the text
     -------------------------------------------------------
     -- Clear any legacy single-text usage
-    if pdata.destroyed_overlay_text and pdata.destroyed_overlay_text.valid then
-        pdata.destroyed_overlay_text:destroy()
+    if ps.destroyed_overlay_text and ps.destroyed_overlay_text.valid then
+        ps.destroyed_overlay_text:destroy()
     end
-    pdata.destroyed_overlay_text = nil
+    ps.destroyed_overlay_text = nil
 
     -- Ensure table exists
-    pdata.destroyed_overlay_texts = pdata.destroyed_overlay_texts or {}
+    ps.destroyed_overlay_texts = ps.destroyed_overlay_texts or {}
 
     -- Line spacing in tiles, scaled with text size
     local base_line_spacing_tiles = 0.8
@@ -193,13 +193,13 @@ function visual.update_destroyed_overlay(player, pdata, destroyed_list)
             y = base_pos.y + (index - 1) * line_spacing
         }
 
-        local obj = pdata.destroyed_overlay_texts[index]
+        local obj = ps.destroyed_overlay_texts[index]
         if obj and obj.valid then
             obj.text = line
             obj.target = line_pos
             obj.scale = effective_scale
         else
-            pdata.destroyed_overlay_texts[index] = rendering.draw_text {
+            ps.destroyed_overlay_texts[index] = rendering.draw_text {
                 text = line,
                 surface = player.surface,
                 target = line_pos,
@@ -219,15 +219,15 @@ function visual.update_destroyed_overlay(player, pdata, destroyed_list)
     end
 
     -- Destroy any extra visual if the list shrank
-    local count = #pdata.destroyed_overlay_texts
+    local count = #ps.destroyed_overlay_texts
     local needed = #lines
     if count > needed then
         for idx = needed + 1, count do
-            local obj = pdata.destroyed_overlay_texts[idx]
+            local obj = ps.destroyed_overlay_texts[idx]
             if obj and obj.valid then
                 obj:destroy()
             end
-            pdata.destroyed_overlay_texts[idx] = nil
+            ps.destroyed_overlay_texts[idx] = nil
         end
     end
 
@@ -235,14 +235,14 @@ function visual.update_destroyed_overlay(player, pdata, destroyed_list)
     -- Draw / update lines from player to each destroyed site
     -------------------------------------------------------
     -- Clear old lines
-    if pdata.destroyed_overlay_lines then
-        for _, obj in pairs(pdata.destroyed_overlay_lines) do
+    if ps.destroyed_overlay_lines then
+        for _, obj in pairs(ps.destroyed_overlay_lines) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
     end
-    pdata.destroyed_overlay_lines = {}
+    ps.destroyed_overlay_lines = {}
 
     local player_pos = player.position
 
@@ -267,27 +267,27 @@ function visual.update_destroyed_overlay(player, pdata, destroyed_list)
             draw_on_ground = true,
             only_in_alt_mode = false
         }
-        pdata.destroyed_overlay_lines[#pdata.destroyed_overlay_lines + 1] = line
+        ps.destroyed_overlay_lines[#ps.destroyed_overlay_lines + 1] = line
     end
 end
 
 -- Call this every tick (or at your bot update interval)
 -- max_health: either a constant or passed in from your get_entity_max_health(bot)
-function visual.update_bot_health_bar(player, bot, pdata, max_health, repair_pack_name)
+function visual.update_bot_health_bar(player, bot, ps, max_health, repair_pack_name)
     if not (bot and bot.valid and max_health and max_health > 0) then
         -- Cleanup if bot missing
-        if pdata.bot_health_bg and pdata.bot_health_bg.valid then
-            pdata.bot_health_bg:destroy()
+        if ps.bot_health_bg and ps.bot_health_bg.valid then
+            ps.bot_health_bg:destroy()
         end
-        if pdata.bot_health_fg and pdata.bot_health_fg.valid then
-            pdata.bot_health_fg:destroy()
+        if ps.bot_health_fg and ps.bot_health_fg.valid then
+            ps.bot_health_fg:destroy()
         end
-        if pdata.bot_health_text and pdata.bot_health_text.valid then
-            pdata.bot_health_text:destroy()
+        if ps.bot_health_text and ps.bot_health_text.valid then
+            ps.bot_health_text:destroy()
         end
-        pdata.bot_health_bg = nil
-        pdata.bot_health_fg = nil
-        pdata.bot_health_text = nil
+        ps.bot_health_bg = nil
+        ps.bot_health_fg = nil
+        ps.bot_health_text = nil
         return
     end
 
@@ -325,17 +325,17 @@ function visual.update_bot_health_bar(player, bot, pdata, max_health, repair_pac
     -------------------------------------------------------
     -- Background rectangle (full bar area, dark)
     -------------------------------------------------------
-    if pdata.bot_health_bg and pdata.bot_health_bg.valid then
-        pdata.bot_health_bg.left_top = {
+    if ps.bot_health_bg and ps.bot_health_bg.valid then
+        ps.bot_health_bg.left_top = {
             entity = bot,
             offset = lt_offset
         }
-        pdata.bot_health_bg.right_bottom = {
+        ps.bot_health_bg.right_bottom = {
             entity = bot,
             offset = rb_offset_full
         }
     else
-        pdata.bot_health_bg = rendering.draw_rectangle {
+        ps.bot_health_bg = rendering.draw_rectangle {
             color = {
                 r = 0,
                 g = 0,
@@ -361,12 +361,12 @@ function visual.update_bot_health_bar(player, bot, pdata, max_health, repair_pac
     -- Foreground (current health) rectangle (green)
     -- Destroy + recreate every tick so it always renders on top
     -------------------------------------------------------
-    if pdata.bot_health_fg and pdata.bot_health_fg.valid then
-        pdata.bot_health_fg:destroy()
-        pdata.bot_health_fg = nil
+    if ps.bot_health_fg and ps.bot_health_fg.valid then
+        ps.bot_health_fg:destroy()
+        ps.bot_health_fg = nil
     end
 
-    pdata.bot_health_fg = rendering.draw_rectangle {
+    ps.bot_health_fg = rendering.draw_rectangle {
         color = {
             r = 0,
             g = 1,
@@ -398,7 +398,7 @@ function visual.update_bot_health_bar(player, bot, pdata, max_health, repair_pac
     local player_packs_available = inv.get_item_count(repair_pack_name)
 
     local chest_packs_available = 0
-    local chest = pdata.repair_chest
+    local chest = ps.repair_chest
 
     if chest and chest.valid and (chest.type == "container" or chest.type == "logistic-container") then
         -- Get chest inventory (always defines.inventory.chest for these types)
@@ -416,14 +416,14 @@ function visual.update_bot_health_bar(player, bot, pdata, max_health, repair_pac
         y = text_y
     }
 
-    local text_value = string.format("%d→%d→%d", pdata.repair_health_pool, chest_packs_available,
+    local text_value = string.format("%d→%d→%d", ps.repair_health_pool, chest_packs_available,
         player_packs_available)
 
-    if pdata.bot_health_text and pdata.bot_health_text.valid then
-        pdata.bot_health_text.target = text_pos
-        pdata.bot_health_text.text = text_value
+    if ps.bot_health_text and ps.bot_health_text.valid then
+        ps.bot_health_text.target = text_pos
+        ps.bot_health_text.text = text_value
     else
-        pdata.bot_health_text = rendering.draw_text {
+        ps.bot_health_text = rendering.draw_text {
             text = text_value,
             surface = bot.surface,
             target = text_pos,
@@ -441,18 +441,18 @@ function visual.update_bot_health_bar(player, bot, pdata, max_health, repair_pac
     end
 end
 
-function visual.clear_lines(pdata)
-    if pdata.vis_lines then
-        for _, obj in pairs(pdata.vis_lines) do
+function visual.clear_lines(ps)
+    if ps.vis_lines then
+        for _, obj in pairs(ps.vis_lines) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
-        pdata.vis_lines = nil
+        ps.vis_lines = nil
     end
 end
 
-function visual.draw_bot_player_visuals(player, bot, pdata)
+function visual.draw_bot_player_visuals(player, bot, ps)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
@@ -465,12 +465,12 @@ function visual.draw_bot_player_visuals(player, bot, pdata)
         y = bot_pos.y + y_offset
     }
 
-    pdata.vis_lines = pdata.vis_lines or {}
+    ps.vis_lines = ps.vis_lines or {}
 
     -- choose line color based on bot mode
     -- red when repairing, grey when following or anything else
     local line_color
-    if pdata.last_mode == "repair" then
+    if ps.last_mode == "repair" then
         line_color = {
             r = 0.5,
             g = 0.1,
@@ -496,33 +496,33 @@ function visual.draw_bot_player_visuals(player, bot, pdata)
         only_in_alt_mode = false
     }
 
-    pdata.vis_lines[#pdata.vis_lines + 1] = line
+    ps.vis_lines[#ps.vis_lines + 1] = line
 end
 
 ---------------------------------------------------
 -- DAMAGED ENTITY MARKERS (DOTS + LINES)
 ---------------------------------------------------
-function visual.clear_damaged_markers(pdata)
-    if pdata.vis_damaged_markers then
-        for _, obj in pairs(pdata.vis_damaged_markers) do
+function visual.clear_damaged_markers(ps)
+    if ps.vis_damaged_markers then
+        for _, obj in pairs(ps.vis_damaged_markers) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
-        pdata.vis_damaged_markers = nil
+        ps.vis_damaged_markers = nil
     end
 
-    if pdata.vis_damaged_lines then
-        for _, obj in pairs(pdata.vis_damaged_lines) do
+    if ps.vis_damaged_lines then
+        for _, obj in pairs(ps.vis_damaged_lines) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
-        pdata.vis_damaged_lines = nil
+        ps.vis_damaged_lines = nil
     end
 end
 
-function visual.draw_damaged_visuals(bot, pdata, damaged_entities)
+function visual.draw_damaged_visuals(bot, ps, damaged_entities)
     if not damaged_entities or #damaged_entities == 0 then
         return
     end
@@ -533,8 +533,8 @@ function visual.draw_damaged_visuals(bot, pdata, damaged_entities)
         y = bot_pos.y
     }
 
-    pdata.vis_damaged_markers = pdata.vis_damaged_markers or {}
-    pdata.vis_damaged_lines = pdata.vis_damaged_lines or {}
+    ps.vis_damaged_markers = ps.vis_damaged_markers or {}
+    ps.vis_damaged_lines = ps.vis_damaged_lines or {}
 
     for _, ent in pairs(damaged_entities) do
         if ent and ent.valid then
@@ -552,7 +552,7 @@ function visual.draw_damaged_visuals(bot, pdata, damaged_entities)
                 draw_on_ground = true,
                 only_in_alt_mode = false
             }
-            pdata.vis_damaged_markers[#pdata.vis_damaged_markers + 1] = dot
+            ps.vis_damaged_markers[#ps.vis_damaged_markers + 1] = dot
 
             local line = rendering.draw_line {
                 color = {
@@ -568,7 +568,7 @@ function visual.draw_damaged_visuals(bot, pdata, damaged_entities)
                 draw_on_ground = true,
                 only_in_alt_mode = false
             }
-            pdata.vis_damaged_lines[#pdata.vis_damaged_lines + 1] = line
+            ps.vis_damaged_lines[#ps.vis_damaged_lines + 1] = line
         end
     end
 end
@@ -576,7 +576,7 @@ end
 ---------------------------------------------------
 -- BOT HIGHLIGHT
 ---------------------------------------------------
-function visual.draw_bot_highlight(bot, pdata)
+function visual.draw_bot_highlight(bot, ps)
     if not (bot and bot.valid) then
         return
     end
@@ -591,18 +591,18 @@ function visual.draw_bot_highlight(bot, pdata)
     local left_top = {cx - size, ui_y - size * 1.5}
     local right_bottom = {cx + size, ui_y + size}
 
-    if pdata.vis_bot_highlight then
-        local obj = pdata.vis_bot_highlight
+    if ps.vis_bot_highlight then
+        local obj = ps.vis_bot_highlight
         if obj and obj.valid then
             obj.left_top = left_top
             obj.right_bottom = right_bottom
             return
         else
-            pdata.vis_bot_highlight = nil
+            ps.vis_bot_highlight = nil
         end
     end
 
-    pdata.vis_bot_highlight = rendering.draw_rectangle {
+    ps.vis_bot_highlight = rendering.draw_rectangle {
         color = {
             r = 0,
             g = 0.2,
@@ -622,9 +622,9 @@ end
 ---------------------------------------------------
 -- CHEST HIGHLIGHT
 ---------------------------------------------------
-function visual.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
+function visual.draw_chest_highlight(chest, ps, chest_highlight_y_offset)
     if not (chest and chest.valid) then
-        visual.clear_chest_highlight(pdata)
+        visual.clear_chest_highlight(ps)
         return
     end
 
@@ -638,18 +638,18 @@ function visual.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
     local left_top = {cx - size, ui_y - size}
     local right_bottom = {cx + size, ui_y + size}
 
-    if pdata.vis_chest_highlight then
-        local obj = pdata.vis_chest_highlight
+    if ps.vis_chest_highlight then
+        local obj = ps.vis_chest_highlight
         if obj and obj.valid then
             obj.left_top = left_top
             obj.right_bottom = right_bottom
             return
         else
-            pdata.vis_chest_highlight = nil
+            ps.vis_chest_highlight = nil
         end
     end
 
-    pdata.vis_chest_highlight = rendering.draw_rectangle {
+    ps.vis_chest_highlight = rendering.draw_rectangle {
         color = {
             r = 0.8,
             g = 0.0,
@@ -667,17 +667,17 @@ function visual.draw_chest_highlight(chest, pdata, chest_highlight_y_offset)
 end
 
 -- Master “clear everything” helper:
-function visual.clear_all(pdata)
-    if not pdata then
+function visual.clear_all(ps)
+    if not ps then
         return
     end
 
-    visual.clear_bot_health_bar(pdata)
-    visual.clear_bot_highlight(pdata)
-    visual.clear_chest_highlight(pdata)
-    visual.clear_lines(pdata)
-    visual.clear_damaged_markers(pdata)
-    visual.clear_destroyed_overlay(pdata)
+    visual.clear_bot_health_bar(ps)
+    visual.clear_bot_highlight(ps)
+    visual.clear_chest_highlight(ps)
+    visual.clear_lines(ps)
+    visual.clear_damaged_markers(ps)
+    visual.clear_destroyed_overlay(ps)
 end
 
 return visual
