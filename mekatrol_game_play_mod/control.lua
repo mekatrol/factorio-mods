@@ -21,11 +21,7 @@ local BOT_NAMES = {"mapper", "repairer", "constructor", "cleaner"}
 -- Visuals and behavior dispatch
 ----------------------------------------------------------------------
 
-local function update_mapper_bot(player, ps, bot_name, bot, tick)
-    if not (bot and bot.valid) then
-        return
-    end
-
+local function update_bot(player, ps, bot_name, bot, tick)
     -- Clear transient visual each update; they are redrawn below (mapper only).
     visual.clear_lines(ps, bot_name)
     visual.draw_bot_highlight(player, ps, bot_name)
@@ -78,9 +74,18 @@ local function update_mapper_bot(player, ps, bot_name, bot, tick)
         visual.draw_lines(player, ps, bot_name, bot, target_pos, line_color)
     end
 
+end
+
+local function update_mapper_bot(player, ps, bot_name, bot, tick)
+    if not (bot and bot.valid) then
+        return
+    end
+
+    update_bot(player, ps, bot_name, bot, tick)
+
     -- Mode behavior step
     if ps.task.current_mode == "follow" then
-        follow.update(player, ps, bot)
+        follow.update(player, ps, bot, -2)
     elseif ps.task.current_mode == "search" then
         search.update(player, ps, bot)
     elseif ps.task.current_mode == "survey" then
@@ -111,6 +116,42 @@ local function update_mapper_bot(player, ps, bot_name, bot, tick)
     local lines = {"State:", bot_mode_name_line, survey_entity_name_line}
     visual.update_overlay(player, ps, lines)
     visual.draw_bot_light(player, ps, bot_name, bot)
+end
+
+local function update_repairer_bot(player, ps, bot_name, bot, tick)
+    if not (bot and bot.valid) then
+        return
+    end
+
+    update_bot(player, ps, bot_name, bot, tick)
+
+    if ps.task.current_mode == "follow" then
+        follow.update(player, ps, bot, -0.666)
+    end
+end
+
+local function update_constructor_bot(player, ps, bot_name, bot, tick)
+    if not (bot and bot.valid) then
+        return
+    end
+
+    update_bot(player, ps, bot_name, bot, tick)
+
+    if ps.task.current_mode == "follow" then
+        follow.update(player, ps, bot, 0.666)
+    end
+end
+
+local function update_cleaner_bot(player, ps, bot_name, bot, tick)
+    if not (bot and bot.valid) then
+        return
+    end
+
+    update_bot(player, ps, bot_name, bot, tick)
+
+    if ps.task.current_mode == "follow" then
+        follow.update(player, ps, bot, 2)
+    end
 end
 
 ----------------------------------------------------------------------
@@ -281,6 +322,12 @@ script.on_event(defines.events.on_tick, function(event)
 
             if name == "mapper" then
                 update_mapper_bot(player, ps, name, bot, event.tick)
+            elseif name == "repairer" then
+                update_repairer_bot(player, ps, name, bot, event.tick)
+            elseif name == "constructor" then
+                update_constructor_bot(player, ps, name, bot, event.tick)
+            elseif name == "cleaner" then
+                update_cleaner_bot(player, ps, name, bot, event.tick)
             end
         end
     end

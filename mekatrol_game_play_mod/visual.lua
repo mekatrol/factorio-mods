@@ -589,14 +589,39 @@ function visual.draw_bot_highlight(player, player_state, bot_name)
             bv.bot_highlight = nil
         end
 
+        local color = {
+            r = 0.2,
+            g = 0.2,
+            b = 0.2,
+            a = 0.1
+        }
+
+        if bot_name == "repairer" then
+            color = {
+                r = 0.2,
+                g = 0.0,
+                b = 0.0,
+                a = 0.1
+            }
+        elseif bot_name == "constructor" then
+            color = {
+                r = 0.0,
+                g = 0.2,
+                b = 0.0,
+                a = 0.1
+            }
+        elseif bot_name == "cleaner" then
+            color = {
+                r = 0.0,
+                g = 0.0,
+                b = 0.2,
+                a = 0.1
+            }
+        end
+
         if not bv.bot_highlight then
             bv.bot_highlight = rendering.draw_rectangle {
-                color = {
-                    r = 0.2,
-                    g = 0.2,
-                    b = 0.2,
-                    a = 0.1
-                },
+                color = color,
                 filled = false,
                 width = 2,
                 left_top = left_top,

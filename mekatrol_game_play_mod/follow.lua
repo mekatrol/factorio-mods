@@ -9,7 +9,7 @@ local BOT_CONF = config.bot
 -- Follow mode
 ----------------------------------------------------------------------
 
-function follow.update(player, ps, bot)
+function follow.update(player, ps, bot, y_offset)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
@@ -55,7 +55,7 @@ function follow.update(player, ps, bot)
 
     local target_pos = {
         x = ppos.x + so,
-        y = ppos.y - 2
+        y = ppos.y + y_offset
     }
 
     positioning.move_bot_towards(player, bot, target_pos)
