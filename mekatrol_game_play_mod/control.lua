@@ -100,7 +100,7 @@ local function update_bot_for_player(player, ps, tick)
     local bot_next_mode_name = ps.task.next_mode or "nil"
     local bot_mode_name_line = string.format("bot mode %s→%s", bot_current_mode_name, bot_next_mode_name)
 
-        local survey_entity = ps.survey_entity or {
+    local survey_entity = ps.survey_entity or {
         name = "nil",
         type = "nil"
     }
@@ -243,6 +243,8 @@ script.on_event(defines.events.on_tick, function(event)
     if not ps then
         return
     end
+
+    visual.draw_player_light(player, ps)
 
     if ps.bot_enabled and ps.bot_entity and ps.bot_entity.valid then
         update_bot_for_player(player, ps, event.tick)

@@ -209,10 +209,23 @@ function visual.clear_bot_light(ps)
 
     local obj = ps.visual.bot_light
     if obj then
-        obj.destroy() -- safe even when obj.valid == false :contentReference[oaicite:2]{index=2}
+        obj.destroy()
     end
 
     ps.visual.bot_light = nil
+end
+
+function visual.clear_player_light(ps)
+    if not (ps and ps.visual) then
+        return
+    end
+
+    local obj = ps.visual.player_light
+    if obj then
+        obj.destroy()
+    end
+
+    ps.visual.player_light = nil
 end
 
 ---------------------------------------------------
@@ -233,6 +246,7 @@ function visual.clear_all(player_state)
     visual.clear_radius_circle(player_state)
     visual.clear_entity_groups(player_state)
     visual.clear_bot_light(player_state)
+    visual.clear_player_light(player_state)
 end
 
 ----------------------------------------------------------------------
@@ -737,7 +751,31 @@ function visual.draw_bot_light(player, ps, bot)
 
         players = {player.index},
         render_mode = "game"
-    } -- returns LuaRenderObject :contentReference[oaicite:4]{index=4}
+    }
+end
+
+function visual.draw_player_light(player, ps)
+    if not (player and player.valid and ps and ps.visual) then
+        return
+    end
+
+    local obj = ps.visual.player_light
+    if obj and obj.valid then
+        return -- already exists; stays attached to target :contentReference[oaicite:3]{index=3}
+    end
+
+    ps.visual.player_light = rendering.draw_light {
+        sprite = "utility/light_medium",
+        target = player.character,
+        surface = player.surface,
+
+        scale = 20,
+        intensity = 4,
+        minimum_darkness = 0.05,
+
+        players = {player.index},
+        render_mode = "game"
+    }
 end
 
 ----------------------------------------------------------------------
