@@ -4,14 +4,12 @@ local common_bot = require("common_bot")
 local config = require("config")
 local follow = require("follow")
 local move_to = require("move_to")
-local state = require("state")
 local search = require("search")
 local survey = require("survey")
-local visual = require("visual")
 
 local BOT_CONF = config.bot
 
-function mapper_bot.update(player, ps, tick)
+function mapper_bot.update(player, ps, state, visual, tick)
     local bot_name = "mapper"
     local bot = state.get_bot_by_name(player, ps, bot_name)
     local conf = BOT_CONF[bot_name]

@@ -3,12 +3,10 @@ local cleaner_bot = {}
 local common_bot = require("common_bot")
 local config = require("config")
 local follow = require("follow")
-local state = require("state")
-local visual = require("visual")
 
 local BOT_CONF = config.bot
 
-function cleaner_bot.update(player, ps, tick)
+function cleaner_bot.update(player, ps, state, visual, tick)
     local bot_name = "cleaner"
     local bot = state.get_bot_by_name(player, ps, bot_name)
     local conf = BOT_CONF[bot_name]

@@ -194,10 +194,10 @@ script.on_event(defines.events.on_tick, function(event)
 
     if ps.bot_enabled and ps.bots then
         local tick = event.tick
-        cleaner_bot.update(player, ps, tick)
-        constructor_bot.update(player, ps, tick)
-        mapper_bot.update(player, ps, tick)
-        repairer_bot.update(player, ps, tick)
+        cleaner_bot.update(player, ps, state, visual, tick)
+        constructor_bot.update(player, ps, state, visual, tick)
+        mapper_bot.update(player, ps, state, visual, tick)
+        repairer_bot.update(player, ps, state, visual, tick)
 
         local cleaner_current_mode, cleaner_next_mode = common_bot.get_modes(player, ps, "cleaner")
         local cleaner_current_mode_line = string.format("cleaner: %s→%s", cleaner_current_mode or "nil",
