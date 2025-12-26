@@ -13,6 +13,7 @@ function move_to.update(player, ps, state, bot)
     end
 
     local target_pos = bot.task.target_position
+
     if not target_pos then
         -- if there is no target position then we switch bot modes
         local mode = bot.task.next_mode or bot.task.current_mode
@@ -27,7 +28,7 @@ function move_to.update(player, ps, state, bot)
         return
     end
 
-    positioning.move_bot_towards(player, bot, target_pos)
+    positioning.move_entity_towards(player, bot.entity, target_pos)
 
     -- auto-exit when reached (same threshold as search)
     local bp = bot.entity.position

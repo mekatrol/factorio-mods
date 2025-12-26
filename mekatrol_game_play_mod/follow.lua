@@ -58,7 +58,7 @@ function follow.update(player, ps, state, bot, y_offset)
         y = ppos.y + y_offset
     }
 
-    positioning.move_bot_towards(player, bot.entity, target_pos)
+    positioning.move_entity_towards(player, bot.entity, target_pos)
 end
 
 return follow

@@ -26,8 +26,8 @@ function positioning.resolve_target_position(target)
     return nil, tostring(target)
 end
 
-function positioning.move_bot_towards(player, bot, target)
-    if not (bot and bot.valid) then
+function positioning.move_entity_towards(player, entity, target)
+    if not (entity and entity.valid) then
         return
     end
 
@@ -39,7 +39,7 @@ function positioning.move_bot_towards(player, bot, target)
 
     local step = BOT_CONF.movement.step_distance
 
-    local bp = bot.position
+    local bp = entity.position
     local dx = pos.x - bp.x
     local dy = pos.y - bp.y
     local d2 = dx * dx + dy * dy
@@ -50,11 +50,11 @@ function positioning.move_bot_towards(player, bot, target)
 
     local dist = math.sqrt(d2)
     if dist <= step then
-        bot.teleport({pos.x, pos.y})
+        entity.teleport({pos.x, pos.y})
         return
     end
 
-    bot.teleport({
+    entity.teleport({
         x = bp.x + dx / dist * step,
         y = bp.y + dy / dist * step
     })

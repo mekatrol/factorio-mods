@@ -134,7 +134,7 @@ local function find_entity(player, ps, bot, pos, surf)
     local next_found_entity = nil
 
     for _, e in ipairs(found) do
-        if e.valid and e ~= bot and e ~= char and not entitygroup.is_survey_ignore_target(e) then
+        if e.valid and e ~= bot.entity and e ~= char and not entitygroup.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
             if not entitygroup.is_in_any_entity_group(ps, surf.index, e) then
                 if not next_found_entity then
@@ -156,19 +156,19 @@ function search.update(player, ps, state, bot)
     end
 
     local surf = bot.entity.surface
-    local target_pos = ps.task.target_position
+    local target_pos = bot.task.target_position
     local bpos = bot.entity.position
 
     if not target_pos then
-        local entity = find_entity(player, ps, bot.entity, bpos, surf)
+        local entity = find_entity(player, ps, bot, bpos, surf)
 
         if entity then
             -- record what we found (optional, but useful for overlay/debug)
-            ps.survey_entity = entity
+            bot.task.survey_entity = entity
 
             -- move to the entity and then switch to survey mode
             -- to survey the entity group
-            ps.task.target_position = {
+            bot.task.target_position = {
                 x = entity.position.x,
                 y = entity.position.y
             }
@@ -177,17 +177,18 @@ function search.update(player, ps, state, bot)
             state.set_bot_task(player, ps, bot, "move_to")
 
             -- reset search spiral so searching restarts cleanly after
-            ps.search_spiral = nil
+            bot.task.search_spiral = nil
 
             return
         end
 
-        target_pos = search.pick_new_search_target_spiral(ps, bot.position)
+        target_pos = search.pick_new_search_target_spiral(ps, bot.entity.position)
+
         -- move to the entity and then swtich to survey mode
-        ps.task.target_position = target_pos
+        bot.task.target_position = target_pos
     end
 
-    positioning.move_bot_towards(player, bot.entity, target_pos)
+    positioning.move_entity_towards(player, bot.entity, target_pos)
 
     local dx = target_pos.x - bpos.x
     local dy = target_pos.y - bpos.y
@@ -197,7 +198,7 @@ function search.update(player, ps, state, bot)
         return
     end
 
-    ps.task.target_position = nil
+    bot.task.target_position = nil
 end
 
 return search

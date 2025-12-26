@@ -86,16 +86,6 @@ function state.get_player_state(player_index)
     mapper_bot.init_state(player, ps)
     repairer_bot.init_state(player, ps)
 
-    ps.task = ps.task or {}
-
-    ps.task.current_mode = ps.task.current_mode or "follow"
-    ps.task.next_mode = ps.task.next_mode or nil
-    ps.task.target_position = ps.task.target_position or nil
-
-    ps.search_spiral = ps.search_spiral or nil
-
-    ps.survey_entity = ps.survey_entity or nil
-
     ps.overlay_next_tick = ps.overlay_next_tick or 0
 
     state.ensure_visuals(ps)
@@ -153,10 +143,10 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
 
     -- Destroy all bot entities (if present).
     if ps.bots then
-        cleaner_bot.destory(player, ps, state)
-        constructor_bot.destory(player, ps, state)
-        mapper_bot.destory(player, ps, state)
-        repairer_bot.destory(player, ps, state)
+        cleaner_bot.destroy_state(player, ps, state)
+        constructor_bot.destroy_state(player, ps, state)
+        mapper_bot.destroy_state(player, ps, state)
+        repairer_bot.destroy_state(player, ps, state)
     end
 
     -- Clear ALL render objects / visual.
@@ -174,9 +164,6 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
 
     -- clear entity groups
     clear_entity_groups(ps)
-
-    -- Clear survey entity
-    ps.survey_entity = nil
 
     -- Reset bookkeeping for render IDs.
     ps.visual = {

@@ -378,7 +378,7 @@ end
 -- along a straight line.
 ----------------------------------------------------------------------
 
-local function move_bot_towards(bot, target)
+local function move_entity_towards(bot, target)
     if not (bot and bot.valid and target) then
         return
     end
@@ -705,7 +705,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     -- If we have a target position, move toward it.
     ------------------------------------------------------------------
     if pdata.target_position then
-        move_bot_towards(bot, pdata.target_position)
+        move_entity_towards(bot, pdata.target_position)
 
         local new_bp = bot.position
         local d2_target = distance_squared(new_bp, pdata.target_position)

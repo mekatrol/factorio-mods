@@ -128,7 +128,7 @@ function entitygroup.add_boundary(player, ps, visual, boundary, entity_name, sur
     -- Draw polygon + label (clears any prior render for this group_id)
     visual.draw_entity_group(player, ps, group_id, entity_name, boundary, center)
 
-    entitygroup.merge_overlapping_groups(player, ps)
+    entitygroup.merge_overlapping_groups(player, ps, visual)
 end
 
 function entitygroup.add_single_tile_entity_group(player, ps, visual, surface_index, entity)
@@ -187,7 +187,7 @@ function entitygroup.add_single_tile_entity_group(player, ps, visual, surface_in
     entitygroup.add_boundary(player, ps, visual, boundary, entity.name, surface_index)
 end
 
-function entitygroup.merge_overlapping_groups(player, ps)
+function entitygroup.merge_overlapping_groups(player, ps, visual)
     entitygroup.ensure_entity_groups(ps)
 
     local groups = ps.entity_groups

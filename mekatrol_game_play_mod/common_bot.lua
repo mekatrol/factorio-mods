@@ -116,7 +116,7 @@ function common_bot.update(player, bot, bot_conf, tick)
     end
 end
 
-function common_bot.clear_bot_light(bot)
+function common_bot.clear_light(bot)
     if not bot then
         return
     end

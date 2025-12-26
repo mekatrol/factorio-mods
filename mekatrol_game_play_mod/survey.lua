@@ -174,14 +174,14 @@ end
 -- Trace state
 ----------------------------------------------------------------------
 
-local function ensure_trace(ps)
-    ps.survey_trace = ps.survey_trace or nil
+local function ensure_trace(ps, bot)
+    bot.task.survey_trace = bot.task.survey_trace or nil
 end
 
-local function start_trace_from_found(ps, bot_pos)
-    local tx, ty = tile_xy_from_pos(bot_pos)
+local function start_trace_from_found(ps, bot)
+    local tx, ty = tile_xy_from_pos(bot.entity.position)
 
-    ps.survey_trace = {
+    bot.task.survey_trace = {
         phase = "north", -- "north" then "edge"
         origin_tx = tx, -- where we first saw it (not strictly required)
         origin_ty = ty,
@@ -214,14 +214,14 @@ end
 ----------------------------------------------------------------------
 
 function survey.perform_survey_scan(player, ps, bot, tick)
-    local surf = bot.surface
-    local bpos = bot.position
+    local surf = bot.entity.surface
+    local bpos = bot.entity.position
 
-    if not ps.survey_entity then
+    if not bot.task.survey_entity then
         return false
     end
 
-    local find_name = ps.survey_entity.name
+    local find_name = bot.task.survey_entity.name
 
     local found = surf.find_entities_filtered {
         position = bpos,
@@ -234,9 +234,9 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     end
 
     -- If we're not already tracing, start.
-    ensure_trace(ps)
-    if not ps.survey_trace then
-        start_trace_from_found(ps, bpos)
+    ensure_trace(ps, bot)
+    if not bot.task.survey_trace then
+        start_trace_from_found(ps, bot)
     end
 
     return true
@@ -244,27 +244,27 @@ end
 
 local function switch_to_next_mode(player, ps, state, bot)
     state.set_bot_task(player, ps, bot, bot.task.next_mode or "search")
-    ps.task.target_position = nil
-    ps.survey_trace = nil
-    ps.survey_entity = nil
+    bot.task.target_position = nil
+    bot.task.survey_trace = nil
+    bot.task.survey_entity = nil
 end
 
 local function trace_step(player, ps, state, visual, bot)
     local name = nil
-    if ps.survey_entity then
-        name = ps.survey_entity.name
+    if bot.task.survey_entity then
+        name = bot.task.survey_entity.name
     end
 
-    local tr = ps.survey_trace
+    local tr = bot.task.survey_trace
     if not tr then
         return nil
     end
 
-    local surf = bot.surface
+    local surf = bot.entity.surface
 
     if tr.phase == "north" then
         -- Walk due north until the next tile does NOT contain the resource.
-        local tx, ty = tile_xy_from_pos(bot.position)
+        local tx, ty = tile_xy_from_pos(bot.entity.position)
 
         local MAX_NORTH_STUCK = 30 -- adjust (30 attempts is usually enough)
 
@@ -272,7 +272,7 @@ local function trace_step(player, ps, state, visual, bot)
             tr.north_stuck_attempts = (tr.north_stuck_attempts or 0) + 1
             if tr.north_stuck_attempts >= MAX_NORTH_STUCK then
                 -- Abort trace; survey will restart when it finds the resource again
-                ps.survey_trace = nil
+                bot.task.survey_trace = nil
                 return nil
             end
         else
@@ -283,7 +283,7 @@ local function trace_step(player, ps, state, visual, bot)
 
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
         if not tile_has_name(surf, name, tx, ty) then
-            local found_tx, found_ty = find_nearby_resource_tile(surf, name, bot.position,
+            local found_tx, found_ty = find_nearby_resource_tile(surf, name, bot.entity.position,
                 math.ceil(BOT_CONF.survey.radius) + 1)
             if found_tx then
                 tr.origin_tx = found_tx
@@ -292,7 +292,7 @@ local function trace_step(player, ps, state, visual, bot)
             end
 
             -- No nearby resource tile; abort trace so scan can restart later
-            ps.survey_trace = nil
+            bot.task.survey_trace = nil
             return nil
         end
 
@@ -322,7 +322,7 @@ local function trace_step(player, ps, state, visual, bot)
 
             if not found_boundary then
                 -- Can't find a boundary; abort.
-                ps.survey_trace = nil
+                bot.task.survey_trace = nil
                 return nil
             end
         end
@@ -342,7 +342,7 @@ local function trace_step(player, ps, state, visual, bot)
         -- First edge move:
         local nx, ny, nbx, nby = moore_next(surf, name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
         if not nx then
-            ps.survey_trace = nil
+            bot.task.survey_trace = nil
             return nil
         end
 
@@ -363,7 +363,7 @@ local function trace_step(player, ps, state, visual, bot)
         -- Closed when we are back at start AND the next step would be p1.
         local nx, ny, nbx, nby = moore_next(surf, name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
         if not nx then
-            ps.survey_trace = nil
+            bot.task.survey_trace = nil
             return nil
         end
 
@@ -393,26 +393,26 @@ local function trace_step(player, ps, state, visual, bot)
 end
 
 function survey.update(player, ps, state, visual, bot, tick)
-    if not (player and player.valid and bot and bot.valid) then
+    if not (player and player.valid and bot and bot.entity.valid) then
         return
     end
 
     -- If we are tracing, drive movement purely from the trace state machine.
-    ensure_trace(ps)
-    if ps.survey_trace then
-        local target_pos = ps.task.target_position
+    ensure_trace(ps, bot)
+    if bot.task.survey_trace then
+        local target_pos = bot.task.target_position
         if not target_pos then
             target_pos = trace_step(player, ps, state, visual, bot)
-            ps.task.target_position = target_pos
+            bot.task.target_position = target_pos
         end
 
         if not target_pos then
             return
         end
 
-        positioning.move_bot_towards(player, bot, target_pos)
+        positioning.move_entity_towards(player, bot.entity, target_pos)
 
-        local bpos = bot.position
+        local bpos = bot.entity.position
         local dx = target_pos.x - bpos.x
         local dy = target_pos.y - bpos.y
         local d2 = dx * dx + dy * dy
@@ -423,20 +423,20 @@ function survey.update(player, ps, state, visual, bot, tick)
         end
 
         -- Arrived; request next trace target next update.
-        ps.task.target_position = nil
+        bot.task.target_position = nil
         return
     end
 
-    if not ps.survey_entity then
+    if not bot.task.survey_entity then
         return
     end
 
     -- For single-tile survey targets (e.g. crude-oil), just add it as self contained polygon
-    if entitygroup.is_survey_single_target(ps.survey_entity) then
-        entitygroup.add_single_tile_entity_group(player, ps, visual, bot.surface_index, ps.survey_entity)
+    if entitygroup.is_survey_single_target(bot.task.survey_entity) then
+        entitygroup.add_single_tile_entity_group(player, ps, visual, bot.entity.surface_index, bot.task.survey_entity)
 
         -- Switch back to survey mode to find next entity
-        switch_to_next_mode(player, ps, state)
+        switch_to_next_mode(player, ps, state, bot)
     else
         -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
         survey.perform_survey_scan(player, ps, bot, tick)
