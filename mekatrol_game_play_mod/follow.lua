@@ -10,12 +10,12 @@ local BOT_CONF = config.bot
 ----------------------------------------------------------------------
 
 function follow.update(player, ps, bot, y_offset)
-    if not (player and player.valid and bot and bot.valid) then
+    if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
     end
 
     local ppos = player.position
-    local bpos = bot.position
+    local bpos = bot.entity.position
 
     local prev = ps.last_player_position
     local left, right = false, false
@@ -58,7 +58,7 @@ function follow.update(player, ps, bot, y_offset)
         y = ppos.y + y_offset
     }
 
-    positioning.move_bot_towards(player, bot, target_pos)
+    positioning.move_bot_towards(player, bot.entity, target_pos)
 end
 
 return follow

@@ -9,14 +9,14 @@ local util = require("util")
 local BOT_CONF = config.bot
 
 function move_to.update(player, ps, bot)
-    if not (player and player.valid and ps and bot and bot.valid) then
+    if not (player and player.valid and ps and bot and bot.entity and bot.entity.valid) then
         return
     end
 
-    local target_pos = ps.task.target_position
+    local target_pos = bot.task.target_position
     if not target_pos then
         -- if there is no target position then we switch bot modes
-        local mode = ps.task.next_mode or ps.task.current_mode
+        local mode = bot.task.next_mode or bot.task.current_mode
 
         -- We don't want an endless loop if target position is nil and mode is "move_to"
         if mode == "move_to" then
@@ -24,21 +24,24 @@ function move_to.update(player, ps, bot)
             mode = "follow"
         end
 
-        state.set_player_bot_task(player, ps, mode)
+        state.set_player_bot_task(player, ps, "mapper", mode)
+        state.set_player_bot_task(player, ps, "repairer", mode)
+        state.set_player_bot_task(player, ps, "constructor", mode)
+        state.set_player_bot_task(player, ps, "cleaner", mode)
         return
     end
 
     positioning.move_bot_towards(player, bot, target_pos)
 
     -- auto-exit when reached (same threshold as search)
-    local bp = bot.position
+    local bp = bot.entity.position
     local dx = target_pos.x - bp.x
     local dy = target_pos.y - bp.y
     local step = BOT_CONF.movement.step_distance
 
     -- reached target, if so move to next mode
     if dx * dx + dy * dy <= step * step then
-        local new_mode = ps.task.next_mode or "follow"        
+        local new_mode = bot.task.next_mode or "follow"
         state.set_player_bot_task(player, ps, new_mode)
     end
 end

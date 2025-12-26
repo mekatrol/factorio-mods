@@ -1,7 +1,7 @@
 -- state.lua
 --
 -- Responsibilities:
---   - Own persistent per-player bot state in `storage.game_bot[player_index]`
+--   - Own persistent per-player bot state in `storage.mekatrol_game_play_bot[player_index]`
 --   - Provide helpers to create/destroy bot and change bot mode
 local state = {}
 
@@ -18,15 +18,25 @@ local BOT_NAMES = {"mapper", "repairer", "constructor", "cleaner"}
 ----------------------------------------------------------------------
 
 function state.ensure_storage_tables()
-    storage.game_bot = storage.game_bot or {}
+    storage.mekatrol_game_play_bot = storage.mekatrol_game_play_bot or {}
 end
 
-local function ensure_visuals_table(ps)
+function state.ensure_bot_visual(ps, bot_name)
+    ps.visual[bot_name] = ps.visual[bot_name] or {}
+
+    ps.visual[bot_name].highlight = ps.visual[bot_name].highlight or nil
+    ps.visual[bot_name].radius_circle = ps.visual[bot_name].radius_circle or nil
+end
+
+function state.ensure_visuals(ps)
     ps.visual = ps.visual or {}
-    ps.visual.bot_highlight = ps.visual.bot_highlight or nil
     ps.visual.lines = ps.visual.lines or nil
-    ps.visual.radius_circle = ps.visual.radius_circle or nil
     ps.visual.overlay_texts = ps.visual.overlay_texts or {}
+
+    state.ensure_bot_visual(ps, "cleaner")
+    state.ensure_bot_visual(ps, "constructor")
+    state.ensure_bot_visual(ps, "mapper")
+    state.ensure_bot_visual(ps, "repairer")
 end
 
 ----------------------------------------------------------------------
@@ -41,14 +51,15 @@ function state.get_bot_by_name(player, ps, bot_name)
         return nil
     end
 
-    local bots = ps.bot_entities
+    local bots = ps.bots
     if not bots then
         return nil
     end
 
-    local ent = bots[bot_name]
-    if ent and ent.valid then
-        return ent
+    local bot = bots[bot_name]
+
+    if bot and bot.entity and bot.entity.valid then
+        return bot
     end
 
     return nil
@@ -57,40 +68,82 @@ end
 function state.get_player_state(player_index)
     state.ensure_storage_tables()
 
-    local ps = storage.game_bot[player_index]
+    local ps = storage.mekatrol_game_play_bot[player_index]
+
     if not ps then
         ps = {
-            bot_entities = {},
+            bots = {
+                ["mapper"] = {
+                    entity = nil,
+                    task = {
+                        target_position = nil,
+                        current_mode = "follow",
+                        next_mode = nil,
+                        search_spiral = nil,
+                        survey_entity = nil
+                    }
+                },
+                ["repairer"] = {
+                    entity = nil,
+                    task = {
+                        target_position = nil,
+                        current_mode = "follow",
+                        next_mode = nil
+                    }
+                },
+                ["constructor"] = {
+                    entity = nil,
+                    task = {
+                        target_position = nil,
+                        current_mode = "follow",
+                        next_mode = nil
+                    }
+                },
+                ["cleaner"] = {
+                    entity = nil,
+                    task = {
+                        target_position = nil,
+                        current_mode = "follow",
+                        next_mode = nil
+                    }
+                }
+            },
+
             bot_enabled = false,
 
             last_player_position = nil,
             last_player_side_offset_x = -BOT_CONF.movement.side_offset_distance,
 
-            task = {
-                target_position = nil,
-                current_mode = "follow",
-                next_mode = nil
-            },
-
-            search_spiral = nil,
-
-            survey_entity = nil,
-
             overlay_next_tick = nil,
 
             visual = {
-                bot_highlight = nil,
+                ["mapper"] = {
+                    bot_highlight = nil,
+                    radius_circle = nil
+                },
+                ["repairer"] = {
+                    bot_highlight = nil,
+                    radius_circle = nil
+                },
+                ["constructor"] = {
+                    bot_highlight = nil,
+                    radius_circle = nil
+                },
+                ["cleaner"] = {
+                    bot_highlight = nil,
+                    radius_circle = nil
+                },
+
                 lines = nil,
-                radius_circle = nil,
                 overlay_texts = {}
             }
         }
 
-        storage.game_bot[player_index] = ps
+        storage.mekatrol_game_play_bot[player_index] = ps
         return ps
     end
 
-    ps.bot_entities = ps.bot_entities or {}
+    ps.bots = ps.bots or {}
 
     ps.task = ps.task or {}
 
@@ -104,7 +157,7 @@ function state.get_player_state(player_index)
 
     ps.overlay_next_tick = ps.overlay_next_tick or 0
 
-    ensure_visuals_table(ps)
+    state.ensure_visuals(ps)
 
     return ps
 end
@@ -113,34 +166,43 @@ end
 -- Mode setting
 ----------------------------------------------------------------------
 
-function state.set_player_bot_task(player, ps, new_mode)
+function state.set_player_mapper_bot_task(player, ps, bot, new_mode)
+    bot.search_spiral = nil
+    bot.survey_entity = nil
+    bot.next_survey_entities = {}
+end
+
+function state.set_player_bot_task(player, ps, bot_name, new_mode)
     -- Validate mode
     if not MODES.index[new_mode] then
         new_mode = "follow"
     end
 
+    -- get bot
+    local bot = state.get_bot_by_name(player, ps, bot_name)
+
     -- set the new current_mode
-    ps.task.current_mode = new_mode
+    bot.task.current_mode = new_mode
 
     -- Follow mode: no fixed target.
     if new_mode == "follow" then
         -- clear the next_mode and target position when switching modes
-        ps.task.next_mode = nil
-        ps.task.target_position = nil
+        bot.task.next_mode = nil
+        bot.task.target_position = nil
 
-        ps.search_spiral = nil
-        ps.survey_entity = nil
-        ps.next_survey_entities = {}
+        if bot_name == "mapper" then
+            state.set_player_mapper_bot_task(player, ps, bot, new_mode)
+        end
         return
     end
 
     if new_mode == "search" then
-        ps.task.next_mode = "survey"
+        bot.task.next_mode = "survey"
         return
     end
 
     if new_mode == "survey" then
-        ps.task.next_mode = "search"
+        bot.task.next_mode = "search"
     end
 end
 
@@ -148,25 +210,25 @@ end
 -- Bot lifecycle
 ----------------------------------------------------------------------
 
-function state.destroy_player_bot(player, silent, clear_all, clear_entity_groups)
+function state.destroy_player_bot(player, clear_all, clear_entity_groups)
     local ps = state.get_player_state(player.index)
 
     -- Destroy all bot entities (if present).
-    if ps.bot_entities then
+    if ps.bots then
         for _, name in ipairs(BOT_NAMES) do
-            local ent = ps.bot_entities[name]
-            if ent and ent.valid then
-                ent.destroy()
+            local bot = ps.bots[name]
+            if bot and bot.entity and bot.entity.valid then
+                bot.entity.destroy()
             end
-            ps.bot_entities[name] = nil
+            ps.bots[name] = nil
         end
     end
 
     -- Clear ALL render objects / visual.
     clear_all(ps)
-    
+
     -- Disable + clear entity references.
-    ps.bot_entities = {}
+    ps.bots = {}
     ps.bot_enabled = false
 
     -- Init to follow mode
@@ -191,26 +253,24 @@ function state.destroy_player_bot(player, silent, clear_all, clear_entity_groups
         overlay_texts = {}
     }
 
-    if not silent then
-        util.print(player, "yellow", "deactivated")
-    end
+    util.print(player, "yellow", "deactivated")
 end
 
 function state.create_player_bot(player, clear_entity_groups)
     local ps = state.get_player_state(player.index)
 
     -- If any bot already exists, just enable and keep references.
-    if ps.bot_entities then
+    if ps.bots then
         for _, name in ipairs(BOT_NAMES) do
-            local ent = ps.bot_entities[name]
-            if ent and ent.valid then
+            local bot = ps.bots[name]
+            if bot and bot.entity and bot.entity.valid then
                 ps.bot_enabled = true
-                return ps.bot_entities
+                return ps.bots
             end
         end
     end
 
-    ps.bot_entities = ps.bot_entities or {}
+    ps.bots = ps.bots or {}
 
     local pos = player.position
     local offsets = {
@@ -250,7 +310,7 @@ function state.create_player_bot(player, clear_entity_groups)
             util.print(player, "red", "create failed (%s)", name)
         else
             -- Store by role name (the "name" the mod uses internally).
-            ps.bot_entities[name] = ent
+            ps.bots[name].entity = ent
             ent.destructible = true
 
             -- Some entity types support backer_name; set it when available.
@@ -272,7 +332,7 @@ function state.create_player_bot(player, clear_entity_groups)
     clear_entity_groups(ps)
 
     util.print(player, "green", "created (mapper/repairer/constructor/cleaner)")
-    return ps.bot_entities
+    return ps.bots
 end
 
 return state

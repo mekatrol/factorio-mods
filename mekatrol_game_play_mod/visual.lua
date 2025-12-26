@@ -10,35 +10,30 @@ local config = require("config")
 local state = require("state")
 local util = require("util")
 
--- Each bot gets its own independent rendering objects (highlight, lines, radius circle, bot light).
-local function ensure_bot_visuals(ps)
-    ps.visual = ps.visual or {}
-    ps.visual.bot_visuals = ps.visual.bot_visuals or {}
-end
-
 -- Iterator over all per-bot visual bookkeeping tables.
 -- Returns the same iterator tuple as pairs(ps.visual.bot_visuals).
 --
 -- Usage:
---   for bot_name, bot_visual in iter_bot_visuals(player_state) do
+--   for bot_name, bot_visual in iter_bot_visuals(ps) do
 --       ...
 --   end
 local function iter_bot_visuals(ps)
-    ensure_bot_visuals(ps)
+    state.ensure_visuals(ps)
     return pairs(ps.visual.bot_visuals)
 end
 
 -- Returns the visual state table for a specific bot role, creating it if needed.
 local function get_bot_visual(ps, bot_name)
-    ensure_bot_visuals(ps)
-    local key = bot_name or "mapper"
-    local bv = ps.visual.bot_visuals[key]
+    state.ensure_visuals(ps)
+
+    local bv = ps.visual[bot_name]
+    
     if not bv then
         bv = {
             -- rendering.draw_line ids for the bot path overlay
             lines = {}
         }
-        ps.visual.bot_visuals[key] = bv
+        ps.visual.bot_visuals[bot_name] = bv
     end
     bv.lines = bv.lines or {}
     return bv
@@ -64,15 +59,15 @@ end
 ----------------------------------------------------------------------
 
 ---------------------------------------------------
--- FUNCTION: clear_bot_highlight(player_state)
+-- FUNCTION: clear_bot_highlight(ps)
 --
 -- Purpose:
 --   Removes any existing highlight rectangle for the player's bot.
 --
 -- Parameters:
---   player_state : table
+--   ps : table
 --       The per-player state table that contains:
---         * player_state.visual.bot_highlight — a LuaRenderObject or nil.
+--         * ps.visual.bot_highlight — a LuaRenderObject or nil.
 --
 -- Behavior:
 --   * If a highlight exists and is still valid, it is explicitly
@@ -84,16 +79,16 @@ end
 --     disappear; they must always be explicitly destroyed.
 --   * This function is safe to call even if no highlight exists.
 ---------------------------------------------------
-function visual.clear_bot_highlight(player_state, bot_name)
-    if not (player_state and player_state.visual) then
+function visual.clear_bot_highlight(ps, bot_name)
+    if not (ps and ps.visual) then
         return
     end
 
-    ensure_bot_visuals(player_state)
+    state.ensure_visuals(ps)
 
     -- If a role is specified, clear only that bot's highlight.
     if bot_name then
-        local bv = get_bot_visual(player_state, bot_name)
+        local bv = get_bot_visual(ps, bot_name)
         local obj = bv.bot_highlight
         if obj and obj.valid then
             obj:destroy()
@@ -103,7 +98,7 @@ function visual.clear_bot_highlight(player_state, bot_name)
     end
 
     -- Otherwise clear all bots' highlights.
-    for _, bv in iter_bot_visuals(player_state) do
+    for _, bv in iter_bot_visuals(ps) do
         local obj = bv.bot_highlight
         if obj and obj.valid then
             obj:destroy()
@@ -112,24 +107,24 @@ function visual.clear_bot_highlight(player_state, bot_name)
     end
 
     -- Legacy fallback (pre multi-bot).
-    local legacy = player_state.visual.bot_highlight
+    local legacy = ps.visual.bot_highlight
     if legacy and legacy.valid then
         legacy:destroy()
     end
-    player_state.visual.bot_highlight = nil
+    ps.visual.bot_highlight = nil
 end
 
 ---------------------------------------------------
--- FUNCTION: clear_lines(player_state)
+-- FUNCTION: clear_lines(ps)
 --
 -- Purpose:
 --   Destroys and clears all line render objects associated with the
 --   player's bot visual.
 --
 -- Parameters:
---   player_state : table
+--   ps : table
 --       The per-player state table that contains:
---         * player_state.visual.lines — an array of LuaRenderObject
+--         * ps.visual.lines — an array of LuaRenderObject
 --           or nil.
 --
 -- Behavior:
@@ -142,16 +137,16 @@ end
 --     Use visual.clear_bot_highlight / visual.clear_radius_circle
 --     for those.
 ---------------------------------------------------
-function visual.clear_lines(player_state, bot_name)
-    if not (player_state and player_state.visual) then
+function visual.clear_lines(ps, bot_name)
+    state.ensure_visuals(ps)
+
+    if not (ps and ps.visual) then
         return
     end
 
-    ensure_bot_visuals(player_state)
-
     -- If a role is specified, clear only that bot's path lines.
     if bot_name then
-        local bv = get_bot_visual(player_state, bot_name)
+        local bv = get_bot_visual(ps, bot_name)
         local lines = bv.lines
         if not lines then
             return
@@ -168,7 +163,7 @@ function visual.clear_lines(player_state, bot_name)
     end
 
     -- Otherwise clear all bots' path lines.
-    for role, bv in iter_bot_visuals(player_state) do
+    for role, bv in iter_bot_visuals(ps) do
         if bv.lines then
             for _, line_obj in pairs(bv.lines) do
                 if line_obj and line_obj.valid then
@@ -180,28 +175,28 @@ function visual.clear_lines(player_state, bot_name)
     end
 
     -- Legacy fallback (pre multi-bot): clear any existing shared lines field.
-    local legacy_lines = player_state.visual.lines
+    local legacy_lines = ps.visual.lines
     if legacy_lines then
         for _, line_obj in pairs(legacy_lines) do
             if line_obj and line_obj.valid then
                 line_obj:destroy()
             end
         end
-        player_state.visual.lines = nil
+        ps.visual.lines = nil
     end
 end
 
 ---------------------------------------------------
--- FUNCTION: clear_radius_circle(player_state)
+-- FUNCTION: clear_radius_circle(ps)
 --
 -- Purpose:
 --   Destroys and clears the radius circle render object (if any)
 --   associated with the player's bot visual.
 --
 -- Parameters:
---   player_state : table
+--   ps : table
 --       The per-player state table that contains:
---         * player_state.visual.radius_circle — a LuaRenderObject or nil.
+--         * ps.visual.radius_circle — a LuaRenderObject or nil.
 --
 -- Behavior:
 --   * If a radius circle exists and is valid, calls :destroy().
@@ -210,16 +205,16 @@ end
 -- Notes:
 --   * Safe to call when no radius circle exists or when visual is nil.
 ---------------------------------------------------
-function visual.clear_radius_circle(player_state, bot_name)
-    if not (player_state and player_state.visual) then
+function visual.clear_radius_circle(ps, bot_name)
+    if not (ps and ps.visual) then
         return
     end
 
-    ensure_bot_visuals(player_state)
+    state.ensure_visuals(ps)
 
     -- If a role is specified, clear only that bot's radius circle.
     if bot_name then
-        local bv = get_bot_visual(player_state, bot_name)
+        local bv = get_bot_visual(ps, bot_name)
         local obj = bv.radius_circle
         if obj and obj.valid then
             obj:destroy()
@@ -229,7 +224,7 @@ function visual.clear_radius_circle(player_state, bot_name)
     end
 
     -- Otherwise clear all bots' radius circles.
-    for _, bv in iter_bot_visuals(player_state) do
+    for _, bv in iter_bot_visuals(ps) do
         local obj = bv.radius_circle
         if obj and obj.valid then
             obj:destroy()
@@ -238,36 +233,36 @@ function visual.clear_radius_circle(player_state, bot_name)
     end
 
     -- Legacy fallback (pre multi-bot).
-    local legacy = player_state.visual.radius_circle
+    local legacy = ps.visual.radius_circle
     if legacy and legacy.valid then
         legacy:destroy()
     end
-    player_state.visual.radius_circle = nil
+    ps.visual.radius_circle = nil
 end
 
-function visual.clear_overlay(player_state)
-    if not player_state then
+function visual.clear_overlay(ps)
+    if not (ps and ps.visual) then
         return
     end
 
-    -- Clear any overlay objects that were created
-    if player_state.overlay_texts then
-        for _, obj in pairs(player_state.overlay_texts) do
+    local overlays = ps.visual.overlay_texts
+    if overlays then
+        for _, obj in pairs(overlays) do
             if obj and obj.valid then
                 obj:destroy()
             end
         end
     end
 
-    player_state.overlay_texts = {}
+    ps.visual.overlay_texts = {}
 end
 
-function visual.clear_entity_groups(player_state)
-    if not (player_state and player_state.visual) then
+function visual.clear_entity_groups(ps)
+    if not (ps and ps.visual) then
         return
     end
 
-    local groups = player_state.visual.entity_groups
+    local groups = ps.visual.entity_groups
     if not groups then
         return
     end
@@ -286,15 +281,15 @@ function visual.clear_entity_groups(player_state)
         end
     end
 
-    player_state.visual.entity_groups = {}
+    ps.visual.entity_groups = {}
 end
 
-function visual.clear_entity_group(player_state, group_id)
-    if not (player_state and player_state.visual and player_state.visual.entity_groups) then
+function visual.clear_entity_group(ps, group_id)
+    if not (ps and ps.visual and ps.visual.entity_groups) then
         return
     end
 
-    local g = player_state.visual.entity_groups[group_id]
+    local g = ps.visual.entity_groups[group_id]
     if not g then
         return
     end
@@ -311,7 +306,7 @@ function visual.clear_entity_group(player_state, group_id)
         g.label:destroy()
     end
 
-    player_state.visual.entity_groups[group_id] = nil
+    ps.visual.entity_groups[group_id] = nil
 end
 
 function visual.clear_bot_light(ps, bot_name)
@@ -319,7 +314,7 @@ function visual.clear_bot_light(ps, bot_name)
         return
     end
 
-    ensure_bot_visuals(ps)
+    state.ensure_visuals(ps)
 
     -- If a role is specified, clear only that bot's light.
     if bot_name then
@@ -363,24 +358,25 @@ function visual.clear_player_light(ps)
 end
 
 ---------------------------------------------------
--- FUNCTION: clear_all(player_state)
+-- FUNCTION: clear_all(ps)
 --
 -- Purpose:
 --   Convenience helper that clears all known render objects belonging
 --   to the player's bot visual (highlight, lines, radius circle,
 --   mapped entities).
 ---------------------------------------------------
-function visual.clear_all(player_state)
-    if not player_state then
+function visual.clear_all(ps)
+    if not ps then
         return
     end
 
-    visual.clear_lines(player_state)
-    visual.clear_bot_highlight(player_state)
-    visual.clear_radius_circle(player_state)
-    visual.clear_entity_groups(player_state)
-    visual.clear_bot_light(player_state)
-    visual.clear_player_light(player_state)
+    visual.clear_lines(ps)
+    visual.clear_bot_highlight(ps)
+    visual.clear_radius_circle(ps)
+    visual.clear_entity_groups(ps)
+    visual.clear_bot_light(ps)
+    visual.clear_player_light(ps)
+    visual.clear_overlay(ps)
 end
 
 ----------------------------------------------------------------------
@@ -424,12 +420,12 @@ local function get_screen_top_left_world(player)
     }
 end
 
-function visual.update_overlay(player, player_state, lines)
+function visual.update_overlay(player, ps, lines)
     if not (player and player.valid) then
         return
     end
 
-    visual.clear_overlay(player_state)
+    visual.clear_overlay(ps)
 
     -------------------------------------------------------
     -- Keep text the same size regardless of zoom
@@ -466,11 +462,31 @@ function visual.update_overlay(player, player_state, lines)
             y = base_pos.y + (index - 1) * line_spacing
         }
 
+        local color = {
+            r = 1,
+            g = 1,
+            b = 0,
+            a = 0.8
+        } -- semi-transparent yellow
+
+        if index > 1 then
+            line_pos.x = line_pos.x + (0.5 * effective_scale)
+
+            color = {
+                r = 1,
+                g = 1,
+                b = 1,
+                a = 0.8
+            } -- white
+
+            line = "> " .. line
+        end
+
         -- Ensure container exists
-        local overlays = player_state.overlay_texts
+        local overlays = ps.visual.overlay_texts
         if not overlays then
             overlays = {}
-            player_state.overlay_texts = overlays
+            ps.visual.overlay_texts = overlays
         end
 
         local obj = overlays[index]
@@ -484,12 +500,7 @@ function visual.update_overlay(player, player_state, lines)
                 text = line,
                 surface = player.surface,
                 target = line_pos,
-                color = {
-                    r = 1,
-                    g = 1,
-                    b = 0,
-                    a = 0.8
-                }, -- semi-transparent yellow
+                color = color,
                 scale = effective_scale,
                 alignment = "left",
                 vertical_alignment = "top",
@@ -501,7 +512,7 @@ function visual.update_overlay(player, player_state, lines)
 end
 
 ---------------------------------------------------
--- FUNCTION: draw_radius_circle(player, player_state, bot_entity, radius, color)
+-- FUNCTION: draw_radius_circle(player, ps, bot_entity, radius, color)
 --
 -- Purpose:
 --   Draws a circle around the bot to visualize a radius (for example,
@@ -511,7 +522,7 @@ end
 --   player       : LuaPlayer
 --       The player who will see this circle.
 --
---   player_state : table
+--   ps : table
 --       The per-player state whose visual table will track the circle.
 --
 --   bot_entity   : LuaEntity
@@ -527,19 +538,19 @@ end
 --   * Clears any existing radius circle via visual.clear_radius_circle.
 --   * If bot is valid and radius is positive, draws a new circle
 --     anchored to the bot entity.
---   * Stores the render reference in player_state.visual.radius_circle.
+--   * Stores the render reference in ps.visual.radius_circle.
 ---------------------------------------------------
-function visual.draw_radius_circle(player, player_state, bot_name, bot_entity, radius, color)
+function visual.draw_radius_circle(player, ps, bot_name, bot_entity, radius, color)
     if not (player and player.valid and bot_entity and bot_entity.valid and radius) then
         return
     end
 
-    ensure_bot_visuals(player_state)
+    state.ensure_visuals(ps)
 
     -- Clear existing radius circle for this bot.
-    visual.clear_radius_circle(player_state, bot_name)
+    visual.clear_radius_circle(ps, bot_name)
 
-    local bv = get_bot_visual(player_state, bot_name)
+    local bv = get_bot_visual(ps, bot_name)
     bv.radius_circle = rendering.draw_circle {
         color = color or {
             r = 1,
@@ -557,54 +568,50 @@ function visual.draw_radius_circle(player, player_state, bot_name, bot_entity, r
     }
 end
 
-function visual.draw_bot_highlight(player, player_state, bot_name)
-    if not (player and player.valid and player_state and player_state.visual) then
+function visual.draw_bot_highlight(player, ps, bot_name)
+    if not (player and player.valid and ps and ps.visual) then
         return
     end
 
-    ensure_bot_visuals(player_state)
+    state.ensure_visuals(ps)
 
     ------------------------------------------------------------------
     -- Draw a highlight rectangle for each bot role.
     ------------------------------------------------------------------
-    if not player_state.bot_entities then
-        return
-    end
-
-    local bot_entity = state.get_bot_by_name(player, player_state, bot_name)
+    local bot = state.get_bot_by_name(player, ps, bot_name)
     local bot_conf = config.get_bot_config(bot_name)
 
-    if bot_entity and bot_entity.valid then
-        local bv = get_bot_visual(player_state, bot_name)
+    if bot then
+        local bv = get_bot_visual(ps, bot_name)
 
         local left_top = {
-            x = bot_entity.position.x - 0.5,
-            y = bot_entity.position.y - 0.7
+            x = bot.entity.position.x - 0.5,
+            y = bot.entity.position.y - 0.7
         }
 
         local right_bottom = {
-            x = bot_entity.position.x + 0.5,
-            y = bot_entity.position.y + 0.3
+            x = bot.entity.position.x + 0.5,
+            y = bot.entity.position.y + 0.3
         }
 
-        if bv.bot_highlight and not bv.bot_highlight.valid then
-            bv.bot_highlight = nil
+        if bv.highlight and not bv.highlight.valid then
+            bv.highlight = nil
         end
 
-        if not bv.bot_highlight then
-            bv.bot_highlight = rendering.draw_rectangle {
+        if not bv.highlight then
+            bv.highlight = rendering.draw_rectangle {
                 color = bot_conf.highlight_color,
                 filled = false,
                 width = 2,
                 left_top = left_top,
                 right_bottom = right_bottom,
-                surface = bot_entity.surface,
+                surface = bot.entity.surface,
                 draw_on_ground = true,
                 only_in_alt_mode = false,
                 players = {player.index}
             }
         else
-            bv.bot_highlight.set_corners(left_top, right_bottom)
+            bv.highlight.set_corners(left_top, right_bottom)
         end
     end
 end
@@ -637,7 +644,7 @@ function visual.draw_line(player, ps, a, b, color, width)
 end
 
 ---------------------------------------------------
--- FUNCTION: draw_lines(player, player_state, bot_entity, line_color)
+-- FUNCTION: draw_lines(player, ps, bot_entity, line_color)
 --
 -- Purpose:
 --   Draws visual lines that connect the player to their bot.
@@ -646,9 +653,9 @@ end
 --   player       : LuaPlayer
 --       The player who will see the visual.
 --
---   player_state : table
+--   ps : table
 --       The per-player state containing:
---         * player_state.visual.lines   — array of LuaRenderObject
+--         * ps.visual.lines   — array of LuaRenderObject
 --           or nil, tracking previously drawn lines.
 --
 --   bot_entity   : LuaEntity
@@ -659,25 +666,25 @@ end
 --
 -- Behavior:
 --   1. Validates player, bot, and state.
---   2. Ensures player_state.visual and visual.lines exist.
+--   2. Ensures ps.visual and visual.lines exist.
 --   3. Draws a line from the player's position to the bot's position.
---   4. Stores the created render object in player_state.visual.lines.
+--   4. Stores the created render object in ps.visual.lines.
 --
 -- Notes:
 --   * The caller is responsible for clearing lines between ticks by
---     calling visual.clear_lines(player_state) to prevent buildup.
+--     calling visual.clear_lines(ps) to prevent buildup.
 ---------------------------------------------------
-function visual.draw_lines(player, player_state, bot_name, bot_entity, target_pos, color)
+function visual.draw_lines(player, ps, bot_name, bot_entity, target_pos, color)
     if not (player and player.valid and bot_entity and bot_entity.valid and target_pos) then
         return
     end
 
-    ensure_bot_visuals(player_state)
+    state.ensure_visuals(ps)
 
     -- Clear existing lines for this bot.
-    visual.clear_lines(player_state, bot_name)
+    visual.clear_lines(ps, bot_name)
 
-    local bv = get_bot_visual(player_state, bot_name)
+    local bv = get_bot_visual(ps, bot_name)
     bv.lines = bv.lines or {}
 
     -- Draw a simple two-segment line: bot -> target.
@@ -698,7 +705,7 @@ function visual.draw_lines(player, player_state, bot_name, bot_entity, target_po
 end
 
 ---------------------------------------------------
--- FUNCTION: draw_mapped_entity_box(player, player_state, entity)
+-- FUNCTION: draw_mapped_entity_box(player, ps, entity)
 --
 -- Purpose:
 --   Draws a green box around a mapped entity to mark it visually.
@@ -707,7 +714,7 @@ end
 --   player       : LuaPlayer
 --       Player who will see the box.
 --
---   player_state : table
+--   ps : table
 --       Per-player state (visual table is not modified here; the
 --       caller stores the returned render id/object).
 --
@@ -719,7 +726,7 @@ end
 --       Render object (or id) returned by rendering.draw_rectangle,
 --       or nil if no box could be drawn.
 ---------------------------------------------------
-function visual.draw_mapped_entity_box(player, player_state, entity)
+function visual.draw_mapped_entity_box(player, ps, entity)
     if not (entity and entity.valid) then
         return nil
     end
@@ -814,7 +821,7 @@ function visual.draw_bot_light(player, ps, bot_name, bot)
         return
     end
 
-    ensure_bot_visuals(ps)
+    state.ensure_visuals(ps)
 
     local bv = get_bot_visual(ps, bot_name)
     local obj = bv.bot_light
