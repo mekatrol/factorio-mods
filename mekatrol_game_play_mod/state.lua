@@ -79,31 +79,10 @@ function state.get_player_state(player_index)
     if not ps then
         ps = {
             bots = {
-                ["mapper"] = mapper_bot.init_state(player, ps, state, visual),
-                ["repairer"] = {
-                    entity = nil,
-                    task = {
-                        target_position = nil,
-                        current_mode = "follow",
-                        next_mode = nil
-                    }
-                },
-                ["constructor"] = {
-                    entity = nil,
-                    task = {
-                        target_position = nil,
-                        current_mode = "follow",
-                        next_mode = nil
-                    }
-                },
-                ["cleaner"] = {
-                    entity = nil,
-                    task = {
-                        target_position = nil,
-                        current_mode = "follow",
-                        next_mode = nil
-                    }
-                }
+                ["cleaner"] = cleaner_bot.init_state(player, ps, state),
+                ["constructor"] = constructor_bot.init_state(player, ps, state),
+                ["mapper"] = mapper_bot.init_state(player, ps, state),
+                ["repairer"] = repairer_bot.init_state(player, ps, state)
             },
 
             bot_enabled = false,

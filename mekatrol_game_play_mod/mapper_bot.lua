@@ -9,7 +9,7 @@ local survey = require("survey")
 
 local BOT_CONF = config.bot
 
-function mapper_bot.init_state(player, ps, state, visual)
+function mapper_bot.init_state(player, ps, state)
     return {
         entity = nil,
         task = {

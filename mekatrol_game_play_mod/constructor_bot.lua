@@ -6,6 +6,17 @@ local follow = require("follow")
 
 local BOT_CONF = config.bot
 
+function constructor_bot.init_state(player, ps, state)
+    return {
+        entity = nil,
+        task = {
+            target_position = nil,
+            current_mode = "follow",
+            next_mode = nil
+        }
+    }
+end
+
 function constructor_bot.update(player, ps, state, visual, tick)
     local bot_name = "constructor"
     local bot = state.get_bot_by_name(player, ps, bot_name)

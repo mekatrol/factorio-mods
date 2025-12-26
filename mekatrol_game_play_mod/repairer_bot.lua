@@ -6,6 +6,17 @@ local follow = require("follow")
 
 local BOT_CONF = config.bot
 
+function repairer_bot.init_state(player, ps, state)
+    return {
+        entity = nil,
+        task = {
+            target_position = nil,
+            current_mode = "follow",
+            next_mode = nil
+        }
+    }
+end
+
 function repairer_bot.update(player, ps, state, visual, tick)
     local bot_name = "repairer"
     local bot = state.get_bot_by_name(player, ps, bot_name)
