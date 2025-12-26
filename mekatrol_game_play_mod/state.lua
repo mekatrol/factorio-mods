@@ -31,13 +31,6 @@ function state.ensure_visuals(ps)
     ps.visual.overlay_texts = ps.visual.overlay_texts or {}
 end
 
-----------------------------------------------------------------------
--- Returns a valid bot entity by role name for the given player.
---
--- @param ps        Player state table (from get_player_state)
--- @param bot_name  string ("mapper", "repairer", "constructor", "cleaner")
--- @return LuaEntity|nil
-----------------------------------------------------------------------
 function state.get_bot_by_name(player, ps, bot_name)
     if not ps then
         return nil
@@ -168,7 +161,7 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
 
             visual.clear_lines(player, ps, bot_name)
             visual.clear_bot_highlight(player, ps, bot_name)
-            visual.clear_radius_circle(player, ps, bot_name)
+            visual.clear_bot_circle(player, ps, bot_name)
             visual.clear_bot_light(player, ps, bot_name)
 
             if bot and bot.entity and bot.entity.valid then

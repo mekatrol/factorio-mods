@@ -27,7 +27,6 @@ function visual.clear_bot_highlight(player, ps, bot_name)
     local bot = state.get_bot_by_name(player, ps, bot_name)
 
     if not bot then
-        util.print(player, "red", "[visual.clear_bot_highlight] Failed to get bot with name: '%s'", bot_name)
         return
     end
 
@@ -47,7 +46,6 @@ function visual.clear_lines(player, ps, bot_name)
     local bot = state.get_bot_by_name(player, ps, bot_name)
 
     if not bot then
-        util.print(player, "red", "[visual.clear_lines] Failed to get bot with name: '%s'", bot_name)
         return
     end
 
@@ -66,7 +64,7 @@ function visual.clear_lines(player, ps, bot_name)
     bot.visual.lines = nil
 end
 
-function visual.clear_radius_circle(player, ps, bot_name)
+function visual.clear_bot_circle(player, ps, bot_name)
     if not (ps and ps.visual) then
         return
     end
@@ -74,17 +72,15 @@ function visual.clear_radius_circle(player, ps, bot_name)
     local bot = state.get_bot_by_name(player, ps, bot_name)
 
     if not bot then
-        util.print(player, "red", "[visual.clear_radius_circle] Failed to get bot with name: '%s'", bot_name)
         return
     end
 
-    local obj = bot.radius_circle
+    local obj = bot.circle
     if obj and obj.valid then
         obj:destroy()
     end
-    bot.radius_circle = nil
 
-    ps.visual.radius_circle = nil
+    ps.visual.circle = nil
 end
 
 function visual.clear_overlay(ps)
@@ -164,7 +160,6 @@ function visual.clear_bot_light(player, ps, bot_name)
     local bot = state.get_bot_by_name(player, ps, bot_name)
 
     if not bot then
-        util.print(player, "red", "[visual.clear_bot_light] Failed to get bot with name: '%s'", bot_name)
         return
     end
 
@@ -313,16 +308,16 @@ function visual.update_overlay(player, ps, lines)
     end
 end
 
-function visual.draw_radius_circle(player, ps, bot_name, bot_entity, radius, color)
+function visual.draw_bot_circle(player, ps, bot_name, bot_entity, radius, color)
     if not (player and player.valid and bot_entity and bot_entity.valid and radius) then
         return
     end
 
     -- Clear existing radius circle for this bot.
-    visual.clear_radius_circle(player, ps, bot_name)
+    visual.clear_bot_circle(player, ps, bot_name)
 
     local bot = state.get_bot_by_name(player, ps, bot_name)
-    bot.visual.radius_circle = rendering.draw_circle {
+    bot.visual.circle = rendering.draw_circle {
         color = color or {
             r = 1,
             g = 1,

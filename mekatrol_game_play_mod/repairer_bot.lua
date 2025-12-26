@@ -17,7 +17,7 @@ function repairer_bot.init_state(player, ps)
         },
         visual = {
             highlight = nil,
-            radius_circle = nil,
+            circle = nil,
             lines = nil,
             light = nil
         }

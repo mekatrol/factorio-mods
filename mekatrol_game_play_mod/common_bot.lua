@@ -68,9 +68,9 @@ function common_bot.update(player, ps, state, visual, bot_name, bot, tick)
     end
 
     if radius and radius > 0 then
-        visual.draw_radius_circle(player, ps, bot_name, bot, radius, radius_color)
+        visual.draw_bot_circle(player, ps, bot_name, bot, radius, radius_color)
     else
-        visual.clear_radius_circle(player, ps, bot_name)
+        visual.clear_bot_circle(player, ps, bot_name)
     end
 
     if target_pos then
