@@ -1,9 +1,7 @@
 local common_bot = {}
 
 local config = require("config")
-local state = require("state")
 local util = require("util")
-local visual = require("visual")
 
 local BOT_CONF = config.bot
 
@@ -11,7 +9,7 @@ local BOT_CONF = config.bot
 -- This module contains code common to all bots in this mod
 -------------------------------------------------------------------------------------------------------
 
-function common_bot.get_modes(player, ps, bot_name)
+function common_bot.get_modes(player, ps, state, visual, bot_name)
     local bot = state.get_bot_by_name(player, ps, bot_name)
 
     if not (bot and bot.task) then
@@ -21,7 +19,7 @@ function common_bot.get_modes(player, ps, bot_name)
     return bot.task.current_mode, bot.task.next_mode
 end
 
-function common_bot.update(player, ps, bot_name, bot, tick)
+function common_bot.update(player, ps, state, visual, bot_name, bot, tick)
     -- Clear transient visual each update; they are redrawn below (mapper only).
     visual.clear_lines(ps, bot_name)
     visual.draw_bot_highlight(player, ps, bot_name)

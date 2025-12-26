@@ -199,22 +199,23 @@ script.on_event(defines.events.on_tick, function(event)
         mapper_bot.update(player, ps, state, visual, tick)
         repairer_bot.update(player, ps, state, visual, tick)
 
-        local cleaner_current_mode, cleaner_next_mode = common_bot.get_modes(player, ps, "cleaner")
+        local cleaner_current_mode, cleaner_next_mode = common_bot.get_modes(player, ps, state, visual, "cleaner")
         local cleaner_current_mode_line = string.format("cleaner: %s→%s", cleaner_current_mode or "nil",
             cleaner_next_mode or "nil")
         overlay_lines[#overlay_lines + 1] = cleaner_current_mode_line
 
-        local constructor_current_mode, constructor_next_mode = common_bot.get_modes(player, ps, "constructor")
+        local constructor_current_mode, constructor_next_mode =
+            common_bot.get_modes(player, ps, state, visual, "constructor")
         local constructor_current_mode_line = string.format("constructor: %s→%s", constructor_current_mode or "nil",
             constructor_next_mode or "nil")
         overlay_lines[#overlay_lines + 1] = constructor_current_mode_line
 
-        local mapper_current_mode, mapper_next_mode = common_bot.get_modes(player, ps, "mapper")
+        local mapper_current_mode, mapper_next_mode = common_bot.get_modes(player, ps, state, visual, "mapper")
         local mapper_current_mode_line = string.format("mapper: %s→%s", mapper_current_mode or "nil",
             mapper_next_mode or "nil")
         overlay_lines[#overlay_lines + 1] = mapper_current_mode_line
 
-        local repairer_current_mode, repairer_next_mode = common_bot.get_modes(player, ps, "repairer")
+        local repairer_current_mode, repairer_next_mode = common_bot.get_modes(player, ps, state, visual, "repairer")
         local repairer_current_mode_line = string.format("repairer: %s→%s", repairer_current_mode or "nil",
             repairer_next_mode or "nil")
         overlay_lines[#overlay_lines + 1] = repairer_current_mode_line
