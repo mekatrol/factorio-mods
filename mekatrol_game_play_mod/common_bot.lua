@@ -198,28 +198,45 @@ function common_bot.draw_bot_light(player, bot)
 end
 
 function common_bot.draw_circle(player, bot, radius, color)
-    if not (player and player.valid and radius) then
+    if not (player and player.valid and bot and bot.entity and bot.entity.valid and radius) then
         return
     end
 
-    -- Clear existing radius circle for this bot.
-    common_bot.clear_circle(bot)
+    bot.visual = bot.visual or {}
 
-    bot.visual.circle = rendering.draw_circle {
-        color = color or {
-            r = 1,
-            g = 1,
-            b = 1,
-            a = 0.25
-        },
-        radius = radius,
-        width = 2,
-        target = bot.entity,
-        surface = bot.entity.surface,
-        filled = false,
-        draw_on_ground = true,
-        players = {player.index}
-    }
+    local circle = bot.visual.circle
+
+    -- Factorio 2: rendering.draw_circle returns a LuaRenderObject.
+    -- Recreate only if missing or invalid.
+    if not (circle and circle.valid) then
+        -- Keep this if your clear_circle destroys any other render objects for the bot.
+        common_bot.clear_circle(bot)
+
+        bot.visual.circle = rendering.draw_circle {
+            color = color or {
+                r = 1,
+                g = 1,
+                b = 1,
+                a = 0.25
+            },
+            radius = radius,
+            width = 2,
+            target = bot.entity,
+            surface = bot.entity.surface,
+            filled = false,
+            draw_on_ground = true,
+            players = {player.index}
+        }
+        return
+    end
+
+    -- Update existing object (no recreate)
+    circle.target = bot.entity
+    circle.radius = radius
+    if color then
+        circle.color = color
+    end
+    circle.players = {player.index}
 end
 
 function common_bot.draw_highlight(player, bot, bot_conf)
