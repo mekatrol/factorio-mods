@@ -4,7 +4,6 @@ local MOD_NAME = "mekatrol_game_play_mod"
 local visual = {}
 
 local config = require("config")
-local state = require("state")
 local util = require("util")
 
 local BOT_NAMES = config.bot_names
