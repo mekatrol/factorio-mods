@@ -19,70 +19,6 @@ local function ensure_entity_groups_table(ps)
     ps.visual.entity_groups = ps.visual.entity_groups or {}
 end
 
-function visual.clear_bot_highlight(player, ps, bot_name)
-    if not (ps and ps.visual) then
-        return
-    end
-
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-
-    if not bot then
-        return
-    end
-
-    local obj = bot.visual.highlight
-    if obj and obj.valid then
-        obj:destroy()
-    end
-
-    ps.visual.highlight = nil
-end
-
-function visual.clear_lines(player, ps, bot_name)
-    if not (ps and ps.visual) then
-        return
-    end
-
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-
-    if not bot then
-        return
-    end
-
-    local lines = bot.visual.lines
-
-    if not lines then
-        return
-    end
-
-    for _, line_obj in pairs(lines) do
-        if line_obj and line_obj.valid then
-            line_obj:destroy()
-        end
-    end
-
-    bot.visual.lines = nil
-end
-
-function visual.clear_bot_circle(player, ps, bot_name)
-    if not (ps and ps.visual) then
-        return
-    end
-
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-
-    if not bot then
-        return
-    end
-
-    local obj = bot.circle
-    if obj and obj.valid then
-        obj:destroy()
-    end
-
-    ps.visual.circle = nil
-end
-
 function visual.clear_overlay(ps)
     if not (ps and ps.visual) then
         return
@@ -152,25 +88,6 @@ function visual.clear_entity_group(ps, group_id)
     ps.visual.entity_groups[group_id] = nil
 end
 
-function visual.clear_bot_light(player, ps, bot_name)
-    if not (ps and ps.visual) then
-        return
-    end
-
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-
-    if not bot then
-        return
-    end
-
-    local obj = bot.light
-
-    if obj and obj.valid then
-        obj:destroy()
-    end
-
-    bot.light = nil
-end
 
 function visual.clear_player_light(ps)
     if not (ps and ps.visual) then
@@ -308,129 +225,6 @@ function visual.update_overlay(player, ps, lines)
     end
 end
 
-function visual.draw_bot_circle(player, ps, bot_name, bot_entity, radius, color)
-    if not (player and player.valid and bot_entity and bot_entity.valid and radius) then
-        return
-    end
-
-    -- Clear existing radius circle for this bot.
-    visual.clear_bot_circle(player, ps, bot_name)
-
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-    bot.visual.circle = rendering.draw_circle {
-        color = color or {
-            r = 1,
-            g = 1,
-            b = 1,
-            a = 0.25
-        },
-        radius = radius,
-        width = 2,
-        target = bot.entity,
-        surface = bot.entity.surface,
-        filled = false,
-        draw_on_ground = true,
-        players = {player.index}
-    }
-end
-
-function visual.draw_bot_highlight(player, ps, bot_name)
-    if not (player and player.valid and ps and ps.visual) then
-        return
-    end
-
-    ------------------------------------------------------------------
-    -- Draw a highlight rectangle for each bot role.
-    ------------------------------------------------------------------
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-    local bot_conf = config.get_bot_config(bot_name)
-
-    local left_top = {
-        x = bot.entity.position.x - 0.5,
-        y = bot.entity.position.y - 0.7
-    }
-
-    local right_bottom = {
-        x = bot.entity.position.x + 0.5,
-        y = bot.entity.position.y + 0.3
-    }
-
-    if bot.visual.highlight and not bot.visual.highlight.valid then
-        bot.visual.highlight = nil
-    end
-
-    if not bot.visual.highlight then
-        bot.visual.highlight = rendering.draw_rectangle {
-            color = bot_conf.highlight_color,
-            filled = false,
-            width = 2,
-            left_top = left_top,
-            right_bottom = right_bottom,
-            surface = bot.entity.surface,
-            draw_on_ground = true,
-            only_in_alt_mode = false,
-            players = {player.index}
-        }
-    else
-        bot.visual.highlight.set_corners(left_top, right_bottom)
-    end
-end
-
-function visual.draw_line(player, ps, a, b, color, width)
-    if not (player and player.valid) then
-        return nil
-    end
-
-    ensure_lines_table(ps)
-
-    local id = rendering.draw_line {
-        surface = player.surface,
-        from = {a.x, a.y},
-        to = {b.x, b.y},
-        color = color or {
-            r = 1,
-            g = 1,
-            b = 1,
-            a = 1
-        },
-        width = width or 2,
-        time_to_live = 2 * 60, -- adjust if you want persistent
-        players = {player.index},
-        draw_on_ground = true
-    }
-
-    ps.visual.lines[#ps.visual.lines + 1] = id
-    return id
-end
-
-function visual.draw_lines(player, ps, bot_name, bot_entity, target_pos, color)
-    if not (player and player.valid and bot_entity and bot_entity.valid and target_pos) then
-        return
-    end
-
-    -- Clear existing lines for this bot.
-    visual.clear_lines(player, ps, bot_name)
-
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-    bot.lines = bot.lines or {}
-
-    -- Draw a simple two-segment line: bot -> target.
-    bot.lines[1] = rendering.draw_line {
-        color = color or {
-            r = 1,
-            g = 1,
-            b = 1,
-            a = 1
-        },
-        width = 2,
-        from = bot_entity,
-        to = target_pos,
-        surface = bot_entity.surface,
-        draw_on_ground = true,
-        players = {player.index}
-    }
-end
-
 function visual.draw_mapped_entity_box(player, ps, entity)
     if not (entity and entity.valid) then
         return nil
@@ -521,28 +315,6 @@ function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
     }
 end
 
-function visual.draw_bot_light(player, ps, bot_name, bot)
-    if not (player and player.valid and ps and ps.visual and bot and bot.valid) then
-        return
-    end
-
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-    local obj = bot.visual.light
-    if obj and obj.valid then
-        return -- already exists; stays attached to target
-    end
-
-    bot.visual.light = rendering.draw_light {
-        sprite = "utility/light_medium",
-        scale = 0.7,
-        intensity = 0.6,
-        minimum_darkness = 0.2,
-        oriented = false,
-        target = bot,
-        surface = bot.surface,
-        players = {player.index}
-    }
-end
 
 function visual.draw_player_light(player, ps)
     if not (player and player.valid and ps and ps.visual) then

@@ -11,38 +11,30 @@ local BOT_CONF = config.bot
 local BOT_NAME = "mapper"
 
 function mapper_bot.init_state(player, ps)
-    ps.bots[BOT_NAME] = ps.bots[BOT_NAME] or {
-        entity = nil,
-        task = {
-            target_position = nil,
-            current_mode = "follow",
-            next_mode = nil,
-            search_spiral = nil,
-            survey_entity = nil
-        },
-        visual = {
-            highlight = nil,
-            circle = nil,
-            lines = nil,
-            light = nil
-        }
-    }
+    common_bot.init_state(player, ps, BOT_NAME)
+
+    ps.bots[BOT_NAME].task.search_spiral = ps.bots[BOT_NAME].task.search_spiral or nil
+    ps.bots[BOT_NAME].task.survey_entity = ps.bots[BOT_NAME].task.survey_entity or nil
+end
+
+function mapper_bot.destroy_state(player, ps)
+    common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
 function mapper_bot.update(player, ps, state, visual, tick)
     local bot = state.get_bot_by_name(player, ps, BOT_NAME)
-    local conf = BOT_CONF[BOT_NAME]
+    local bot_conf = BOT_CONF[BOT_NAME]
 
     if not (bot and bot.entity and bot.entity.valid) then
         return
     end
 
     -- perform updates common to all bots
-    common_bot.update(player, ps, state, visual, BOT_NAME, bot, tick)
+    common_bot.update(player, bot, bot_conf, tick)
 
     -- Mode behavior step
     if bot.task.current_mode == "follow" then
-        follow.update(player, ps, state, bot, conf.follow_offset_y)
+        follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_mode == "move_to" then
         move_to.update(player, ps, state, bot)
     elseif bot.task.current_mode == "search" then

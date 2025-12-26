@@ -156,19 +156,10 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
 
     -- Destroy all bot entities (if present).
     if ps.bots then
-        for _, bot_name in ipairs(BOT_NAMES) do
-            local bot = ps.bots[bot_name]
-
-            visual.clear_lines(player, ps, bot_name)
-            visual.clear_bot_highlight(player, ps, bot_name)
-            visual.clear_bot_circle(player, ps, bot_name)
-            visual.clear_bot_light(player, ps, bot_name)
-
-            if bot and bot.entity and bot.entity.valid then
-                bot.entity.destroy()
-            end
-            ps.bots[bot_name] = nil
-        end
+        cleaner_bot.destory(player, ps, state)
+        constructor_bot.destory(player, ps, state)
+        mapper_bot.destory(player, ps, state)
+        repairer_bot.destory(player, ps, state)
     end
 
     -- Clear ALL render objects / visual.

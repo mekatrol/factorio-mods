@@ -8,36 +8,27 @@ local BOT_CONF = config.bot
 local BOT_NAME = "repairer"
 
 function repairer_bot.init_state(player, ps)
-    ps.bots[BOT_NAME] = ps.bots[BOT_NAME] or  {
-        entity = nil,
-        task = {
-            target_position = nil,
-            current_mode = "follow",
-            next_mode = nil
-        },
-        visual = {
-            highlight = nil,
-            circle = nil,
-            lines = nil,
-            light = nil
-        }
-    }
+    common_bot.init_state(player, ps, BOT_NAME)
+end
+
+function repairer_bot.destroy_state(player, ps)
+    common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
 function repairer_bot.update(player, ps, state, visual, tick)
     local bot = state.get_bot_by_name(player, ps, BOT_NAME)
-    local conf = BOT_CONF[BOT_NAME]
+    local bot_conf = BOT_CONF[BOT_NAME]
 
     if not (bot and bot.entity and bot.entity.valid) then
         return
     end
 
     -- perform updates common to all bots
-    common_bot.update(player, ps, state, visual, BOT_NAME, bot, tick)
+    common_bot.update(player, bot, bot_conf, tick)
 
     -- Mode behavior step
     if bot.task.current_mode == "follow" then
-        follow.update(player, ps, state, bot, conf.follow_offset_y)
+        follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     end
 
     -- Throttle overlay updates
