@@ -8,11 +8,6 @@ local util = require("util")
 
 local BOT_NAMES = config.bot_names
 
-local function ensure_lines_table(ps)
-    ps.visual = ps.visual or {}
-    ps.visual.lines = ps.visual.lines or {}
-end
-
 local function ensure_entity_groups_table(ps)
     ps.visual = ps.visual or {}
     ps.visual.entity_groups = ps.visual.entity_groups or {}

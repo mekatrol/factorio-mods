@@ -21,6 +21,7 @@ end
 
 function common_bot.init_state(player, ps, bot_name)
     ps.bots[bot_name] = ps.bots[bot_name] or {
+        name = bot_name,
         entity = nil,
         task = {
             target_position = nil,

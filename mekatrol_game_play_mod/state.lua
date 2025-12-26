@@ -107,20 +107,17 @@ end
 -- Mode setting
 ----------------------------------------------------------------------
 
-function state.set_player_mapper_bot_task(player, ps, bot, new_mode)
+function state.set_mapper_bot_task(player, ps, bot, new_mode)
     bot.search_spiral = nil
     bot.survey_entity = nil
     bot.next_survey_entities = {}
 end
 
-function state.set_player_bot_task(player, ps, bot_name, new_mode)
+function state.set_bot_task(player, ps, bot, new_mode)
     -- Validate mode
     if not MODES.index[new_mode] then
         new_mode = "follow"
     end
-
-    -- get bot
-    local bot = state.get_bot_by_name(player, ps, bot_name)
 
     -- set the new current_mode
     bot.task.current_mode = new_mode
@@ -131,8 +128,8 @@ function state.set_player_bot_task(player, ps, bot_name, new_mode)
         bot.task.next_mode = nil
         bot.task.target_position = nil
 
-        if bot_name == "mapper" then
-            state.set_player_mapper_bot_task(player, ps, bot, new_mode)
+        if bot.name == "mapper" then
+            state.set_mapper_bot_task(player, ps, bot, new_mode)
         end
         return
     end

@@ -151,16 +151,16 @@ local function find_entity(player, ps, bot, pos, surf)
 end
 
 function search.update(player, ps, state, bot)
-    if not (player and player.valid and bot and bot.valid) then
+    if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
     end
 
-    local surf = bot.surface
+    local surf = bot.entity.surface
     local target_pos = ps.task.target_position
-    local bpos = bot.position
+    local bpos = bot.entity.position
 
     if not target_pos then
-        local entity = find_entity(player, ps, bot, bpos, surf)
+        local entity = find_entity(player, ps, bot.entity, bpos, surf)
 
         if entity then
             -- record what we found (optional, but useful for overlay/debug)
@@ -174,7 +174,7 @@ function search.update(player, ps, state, bot)
             }
 
             -- switch to move_to mode
-            state.set_player_bot_task(player, ps, "move_to")
+            state.set_bot_task(player, ps, bot, "move_to")
 
             -- reset search spiral so searching restarts cleanly after
             ps.search_spiral = nil
@@ -187,7 +187,7 @@ function search.update(player, ps, state, bot)
         ps.task.target_position = target_pos
     end
 
-    positioning.move_bot_towards(player, bot, target_pos)
+    positioning.move_bot_towards(player, bot.entity, target_pos)
 
     local dx = target_pos.x - bpos.x
     local dy = target_pos.y - bpos.y

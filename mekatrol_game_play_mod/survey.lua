@@ -242,8 +242,8 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     return true
 end
 
-local function switch_to_next_mode(player, ps, state)
-    state.set_player_bot_task(player, ps, ps.task.next_mode or "search")
+local function switch_to_next_mode(player, ps, state, bot)
+    state.set_bot_task(player, ps, bot, bot.task.next_mode or "search")
     ps.task.target_position = nil
     ps.survey_trace = nil
     ps.survey_entity = nil
@@ -377,7 +377,7 @@ local function trace_step(player, ps, state, visual, bot)
             entitygroup.add_boundary(player, ps, visual, boundary, name, surf.index)
 
             -- Switch back to survey mode to find next entity
-            switch_to_next_mode(player, ps, state)
+            switch_to_next_mode(player, ps, state, bot)
             return nil
         end
 

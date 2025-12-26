@@ -73,7 +73,7 @@ local function on_cycle_mapper_bot_mode(event)
         new_mode = "follow"
     end
 
-    state.set_player_bot_task(player, ps, "mapper", new_mode)
+    state.set_bot_task(player, ps, bot, new_mode)
 end
 
 ----------------------------------------------------------------------

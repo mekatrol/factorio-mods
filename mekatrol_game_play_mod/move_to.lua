@@ -23,10 +23,7 @@ function move_to.update(player, ps, state, bot)
             mode = "follow"
         end
 
-        state.set_player_bot_task(player, ps, "mapper", mode)
-        state.set_player_bot_task(player, ps, "repairer", mode)
-        state.set_player_bot_task(player, ps, "constructor", mode)
-        state.set_player_bot_task(player, ps, "cleaner", mode)
+        state.set_bot_task(player, ps, bot, mode)
         return
     end
 
@@ -41,7 +38,7 @@ function move_to.update(player, ps, state, bot)
     -- reached target, if so move to next mode
     if dx * dx + dy * dy <= step * step then
         local new_mode = bot.task.next_mode or "follow"
-        state.set_player_bot_task(player, ps, new_mode)
+        state.set_bot_task(player, ps, bot, new_mode)
     end
 end
 
