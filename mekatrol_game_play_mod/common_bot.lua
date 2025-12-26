@@ -135,7 +135,7 @@ function common_bot.clear_circle(bot)
         return
     end
 
-    local obj = bot.circle
+    local obj = bot.visual.circle
 
     if obj and obj.valid then
         obj:destroy()

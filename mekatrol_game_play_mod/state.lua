@@ -25,12 +25,6 @@ function state.ensure_storage_tables()
     storage.mekatrol_game_play_bot = storage.mekatrol_game_play_bot or {}
 end
 
-function state.ensure_visuals(ps)
-    ps.visual = ps.visual or {}
-    ps.visual.lines = ps.visual.lines or nil
-    ps.visual.overlay_texts = ps.visual.overlay_texts or {}
-end
-
 function state.get_bot_by_name(player, ps, bot_name)
     if not ps then
         return nil
@@ -69,8 +63,6 @@ function state.get_player_state(player_index)
             overlay_next_tick = nil,
 
             visual = {
-
-                lines = nil,
                 overlay_texts = {}
             }
         }
@@ -88,7 +80,8 @@ function state.get_player_state(player_index)
 
     ps.overlay_next_tick = ps.overlay_next_tick or 0
 
-    state.ensure_visuals(ps)
+    ps.visual = ps.visual or {}
+    ps.visual.overlay_texts = ps.visual.overlay_texts or {}
 
     return ps
 end
