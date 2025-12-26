@@ -8,9 +8,10 @@ local search = require("search")
 local survey = require("survey")
 
 local BOT_CONF = config.bot
+local BOT_NAME = "mapper"
 
-function mapper_bot.init_state(player, ps, state)
-    return {
+function mapper_bot.init_state(player, ps)
+    ps.bots[BOT_NAME] = ps.bots[BOT_NAME] or {
         entity = nil,
         task = {
             target_position = nil,
@@ -23,16 +24,15 @@ function mapper_bot.init_state(player, ps, state)
 end
 
 function mapper_bot.update(player, ps, state, visual, tick)
-    local bot_name = "mapper"
-    local bot = state.get_bot_by_name(player, ps, bot_name)
-    local conf = BOT_CONF[bot_name]
+    local bot = state.get_bot_by_name(player, ps, BOT_NAME)
+    local conf = BOT_CONF[BOT_NAME]
 
     if not (bot and bot.entity and bot.entity.valid) then
         return
     end
 
     -- perform updates common to all bots
-    common_bot.update(player, ps, state, visual, bot_name, bot, tick)
+    common_bot.update(player, ps, state, visual, BOT_NAME, bot, tick)
 
     -- Mode behavior step
     if bot.task.current_mode == "follow" then
@@ -52,7 +52,7 @@ function mapper_bot.update(player, ps, state, visual, tick)
         return
     end
 
-    visual.draw_bot_light(player, ps, bot_name, bot)
+    visual.draw_bot_light(player, ps, BOT_NAME, bot)
 end
 
 return mapper_bot

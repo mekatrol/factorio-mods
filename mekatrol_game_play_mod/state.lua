@@ -16,7 +16,7 @@ local repairer_bot = require("repairer_bot")
 local BOT_CONF = config.bot
 local MODES = config.modes
 
-local BOT_NAMES = {"mapper", "repairer", "constructor", "cleaner"}
+local BOT_NAMES = {"cleaner", "constructor", "mapper", "repairer"}
 
 ----------------------------------------------------------------------
 -- Storage and player state
@@ -78,13 +78,7 @@ function state.get_player_state(player_index)
 
     if not ps then
         ps = {
-            bots = {
-                ["cleaner"] = cleaner_bot.init_state(player, ps, state),
-                ["constructor"] = constructor_bot.init_state(player, ps, state),
-                ["mapper"] = mapper_bot.init_state(player, ps, state),
-                ["repairer"] = repairer_bot.init_state(player, ps, state)
-            },
-
+            bots = nil,
             bot_enabled = false,
 
             last_player_position = nil,
@@ -93,11 +87,11 @@ function state.get_player_state(player_index)
             overlay_next_tick = nil,
 
             visual = {
-                ["mapper"] = {
+                ["cleaner"] = {
                     bot_highlight = nil,
                     radius_circle = nil
                 },
-                ["repairer"] = {
+                ["mapper"] = {
                     bot_highlight = nil,
                     radius_circle = nil
                 },
@@ -105,7 +99,7 @@ function state.get_player_state(player_index)
                     bot_highlight = nil,
                     radius_circle = nil
                 },
-                ["cleaner"] = {
+                ["repairer"] = {
                     bot_highlight = nil,
                     radius_circle = nil
                 },
@@ -120,6 +114,11 @@ function state.get_player_state(player_index)
     end
 
     ps.bots = ps.bots or {}
+
+    cleaner_bot.init_state(player, ps)
+    constructor_bot.init_state(player, ps)
+    mapper_bot.init_state(player, ps)
+    repairer_bot.init_state(player, ps)
 
     ps.task = ps.task or {}
 
