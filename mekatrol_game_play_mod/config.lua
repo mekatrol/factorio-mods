@@ -23,7 +23,7 @@ config.bot = {
         arrival_threshold = 0.5 -- distance threshold for "arrived at frontier node"
     },
 
-    mapper = {
+    ["mapper"] = {
         follow_offset_y = -2,
         highlight_color = {
             r = 0.5,
@@ -33,7 +33,7 @@ config.bot = {
         }
     },
 
-    repairer = {
+    ["repairer"] = {
         follow_offset_y = -0.666,
         highlight_color = {
             r = 0.5,
@@ -43,7 +43,7 @@ config.bot = {
         }
     },
 
-    constructor = {
+    ["constructor"] = {
         follow_offset_y = 0.666,
         highlight_color = {
             r = 0.0,
@@ -53,7 +53,7 @@ config.bot = {
         }
     },
 
-    cleaner = {
+    ["cleaner"] = {
         follow_offset_y = 2,
         highlight_color = {
             r = 0.0,
@@ -80,17 +80,7 @@ end
 config.bot_names = {"mapper", "repairer", "constructor", "cleaner"}
 
 function config.get_bot_config(bot_name)
-    if bot_name == "mapper" then
-        return config.bot.mapper
-    elseif bot_name == "repairer" then
-        return config.bot.repairer
-    elseif bot_name == "constructor" then
-        return config.bot.constructor
-    elseif bot_name == "cleaner" then
-        return config.bot.cleaner
-    end
-
-    return nil
+    return config.bot[bot_name]
 end
 
 return config

@@ -14,6 +14,7 @@ local BOT_CONF = config.bot
 function mapper_bot.update(player, ps, tick)
     local bot_name = "mapper"
     local bot = state.get_bot_by_name(player, ps, bot_name)
+    local conf = BOT_CONF[bot_name]
 
     if not (bot and bot.entity and bot.entity.valid) then
         return
@@ -24,7 +25,7 @@ function mapper_bot.update(player, ps, tick)
 
     -- Mode behavior step
     if bot.task.current_mode == "follow" then
-        follow.update(player, ps, bot, BOT_CONF.mapper.follow_offset_y)
+        follow.update(player, ps, bot, conf.follow_offset_y)
     elseif bot.task.current_mode == "move_to" then
         move_to.update(player, ps, bot)
     elseif bot.task.current_mode == "search" then

@@ -274,19 +274,19 @@ function state.create_player_bot(player, clear_entity_groups)
 
     local pos = player.position
     local offsets = {
-        mapper = {
+        ["mapper"] = {
             x = -2,
             y = BOT_CONF.mapper.follow_offset_y
         },
-        repairer = {
+        ["repairer"] = {
             x = -2,
             y = BOT_CONF.repairer.follow_offset_y
         },
-        constructor = {
+        ["constructor"]= {
             x = -2,
             y = BOT_CONF.constructor.follow_offset_y
         },
-        cleaner = {
+        ["cleaner"] = {
             x = -2,
             y = BOT_CONF.cleaner.follow_offset_y
         }
