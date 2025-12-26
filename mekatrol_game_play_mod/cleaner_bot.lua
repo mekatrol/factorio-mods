@@ -14,6 +14,12 @@ function cleaner_bot.init_state(player, ps)
             target_position = nil,
             current_mode = "follow",
             next_mode = nil
+        },
+        visual = {
+            highlight = nil,
+            radius_circle = nil,
+            lines = nil,
+            light = nil
         }
     }
 end

@@ -98,13 +98,12 @@ local function on_entity_died(event)
         end
 
         if match then
-            local pl = game.get_player(idx)
-            if pl and pl.valid then
-                state.destroy_player_bot(pl, visual, entitygroup.clear_entity_groups)
-                util.print(pl, "yellow", "destroyed")
+            local player = game.get_player(idx)
+            if player and player.valid then
+                state.destroy_player_bot(player, visual, entitygroup.clear_entity_groups)
+                util.print(player, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
-                visual.clear_all(ps)
                 storage.mekatrol_game_play_bot[idx] = nil
             end
             return

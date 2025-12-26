@@ -15,8 +15,7 @@ local repairer_bot = require("repairer_bot")
 
 local BOT_CONF = config.bot
 local MODES = config.modes
-
-local BOT_NAMES = {"cleaner", "constructor", "mapper", "repairer"}
+local BOT_NAMES = config.bot_names
 
 ----------------------------------------------------------------------
 -- Storage and player state
@@ -26,22 +25,10 @@ function state.ensure_storage_tables()
     storage.mekatrol_game_play_bot = storage.mekatrol_game_play_bot or {}
 end
 
-function state.ensure_bot_visual(ps, bot_name)
-    ps.visual[bot_name] = ps.visual[bot_name] or {}
-
-    ps.visual[bot_name].highlight = ps.visual[bot_name].highlight or nil
-    ps.visual[bot_name].radius_circle = ps.visual[bot_name].radius_circle or nil
-end
-
 function state.ensure_visuals(ps)
     ps.visual = ps.visual or {}
     ps.visual.lines = ps.visual.lines or nil
     ps.visual.overlay_texts = ps.visual.overlay_texts or {}
-
-    state.ensure_bot_visual(ps, "cleaner")
-    state.ensure_bot_visual(ps, "constructor")
-    state.ensure_bot_visual(ps, "mapper")
-    state.ensure_bot_visual(ps, "repairer")
 end
 
 ----------------------------------------------------------------------
@@ -57,7 +44,9 @@ function state.get_bot_by_name(player, ps, bot_name)
     end
 
     local bots = ps.bots
+
     if not bots then
+        util.print(player, "red", "Failed to get bot with name: '%s'", bot_name)
         return nil
     end
 
@@ -87,22 +76,6 @@ function state.get_player_state(player_index)
             overlay_next_tick = nil,
 
             visual = {
-                ["cleaner"] = {
-                    bot_highlight = nil,
-                    radius_circle = nil
-                },
-                ["mapper"] = {
-                    bot_highlight = nil,
-                    radius_circle = nil
-                },
-                ["constructor"] = {
-                    bot_highlight = nil,
-                    radius_circle = nil
-                },
-                ["repairer"] = {
-                    bot_highlight = nil,
-                    radius_circle = nil
-                },
 
                 lines = nil,
                 overlay_texts = {}
@@ -190,24 +163,29 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
 
     -- Destroy all bot entities (if present).
     if ps.bots then
-        for _, name in ipairs(BOT_NAMES) do
-            local bot = ps.bots[name]
+        for _, bot_name in ipairs(BOT_NAMES) do
+            local bot = ps.bots[bot_name]
+
+            visual.clear_lines(player, ps, bot_name)
+            visual.clear_bot_highlight(player, ps, bot_name)
+            visual.clear_radius_circle(player, ps, bot_name)
+            visual.clear_bot_light(player, ps, bot_name)
+
             if bot and bot.entity and bot.entity.valid then
                 bot.entity.destroy()
             end
-            ps.bots[name] = nil
+            ps.bots[bot_name] = nil
         end
     end
 
     -- Clear ALL render objects / visual.
-    visual.clear_all(ps)
+    visual.clear_entity_groups(ps)
+    visual.clear_player_light(ps)
+    visual.clear_overlay(ps)
 
     -- Disable + clear entity references.
     ps.bots = {}
     ps.bot_enabled = false
-
-    -- Init to follow mode
-    state.set_player_bot_task(player, ps, "follow")
 
     -- Movement bookkeeping.
     ps.last_player_position = nil

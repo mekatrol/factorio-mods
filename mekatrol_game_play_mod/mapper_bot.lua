@@ -19,6 +19,12 @@ function mapper_bot.init_state(player, ps)
             next_mode = nil,
             search_spiral = nil,
             survey_entity = nil
+        },
+        visual = {
+            highlight = nil,
+            radius_circle = nil,
+            lines = nil,
+            light = nil
         }
     }
 end
