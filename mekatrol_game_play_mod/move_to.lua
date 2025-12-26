@@ -3,12 +3,11 @@ local move_to = {}
 
 local config = require("config")
 local positioning = require("positioning")
-local state = require("state")
 local util = require("util")
 
 local BOT_CONF = config.bot
 
-function move_to.update(player, ps, bot)
+function move_to.update(player, ps, state, bot)
     if not (player and player.valid and ps and bot and bot.entity and bot.entity.valid) then
         return
     end

@@ -4,9 +4,7 @@ local config = require("config")
 local entitygroup = require("entitygroup")
 local polygon = require("polygon")
 local positioning = require("positioning")
-local state = require("state")
 local util = require("util")
-local visual = require("visual")
 
 local BOT_CONF = config.bot
 
@@ -244,14 +242,14 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     return true
 end
 
-local function switch_to_next_mode(player, ps)
+local function switch_to_next_mode(player, ps, state)
     state.set_player_bot_task(player, ps, ps.task.next_mode or "search")
     ps.task.target_position = nil
     ps.survey_trace = nil
     ps.survey_entity = nil
 end
 
-local function trace_step(player, ps, bot)
+local function trace_step(player, ps, state, visual, bot)
     local name = nil
     if ps.survey_entity then
         name = ps.survey_entity.name
@@ -376,10 +374,10 @@ local function trace_step(player, ps, bot)
             local boundary = tr.boundary or {}
 
             -- add to boundary group
-            entitygroup.add_boundary(player, ps, boundary, name, surf.index)
+            entitygroup.add_boundary(player, ps, visual, boundary, name, surf.index)
 
             -- Switch back to survey mode to find next entity
-            switch_to_next_mode(player, ps)
+            switch_to_next_mode(player, ps, state)
             return nil
         end
 
@@ -394,7 +392,7 @@ local function trace_step(player, ps, bot)
     return nil
 end
 
-function survey.update(player, ps, bot, tick)
+function survey.update(player, ps, state, visual, bot, tick)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
@@ -404,7 +402,7 @@ function survey.update(player, ps, bot, tick)
     if ps.survey_trace then
         local target_pos = ps.task.target_position
         if not target_pos then
-            target_pos = trace_step(player, ps, bot)
+            target_pos = trace_step(player, ps, state, visual, bot)
             ps.task.target_position = target_pos
         end
 
@@ -435,10 +433,10 @@ function survey.update(player, ps, bot, tick)
 
     -- For single-tile survey targets (e.g. crude-oil), just add it as self contained polygon
     if entitygroup.is_survey_single_target(ps.survey_entity) then
-        entitygroup.add_single_tile_entity_group(player, ps, bot.surface_index, ps.survey_entity)
+        entitygroup.add_single_tile_entity_group(player, ps, visual, bot.surface_index, ps.survey_entity)
 
         -- Switch back to survey mode to find next entity
-        switch_to_next_mode(player, ps)
+        switch_to_next_mode(player, ps, state)
     else
         -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
         survey.perform_survey_scan(player, ps, bot, tick)

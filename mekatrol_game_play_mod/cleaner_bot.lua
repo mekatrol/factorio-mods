@@ -20,7 +20,7 @@ function cleaner_bot.update(player, ps, state, visual, tick)
 
     -- Mode behavior step
     if bot.task.current_mode == "follow" then
-        follow.update(player, ps, bot, conf.follow_offset_y)
+        follow.update(player, ps, state, bot, conf.follow_offset_y)
     end
 
     -- Throttle overlay updates

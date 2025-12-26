@@ -8,6 +8,11 @@ local state = {}
 local config = require("config")
 local util = require("util")
 
+local cleaner_bot = require("cleaner_bot")
+local constructor_bot = require("constructor_bot")
+local mapper_bot = require("mapper_bot")
+local repairer_bot = require("repairer_bot")
+
 local BOT_CONF = config.bot
 local MODES = config.modes
 
@@ -69,20 +74,12 @@ function state.get_player_state(player_index)
     state.ensure_storage_tables()
 
     local ps = storage.mekatrol_game_play_bot[player_index]
+    local player = game.get_player(player_index)
 
     if not ps then
         ps = {
             bots = {
-                ["mapper"] = {
-                    entity = nil,
-                    task = {
-                        target_position = nil,
-                        current_mode = "follow",
-                        next_mode = nil,
-                        search_spiral = nil,
-                        survey_entity = nil
-                    }
-                },
+                ["mapper"] = mapper_bot.init_state(player, ps, state, visual),
                 ["repairer"] = {
                     entity = nil,
                     task = {
@@ -210,7 +207,7 @@ end
 -- Bot lifecycle
 ----------------------------------------------------------------------
 
-function state.destroy_player_bot(player, clear_all, clear_entity_groups)
+function state.destroy_player_bot(player, visual, clear_entity_groups)
     local ps = state.get_player_state(player.index)
 
     -- Destroy all bot entities (if present).
@@ -225,7 +222,7 @@ function state.destroy_player_bot(player, clear_all, clear_entity_groups)
     end
 
     -- Clear ALL render objects / visual.
-    clear_all(ps)
+    visual.clear_all(ps)
 
     -- Disable + clear entity references.
     ps.bots = {}
@@ -256,7 +253,7 @@ function state.destroy_player_bot(player, clear_all, clear_entity_groups)
     util.print(player, "yellow", "deactivated")
 end
 
-function state.create_player_bot(player, clear_entity_groups)
+function state.create_player_bot(player, visual, clear_entity_groups)
     local ps = state.get_player_state(player.index)
 
     -- If any bot already exists, just enable and keep references.
@@ -282,7 +279,7 @@ function state.create_player_bot(player, clear_entity_groups)
             x = -2,
             y = BOT_CONF.repairer.follow_offset_y
         },
-        ["constructor"]= {
+        ["constructor"] = {
             x = -2,
             y = BOT_CONF.constructor.follow_offset_y
         },

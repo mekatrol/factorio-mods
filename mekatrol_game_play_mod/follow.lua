@@ -9,7 +9,7 @@ local BOT_CONF = config.bot
 -- Follow mode
 ----------------------------------------------------------------------
 
-function follow.update(player, ps, bot, y_offset)
+function follow.update(player, ps, state, bot, y_offset)
     if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
     end

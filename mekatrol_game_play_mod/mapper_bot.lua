@@ -9,6 +9,19 @@ local survey = require("survey")
 
 local BOT_CONF = config.bot
 
+function mapper_bot.init_state(player, ps, state, visual)
+    return {
+        entity = nil,
+        task = {
+            target_position = nil,
+            current_mode = "follow",
+            next_mode = nil,
+            search_spiral = nil,
+            survey_entity = nil
+        }
+    }
+end
+
 function mapper_bot.update(player, ps, state, visual, tick)
     local bot_name = "mapper"
     local bot = state.get_bot_by_name(player, ps, bot_name)
@@ -23,13 +36,13 @@ function mapper_bot.update(player, ps, state, visual, tick)
 
     -- Mode behavior step
     if bot.task.current_mode == "follow" then
-        follow.update(player, ps, bot, conf.follow_offset_y)
+        follow.update(player, ps, state, bot, conf.follow_offset_y)
     elseif bot.task.current_mode == "move_to" then
-        move_to.update(player, ps, bot)
+        move_to.update(player, ps, state, bot)
     elseif bot.task.current_mode == "search" then
-        search.update(player, ps, bot)
+        search.update(player, ps, state, bot)
     elseif bot.task.current_mode == "survey" then
-        survey.update(player, ps, bot, tick)
+        survey.update(player, ps, bot, state, visual, tick)
     end
 
     -- Throttle overlay updates

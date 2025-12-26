@@ -45,9 +45,9 @@ local function on_toggle_bot(event)
     end
 
     if has_any then
-        state.destroy_player_bot(p, visual.clear_all, entitygroup.clear_entity_groups)
+        state.destroy_player_bot(p, visual, entitygroup.clear_entity_groups)
     else
-        state.create_player_bot(p, entitygroup.clear_entity_groups)
+        state.create_player_bot(p, visual, entitygroup.clear_entity_groups)
     end
 end
 
@@ -100,7 +100,7 @@ local function on_entity_died(event)
         if match then
             local pl = game.get_player(idx)
             if pl and pl.valid then
-                state.destroy_player_bot(pl, visual.clear_all, entitygroup.clear_entity_groups)
+                state.destroy_player_bot(pl, visual, entitygroup.clear_entity_groups)
                 util.print(pl, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
@@ -128,7 +128,7 @@ local function on_player_removed(event)
 
     local p = game.get_player(idx)
     if p and p.valid then
-        state.destroy_player_bot(p, true, visual.clear_all, entitygroup.clear_entity_groups)
+        state.destroy_player_bot(p, visual, entitygroup.clear_entity_groups)
     else
         -- Player entity is gone; best-effort cleanup of any remaining bots.
         if ps.bots then

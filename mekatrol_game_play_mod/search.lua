@@ -4,9 +4,7 @@ local config = require("config")
 local entitygroup = require("entitygroup")
 local polygon = require("polygon")
 local positioning = require("positioning")
-local state = require("state")
 local util = require("util")
-local visual = require("visual")
 
 local BOT_CONF = config.bot
 local DETECTION_RADIUS = BOT_CONF.search.detection_radius / 3
@@ -152,7 +150,7 @@ local function find_entity(player, ps, bot, pos, surf)
     return next_found_entity
 end
 
-function search.update(player, ps, bot)
+function search.update(player, ps, state, bot)
     if not (player and player.valid and bot and bot.valid) then
         return
     end
