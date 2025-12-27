@@ -38,9 +38,8 @@ function constructor_bot.set_bot_task(player, ps, new_task, next_task)
     -- set the new current_task
     bot.task.current_task = new_task
 
-    if next_task then
-        bot.task.current_task = next_task
-    end
+    -- set new next_task
+    bot.task.next_task = next_task
 end
 
 function constructor_bot.update(player, ps, state, visual, tick)

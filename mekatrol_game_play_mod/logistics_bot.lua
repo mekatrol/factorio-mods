@@ -1,6 +1,6 @@
 local logistics_bot = {}
 
-local clean = require("clean")
+local collect = require("collect")
 local common_bot = require("common_bot")
 local config = require("config")
 local follow = require("follow")
@@ -11,7 +11,7 @@ local BOT_CONF = config.bot
 local BOT_NAME = "logistics"
 
 local BOT_TASKS = {
-    list = {"follow", "clean", "move_to"},
+    list = {"follow", "collect", "move_to"},
     index = {}
 }
 
@@ -20,7 +20,7 @@ for i, task in ipairs(BOT_TASKS.list) do
 end
 
 function logistics_bot.init_state(player, ps)
-    common_bot.init_state(player, ps, BOT_NAME)
+    common_bot.init_state(player, ps, BOT_NAME, "collect")
 end
 
 function logistics_bot.destroy_state(player, ps)
@@ -39,9 +39,8 @@ function logistics_bot.set_bot_task(player, ps, new_task, next_task)
     -- set the new current_task
     bot.task.current_task = new_task
 
-    if next_task then
-        bot.task.next_task = next_task
-    end
+    -- set new next_task
+    bot.task.next_task = next_task
 end
 
 function logistics_bot.update(player, ps, state, visual, tick)
@@ -60,8 +59,8 @@ function logistics_bot.update(player, ps, state, visual, tick)
         follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
-    elseif bot.task.current_task == "clean" then
-        clean.update(player, ps, bot)
+    elseif bot.task.current_task == "collect" then
+        collect.update(player, ps, bot)
     end
 
     -- Throttle overlay updates

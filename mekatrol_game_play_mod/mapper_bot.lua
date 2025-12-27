@@ -66,10 +66,8 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task)
         bot.task.next_task = "search"
     end
 
-    if next_task then
-        bot.task.next_task = next_task
-    end
-
+    -- set new next_task
+    bot.task.next_task = next_task
 end
 
 function mapper_bot.toggle_task(player, ps)
@@ -83,7 +81,7 @@ function mapper_bot.toggle_task(player, ps)
         new_task = "follow"
     end
 
-    mapper_bot.set_bot_task(player, ps, new_task)
+    mapper_bot.set_bot_task(player, ps, new_task, nil)
 end
 
 function mapper_bot.update(player, ps, state, visual, tick)

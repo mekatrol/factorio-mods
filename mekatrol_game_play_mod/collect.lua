@@ -1,4 +1,4 @@
-local clean = {}
+local collect = {}
 
 local module = require("module")
 local util = require("util")
@@ -9,7 +9,6 @@ local BOT_MAX_ITEM_COUNT = 100
 local function get_total_carried(player, bot)
     local total = 0
     if not bot or not bot.tasks.carried_items then
-        util.print(player, "yellow", "zero carried")
         return 0
     end
     for _, count in pairs(bot.tasks.carried_items) do
@@ -41,7 +40,7 @@ local function add_to_carried(bot, name, count)
     t[name] = (t[name] or 0) + count
 end
 
-function clean.update(player, ps, bot)
+function collect.update(player, ps, bot)
     if not (bot and bot.entity and bot.entity.valid) then
         return
     end
@@ -60,8 +59,8 @@ function clean.update(player, ps, bot)
     local bot_module = module.get_module(bot.name)
 
     if not items or #items == 0 then
-        -- return to follow and then try cleaning again
-        bot_module.set_bot_task(player, ps, "follow", "clean")
+        -- return to follow and then try collecting again
+        -- bot_module.set_bot_task(player, ps, "follow", nil)
         return
     end
 
@@ -97,10 +96,10 @@ function clean.update(player, ps, bot)
 
     if picked_any then
         local total = get_total_carried(player, bot)
-        if total > 0 and (bot.task.current_task == "idle" or pdata.mode == "roam") then
-            bot_module.set_bot_task(player, ps, "pickup", "clean")
+        if total > 0 and (bot.task.current_task == "idle") then
+            bot_module.set_bot_task(player, ps, "pickup", nil)
         end
     end
 end
 
-return clean
+return collect

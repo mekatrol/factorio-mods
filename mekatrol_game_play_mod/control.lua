@@ -81,6 +81,19 @@ end
 local function set_bot_state(player, bot_name, new_task)
     local ps = state.get_player_state(player.index)
 
+    -- convert short hand bot name to long bot name
+    if bot_name == "a" then
+        bot_name = "all"
+    elseif bot_name == "c" then
+        bot_name = "constructor"
+    elseif bot_name == "l" then
+        bot_name = "logistics"
+    elseif bot_name == "m" then
+        bot_name = "mapper"
+    elseif bot_name == "r" then
+        bot_name = "repairer"
+    end
+
     if not ps.bot_enabled then
         util.print(player, "red", "bot not enabled")
         return
@@ -92,7 +105,7 @@ end
 local function register_commands()
     -- a generic command: /bot <name> <task>
     if not commands.commands["bot"] then
-        commands.add_command("bot", "Usage: /bot <repairer|logistics|mapper|constructor> <task>", function(cmd)
+        commands.add_command("bot", "Usage: /bot <constructor|logistics|mapper|repairer> <task>", function(cmd)
             local player = game.get_player(cmd.player_index)
             if not (player and player.valid) then
                 return

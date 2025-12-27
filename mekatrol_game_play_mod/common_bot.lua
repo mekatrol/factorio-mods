@@ -21,13 +21,17 @@ function common_bot.get_tasks(player, ps, state, visual, bot_name)
     return bot.task.current_task, bot.task.next_task
 end
 
-function common_bot.init_state(player, ps, bot_name)
+function common_bot.init_state(player, ps, bot_name, init_task)
+    if not init_task then
+        init_task = "follow"
+    end
+
     ps.bots[bot_name] = ps.bots[bot_name] or {
         name = bot_name,
         entity = nil,
         task = {
             target_position = nil,
-            current_task = "follow",
+            current_task = init_task,
             next_task = nil
         },
         visual = {
@@ -126,7 +130,7 @@ local function issue_task(player, ps, bot_name, new_task)
         return
     end
 
-    bot_module.set_bot_task(player, ps, new_task)
+    bot_module.set_bot_task(player, ps, new_task, nil)
 end
 
 function common_bot.issue_task(player, ps, bot_name, new_task)
