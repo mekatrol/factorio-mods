@@ -31,7 +31,7 @@ function constructor_bot.set_bot_task(player, ps, new_task)
 
     -- Validate task
     if not BOT_TASKS.index[new_task] then
-        util.print(player, "red", "task '%s' not found for bot name: '%s'", bot.name)
+        util.print(player, "red", "task '%s' not found for bot name: '%s'", new_task, bot.name)
         return
     end
 
