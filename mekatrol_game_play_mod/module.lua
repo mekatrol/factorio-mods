@@ -6,7 +6,8 @@ local key_for = {
     constructor = "constructor_bot",
     logistics = "logistics_bot",
     mapper = "mapper_bot",
-    repairer = "repairer_bot"
+    repairer = "repairer_bot",
+    entitygroup = "entitygroup"
 }
 
 module.modules = {}

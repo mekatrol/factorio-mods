@@ -1,7 +1,6 @@
 local search = {}
 
 local config = require("config")
-local entitygroup = require("entitygroup")
 local module = require("module")
 local polygon = require("polygon")
 local positioning = require("positioning")
@@ -104,6 +103,8 @@ local function sort_entities_by_position(entities, pos)
 end
 
 local function find_entity(player, ps, bot, pos, surf)
+    local entitygroup = module.get_module("entitygroup")
+    
     bot.task.next_survey_entities = bot.task.next_survey_entities or {}
 
     local next_entities = bot.task.next_survey_entities

@@ -27,7 +27,8 @@ local function init_modules()
         logistics_bot = logistics_bot,
         constructor_bot = constructor_bot,
         mapper_bot = mapper_bot,
-        repairer_bot = repairer_bot
+        repairer_bot = repairer_bot,
+        entitygroup = entitygroup
     })
 end
 

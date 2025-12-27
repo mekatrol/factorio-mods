@@ -1,7 +1,6 @@
 local survey = {}
 
 local config = require("config")
-local entitygroup = require("entitygroup")
 local module = require("module")
 local polygon = require("polygon")
 local positioning = require("positioning")
@@ -370,6 +369,8 @@ local function trace_step(player, ps, state, visual, bot)
         end
 
         if tr.started_edge and tr.p_tx == tr.start_tx and tr.p_ty == tr.start_ty and nx == tr.p1_tx and ny == tr.p1_ty then
+            local entitygroup = module.get_module("entitygroup")
+            
             -- Completed loop: persist + render group.
             entitygroup.ensure_entity_groups(ps)
 
@@ -398,6 +399,8 @@ function survey.update(player, ps, state, visual, bot, tick)
     if not (player and player.valid and bot and bot.entity.valid) then
         return
     end
+
+    local entitygroup = module.get_module("entitygroup")
 
     -- If we are tracing, drive movement purely from the trace state machine.
     ensure_trace(ps, bot)
