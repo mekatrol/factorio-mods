@@ -153,15 +153,29 @@ function collect.update(player, ps, bot)
                     local stack = ent.stack
                     if stack and stack.valid_for_read then
                         local before = stack.count
-                        local inserted = insert_stack_into_player(player, stack)
-                        if inserted > 0 then
-                            if inserted >= before then
-                                ent.destroy()
-                            else
-                                stack.count = before - inserted
+                        local inv = player.get_main_inventory()
+                        if inv then
+                            local name = stack.name
+                            local stack_count = stack.count
+                            local free = inv.get_insertable_count(name)
+
+                            if free > 0 then
+                                local take = math.min(stack_count, free)
+                                local inserted = inv.insert {
+                                    name = name,
+                                    count = take
+                                }
+
+                                if inserted > 0 then
+                                    if inserted == stack_count then
+                                        ent.destroy()
+                                    else
+                                        stack.count = stack_count - inserted
+                                    end
+                                end
                             end
-                            moved_any = true
                         end
+
                     end
                 else
                     if transfer_container_to_player(player, ent) then
