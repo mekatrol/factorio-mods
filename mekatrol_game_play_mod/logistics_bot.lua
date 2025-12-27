@@ -1,4 +1,4 @@
-local cleaner_bot = {}
+local logistics_bot = {}
 
 local clean = require("clean")
 local common_bot = require("common_bot")
@@ -8,7 +8,7 @@ local move_to = require("move_to")
 local util = require("util")
 
 local BOT_CONF = config.bot
-local BOT_NAME = "cleaner"
+local BOT_NAME = "logistics"
 
 local BOT_TASKS = {
     list = {"follow", "clean", "move_to"},
@@ -19,15 +19,15 @@ for i, task in ipairs(BOT_TASKS.list) do
     BOT_TASKS.index[task] = i
 end
 
-function cleaner_bot.init_state(player, ps)
+function logistics_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME)
 end
 
-function cleaner_bot.destroy_state(player, ps)
+function logistics_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function cleaner_bot.set_bot_task(player, ps, new_task, next_task)
+function logistics_bot.set_bot_task(player, ps, new_task, next_task)
     local bot = ps.bots[BOT_NAME]
 
     -- Validate task
@@ -44,7 +44,7 @@ function cleaner_bot.set_bot_task(player, ps, new_task, next_task)
     end
 end
 
-function cleaner_bot.update(player, ps, state, visual, tick)
+function logistics_bot.update(player, ps, state, visual, tick)
     local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
 
@@ -74,4 +74,4 @@ function cleaner_bot.update(player, ps, state, visual, tick)
     visual.draw_bot_light(player, ps, BOT_NAME, bot)
 end
 
-return cleaner_bot
+return logistics_bot

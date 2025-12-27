@@ -11,8 +11,8 @@ local survey = require("survey")
 local util = require("util")
 local visual = require("visual")
 
-local cleaner_bot = require("cleaner_bot")
 local constructor_bot = require("constructor_bot")
+local logistics_bot = require("logistics_bot")
 local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
 
@@ -24,7 +24,7 @@ local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
 
 local function init_modules()
     module.init_module({
-        cleaner_bot = cleaner_bot,
+        logistics_bot = logistics_bot,
         constructor_bot = constructor_bot,
         mapper_bot = mapper_bot,
         repairer_bot = repairer_bot
@@ -92,7 +92,7 @@ end
 local function register_commands()
     -- a generic command: /bot <name> <task>
     if not commands.commands["bot"] then
-        commands.add_command("bot", "Usage: /bot <cleaner|repairer|mapper|constructor> <task>", function(cmd)
+        commands.add_command("bot", "Usage: /bot <repairer|logistics|mapper|constructor> <task>", function(cmd)
             local player = game.get_player(cmd.player_index)
             if not (player and player.valid) then
                 return
@@ -182,14 +182,14 @@ end
 ----------------------------------------------------------------------
 
 script.on_init(function()
-    init_modules()
     state.ensure_storage_tables()
+    init_modules()
     register_commands()
 end)
 
 script.on_configuration_changed(function(_)
-    init_modules()
     state.ensure_storage_tables()
+    init_modules()
     register_commands()
 end)
 
@@ -231,21 +231,21 @@ script.on_event(defines.events.on_tick, function(event)
 
     if ps.bot_enabled and ps.bots then
         local tick = event.tick
-        cleaner_bot.update(player, ps, state, visual, tick)
         constructor_bot.update(player, ps, state, visual, tick)
+        logistics_bot.update(player, ps, state, visual, tick)
         mapper_bot.update(player, ps, state, visual, tick)
         repairer_bot.update(player, ps, state, visual, tick)
-
-        local cleaner_current_task, cleaner_next_task = common_bot.get_tasks(player, ps, state, visual, "cleaner")
-        local cleaner_current_task_line = string.format("cleaner: %s→%s", cleaner_current_task or "nil",
-            cleaner_next_task or "nil")
-        overlay_lines[#overlay_lines + 1] = cleaner_current_task_line
 
         local constructor_current_task, constructor_next_task =
             common_bot.get_tasks(player, ps, state, visual, "constructor")
         local constructor_current_task_line = string.format("constructor: %s→%s", constructor_current_task or "nil",
             constructor_next_task or "nil")
         overlay_lines[#overlay_lines + 1] = constructor_current_task_line
+
+        local logistics_current_task, logistics_next_task = common_bot.get_tasks(player, ps, state, visual, "logistics")
+        local logistics_current_task_line = string.format("logistics: %s→%s", logistics_current_task or "nil",
+            logistics_next_task or "nil")
+        overlay_lines[#overlay_lines + 1] = logistics_current_task_line
 
         local mapper_current_task, mapper_next_task = common_bot.get_tasks(player, ps, state, visual, "mapper")
         local mapper_current_task_line = string.format("mapper: %s→%s", mapper_current_task or "nil",

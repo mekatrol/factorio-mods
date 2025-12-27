@@ -3,8 +3,8 @@ local module = {}
 local util = require("util")
 
 local key_for = {
-    cleaner = "cleaner_bot",
     constructor = "constructor_bot",
+    logistics = "logistics_bot",
     mapper = "mapper_bot",
     repairer = "repairer_bot"
 }

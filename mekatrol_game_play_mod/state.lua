@@ -8,8 +8,8 @@ local state = {}
 local config = require("config")
 local util = require("util")
 
-local cleaner_bot = require("cleaner_bot")
 local constructor_bot = require("constructor_bot")
+local logistics_bot = require("logistics_bot")
 local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
 
@@ -72,8 +72,8 @@ function state.get_player_state(player_index)
 
     ps.bots = ps.bots or {}
 
-    cleaner_bot.init_state(player, ps)
     constructor_bot.init_state(player, ps)
+    logistics_bot.init_state(player, ps)
     mapper_bot.init_state(player, ps)
     repairer_bot.init_state(player, ps)
 
@@ -94,8 +94,8 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
 
     -- Destroy all bot entities (if present).
     if ps.bots then
-        cleaner_bot.destroy_state(player, ps, state)
         constructor_bot.destroy_state(player, ps, state)
+        logistics_bot.destroy_state(player, ps, state)
         mapper_bot.destroy_state(player, ps, state)
         repairer_bot.destroy_state(player, ps, state)
     end
@@ -158,9 +158,9 @@ function state.create_player_bot(player, visual, clear_entity_groups)
             x = -2,
             y = BOT_CONF.constructor.follow_offset_y
         },
-        ["cleaner"] = {
+        ["logistics"] = {
             x = -2,
-            y = BOT_CONF.cleaner.follow_offset_y
+            y = BOT_CONF.logistics.follow_offset_y
         }
     }
 
@@ -203,7 +203,7 @@ function state.create_player_bot(player, visual, clear_entity_groups)
     -- clear entity groups
     clear_entity_groups(ps)
 
-    util.print(player, "green", "created (mapper/repairer/constructor/cleaner)")
+    util.print(player, "green", "created (constructor/logistics/mapper/repairer)")
     return ps.bots
 end
 

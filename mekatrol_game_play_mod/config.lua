@@ -23,6 +23,25 @@ config.bot = {
         arrival_threshold = 0.5 -- distance threshold for "arrived at frontier node"
     },
 
+    ["constructor"] = {
+        follow_offset_y = 0.666,
+        highlight_color = {
+            r = 0.0,
+            g = 0.5,
+            b = 0.0,
+            a = 0.3
+        }
+    },
+
+    ["logistics"] = {
+        follow_offset_y = 2,
+        highlight_color = {
+            r = 0.0,
+            g = 0.0,
+            b = 0.5,
+            a = 0.3
+        }
+    },
     ["mapper"] = {
         follow_offset_y = -2,
         highlight_color = {
@@ -41,30 +60,10 @@ config.bot = {
             b = 0.0,
             a = 0.3
         }
-    },
-
-    ["constructor"] = {
-        follow_offset_y = 0.666,
-        highlight_color = {
-            r = 0.0,
-            g = 0.5,
-            b = 0.0,
-            a = 0.3
-        }
-    },
-
-    ["cleaner"] = {
-        follow_offset_y = 2,
-        highlight_color = {
-            r = 0.0,
-            g = 0.0,
-            b = 0.5,
-            a = 0.3
-        }
     }
 }
 
-config.bot_names = {"mapper", "repairer", "constructor", "cleaner"}
+config.bot_names = {"constructor", "logistics", "mapper", "repairer"}
 
 function config.get_bot_config(bot_name)
     return config.bot[bot_name]
