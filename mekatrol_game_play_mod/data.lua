@@ -7,22 +7,6 @@ data:extend({{
 
     -- "none" so the key press is not consumed by script only.
     consuming = "none"
-}, {
-    -- Second hotkey: toggle mapper bot tasks.
-    --
-    -- This hotkey is used to change the bot's task
-    -- without destroying/recreating the entity:
-    --   * follow
-    --   * search
-    --
-    -- The control script will interpret this as "toggle task".
-    type = "custom-input",
-    name = "mekatrol-game-play-mapper-bot-toggle-task",
-
-    -- Default key combination: Ctrl + Shift + H
-    key_sequence = "CONTROL + SHIFT + H",
-
-    consuming = "none"
 }})
 
 ----------------------------------------------------------------------

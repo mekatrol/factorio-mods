@@ -19,6 +19,16 @@ for i, task in ipairs(BOT_TASKS.list) do
     BOT_TASKS.index[task] = i
 end
 
+local function full_task_name(task_name)
+    if task_name == "f" then
+        return "follow"
+    elseif task_name == "c" then
+        return "collect"
+    end
+
+    return task_name
+end
+
 function logistics_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME, "collect")
 end
@@ -29,6 +39,9 @@ end
 
 function logistics_bot.set_bot_task(player, ps, new_task, next_task)
     local bot = ps.bots[BOT_NAME]
+
+    new_task = full_task_name(new_task)
+    next_task = full_task_name(next_task)
 
     -- Validate task
     if not BOT_TASKS.index[new_task] then

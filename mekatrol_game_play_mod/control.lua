@@ -64,21 +64,6 @@ local function on_toggle_bot(event)
     end
 end
 
-local function on_toggle_mapper_bot_task(event)
-    local player = game.get_player(event.player_index)
-    if not (player and player.valid) then
-        return
-    end
-
-    local ps = state.get_player_state(player.index)
-
-    if not ps.bot_enabled then
-        return
-    end
-
-    mapper_bot.toggle_task(player, ps)
-end
-
 local function set_bot_state(player, bot_name, new_task)
     local ps = state.get_player_state(player.index)
 
@@ -212,7 +197,6 @@ end)
 ----------------------------------------------------------------------
 
 script.on_event("mekatrol-game-play-bot-toggle", on_toggle_bot)
-script.on_event("mekatrol-game-play-mapper-bot-toggle-task", on_toggle_mapper_bot_task)
 
 script.on_event(defines.events.on_entity_died, on_entity_died)
 script.on_event(defines.events.on_player_removed, on_player_removed)
