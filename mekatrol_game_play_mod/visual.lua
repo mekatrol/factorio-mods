@@ -292,8 +292,9 @@ function visual.draw_entity_group(player, ps, group_id, name, type, boundary, ce
 
     local name_label = nil
     local type_label = nil
+    local draw_label = false
 
-    if center then
+    if center and draw_label then
         local center_minus = {
             x = center.x,
             y = center.y - 0.4
@@ -343,7 +344,7 @@ function visual.draw_entity_group(player, ps, group_id, name, type, boundary, ce
 
     ps.visual.entity_groups[group_id] = {
         lines = lines,
-        name_labellabel = name_label,
+        name_label = name_label,
         type_label = type_label
     }
 end

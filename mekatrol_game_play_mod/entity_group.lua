@@ -66,6 +66,25 @@ function entity_group.is_survey_single_target(entity)
     return false
 end
 
+function entity_group.get_group_entity_name_starts_with(ps, entity_name)
+    local groups = ps.entity_groups
+
+    if not groups then
+        return false
+    end
+
+    for _, g in pairs(groups) do
+        util.print(game, "red", "starts with: %s %s", g.name, entity_name)
+
+        -- test group name starts with
+        if g and string.sub(g.name, 1, #entity_name) == entity_name and g.boundary and #g.boundary >= 3 then
+            return g
+        end
+    end
+
+    return nil
+end
+
 function entity_group.is_in_any_entity_group(ps, surface_index, entity)
     local groups = ps.entity_groups
 
@@ -129,7 +148,7 @@ function entity_group.add_boundary(player, ps, visual, boundary, entity, surface
         center = center
     }
 
-    -- Draw polygon + label (clears any prior render for this group_id)
+    -- Draw polygon + labels (clears any prior render for this group_id)
     visual.draw_entity_group(player, ps, group_id, entity_name, entity_type, boundary, center)
 
     entity_group.merge_overlapping_groups(player, ps, visual)

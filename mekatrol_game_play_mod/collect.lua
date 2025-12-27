@@ -50,13 +50,27 @@ function collect.update(player, ps, bot)
         return false
     end
 
-    local items = surface.find_entities_filtered {
-        position = bot.entity.position,
-        radius = 1.0,
-        type = "item-entity"
-    }
+    local items = nil
 
+    local entity_group = module.get_module("entity_group")
     local bot_module = module.get_module(bot.name)
+
+    -- always collect space ship items as a priority
+    local g = entity_group.get_group_entity_name_starts_with(ps, "crash-site-spaceship")
+
+    if g then
+        bot.task.target_position = g.center
+        bot_module.set_bot_task(player, ps, "move_to", "collect")
+        return
+    end
+
+    if not items then
+        items = surface.find_entities_filtered {
+            position = bot.entity.position,
+            radius = 1.0,
+            type = "item-entity"
+        }
+    end
 
     if not items or #items == 0 then
         -- return to follow and then try collecting again
