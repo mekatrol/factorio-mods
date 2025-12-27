@@ -49,8 +49,12 @@ function visual.clear_entity_groups(ps)
             end
         end
 
-        if g.label and g.label.valid then
-            g.label:destroy()
+        if g.name_label and g.name_label.valid then
+            g.name_label:destroy()
+        end
+
+        if g.type_label and g.type_label.valid then
+            g.type_label:destroy()
         end
     end
 
@@ -75,8 +79,12 @@ function visual.clear_entity_group(ps, group_id)
         end
     end
 
-    if g.label and g.label.valid then
-        g.label:destroy()
+    if g.name_label and g.name_label.valid then
+        g.name_label:destroy()
+    end
+
+    if g.type_label and g.type_label.valid then
+        g.type_label:destroy()
     end
 
     ps.visual.entity_groups[group_id] = nil
@@ -248,7 +256,7 @@ function visual.draw_mapped_entity_box(player, ps, entity)
     return box_render
 end
 
-function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
+function visual.draw_entity_group(player, ps, group_id, name, type, boundary, center)
     if not (player and player.valid and ps) then
         return
     end
@@ -282,12 +290,24 @@ function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
         end
     end
 
-    local label = nil
+    local name_label = nil
+    local type_label = nil
+
     if center then
-        label = rendering.draw_text {
+        local center_minus = {
+            x = center.x,
+            y = center.y - 0.4
+        }
+
+        local center_plus = {
+            x = center.x,
+            y = center.y + 0.4
+        }
+
+        name_label = rendering.draw_text {
             text = name,
             surface = player.surface,
-            target = center,
+            target = center_minus,
             color = {
                 r = 0.1,
                 g = 1.0,
@@ -301,11 +321,30 @@ function visual.draw_entity_group(player, ps, group_id, name, boundary, center)
             only_in_alt_mode = false,
             players = {player.index}
         }
+
+        type_label = rendering.draw_text {
+            text = type,
+            surface = player.surface,
+            target = center_plus,
+            color = {
+                r = 1.0,
+                g = 1.0,
+                b = 1.0,
+                a = 0.95
+            },
+            scale = 2,
+            alignment = "center",
+            vertical_alignment = "middle",
+            draw_on_ground = false,
+            only_in_alt_mode = false,
+            players = {player.index}
+        }
     end
 
     ps.visual.entity_groups[group_id] = {
         lines = lines,
-        label = label
+        name_labellabel = name_label,
+        type_label = type_label
     }
 end
 

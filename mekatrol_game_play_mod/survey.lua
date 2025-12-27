@@ -251,9 +251,12 @@ local function switch_to_next_task(player, ps, state, bot)
 end
 
 local function trace_step(player, ps, state, visual, bot)
-    local name = nil
+    local entity_name = nil
+    local entity = nil
+
     if bot.task.survey_entity then
-        name = bot.task.survey_entity.name
+        entity = bot.task.survey_entity
+        entity_name = entity.name
     end
 
     local tr = bot.task.survey_trace
@@ -283,8 +286,8 @@ local function trace_step(player, ps, state, visual, bot)
         end
 
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
-        if not tile_has_name(surf, name, tx, ty) then
-            local found_tx, found_ty = find_nearby_resource_tile(surf, name, bot.entity.position,
+        if not tile_has_name(surf, entity_name, tx, ty) then
+            local found_tx, found_ty = find_nearby_resource_tile(surf, entity_name, bot.entity.position,
                 math.ceil(BOT_CONF.survey.radius) + 1)
             if found_tx then
                 tr.origin_tx = found_tx
@@ -298,7 +301,7 @@ local function trace_step(player, ps, state, visual, bot)
         end
 
         local next_ty = ty - 1 -- due north in Factorio coords
-        if tile_has_name(surf, name, tx, next_ty) then
+        if tile_has_name(surf, entity_name, tx, next_ty) then
             return tile_center(tx, next_ty)
         end
 
@@ -307,13 +310,13 @@ local function trace_step(player, ps, state, visual, bot)
         tr.start_ty = ty
 
         -- Ensure we start on a boundary tile; if not, search nearby for one (tight, local).
-        if not is_boundary_tile(surf, name, tr.start_tx, tr.start_ty) then
+        if not is_boundary_tile(surf, entity_name, tr.start_tx, tr.start_ty) then
             local found_boundary = false
             for i = 1, 8 do
                 local n = N8[i]
                 local ntx = tr.start_tx + n.dx
                 local nty = tr.start_ty + n.dy
-                if is_boundary_tile(surf, name, ntx, nty) then
+                if is_boundary_tile(surf, entity_name, ntx, nty) then
                     tr.start_tx = ntx
                     tr.start_ty = nty
                     found_boundary = true
@@ -341,7 +344,7 @@ local function trace_step(player, ps, state, visual, bot)
         tr.p1_ty = nil
 
         -- First edge move:
-        local nx, ny, nbx, nby = moore_next(surf, name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
+        local nx, ny, nbx, nby = moore_next(surf, entity_name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
         if not nx then
             bot.task.survey_trace = nil
             return nil
@@ -362,7 +365,7 @@ local function trace_step(player, ps, state, visual, bot)
 
     if tr.phase == "edge" then
         -- Closed when we are back at start AND the next step would be p1.
-        local nx, ny, nbx, nby = moore_next(surf, name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
+        local nx, ny, nbx, nby = moore_next(surf, entity_name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
         if not nx then
             bot.task.survey_trace = nil
             return nil
@@ -377,7 +380,7 @@ local function trace_step(player, ps, state, visual, bot)
             local boundary = tr.boundary or {}
 
             -- add to boundary group
-            entitygroup.add_boundary(player, ps, visual, boundary, name, surf.index)
+            entitygroup.add_boundary(player, ps, visual, boundary, entity, surf.index)
 
             -- Switch back to survey task to find next entity
             switch_to_next_task(player, ps, state, bot)

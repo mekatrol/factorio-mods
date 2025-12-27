@@ -96,11 +96,14 @@ function entitygroup.is_in_any_entity_group(ps, surface_index, entity)
     return false
 end
 
-function entitygroup.add_boundary(player, ps, visual, boundary, entity_name, surface_index)
+function entitygroup.add_boundary(player, ps, visual, boundary, entity, surface_index)
     -- must be at least 3 points in boundary
     if #boundary < 3 then
         return
     end
+
+    local entity_name = entity.name
+    local entity_type = entity.type
 
     -- make sure boundary end point equals start point
     local first = boundary[1]
@@ -120,13 +123,14 @@ function entitygroup.add_boundary(player, ps, visual, boundary, entity_name, sur
 
     ps.entity_groups[group_id] = {
         name = entity_name,
+        type = entity_type,
         surface_index = surface_index,
         boundary = boundary,
         center = center
     }
 
     -- Draw polygon + label (clears any prior render for this group_id)
-    visual.draw_entity_group(player, ps, group_id, entity_name, boundary, center)
+    visual.draw_entity_group(player, ps, group_id, entity_name, entity_type, boundary, center)
 
     entitygroup.merge_overlapping_groups(player, ps, visual)
 end
@@ -157,7 +161,7 @@ function entitygroup.add_single_tile_entity_group(player, ps, visual, surface_in
             y = pos.y + size
         }}
 
-        entitygroup.add_boundary(player, ps, visual, boundary, entity.name, surface_index)
+        entitygroup.add_boundary(player, ps, visual, boundary, entity, surface_index)
 
         return
     end
@@ -184,7 +188,7 @@ function entitygroup.add_single_tile_entity_group(player, ps, visual, surface_in
         y = pos.y + height
     }}
 
-    entitygroup.add_boundary(player, ps, visual, boundary, entity.name, surface_index)
+    entitygroup.add_boundary(player, ps, visual, boundary, entity, surface_index)
 end
 
 function entitygroup.merge_overlapping_groups(player, ps, visual)
@@ -228,7 +232,7 @@ function entitygroup.merge_overlapping_groups(player, ps, visual)
 
     -- Redraw merged groups
     for id, g in pairs(groups) do
-        visual.draw_entity_group(player, ps, id, g.name, g.boundary, g.center)
+        visual.draw_entity_group(player, ps, id, g.name, g.type, g.boundary, g.center)
     end
 end
 
