@@ -11,7 +11,7 @@ local BOT_CONF = config.bot
 local BOT_NAME = "logistics"
 
 local BOT_TASKS = {
-    list = {"follow", "collect", "move_to"},
+    list = {"follow", "collect", "move_to", "pick_up"},
     index = {}
 }
 
@@ -72,7 +72,7 @@ function logistics_bot.update(player, ps, state, visual, tick)
         follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
-    elseif bot.task.current_task == "collect" then
+    elseif bot.task.current_task == "collect" or bot.task.current_task == "pick_up" then
         collect.update(player, ps, bot)
     end
 

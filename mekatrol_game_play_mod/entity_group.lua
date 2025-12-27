@@ -1,5 +1,6 @@
 local entity_group = {}
 
+local module = require("module")
 local polygon = require("polygon")
 local util = require("util")
 
@@ -74,8 +75,6 @@ function entity_group.get_group_entity_name_starts_with(ps, entity_name)
     end
 
     for _, g in pairs(groups) do
-        util.print(game, "red", "starts with: %s %s", g.name, entity_name)
-
         -- test group name starts with
         if g and string.sub(g.name, 1, #entity_name) == entity_name and g.boundary and #g.boundary >= 3 then
             return g
@@ -115,6 +114,62 @@ function entity_group.is_in_any_entity_group(ps, surface_index, entity)
     return false
 end
 
+function entity_group.remove_group(player, ps, group_or_id)
+    entity_group.ensure_entity_groups(ps)
+
+    local groups = ps.entity_groups
+    if not groups then
+        return false
+    end
+
+    -- Resolve id
+    local id = nil
+
+    if type(group_or_id) == "string" then
+        id = group_or_id
+    elseif type(group_or_id) == "table" then
+        -- If caller already knows the id, allow it
+        if group_or_id.id then
+            id = group_or_id.id
+        else
+            -- Reconstruct the id format used in add_boundary()
+            local gname = group_or_id.name
+            local c = group_or_id.center
+            if gname and c and c.x and c.y then
+                id = tostring(gname) .. "@" .. tostring(c.x) .. "," .. tostring(c.y)
+            end
+        end
+    end
+
+    if not id then
+        return false
+    end
+
+    if not groups[id] then
+        -- Fallback: find matching group by name+center if floats differ slightly
+        if type(group_or_id) == "table" and group_or_id.name and group_or_id.center then
+            local gx, gy = group_or_id.center.x, group_or_id.center.y
+            for k, g in pairs(groups) do
+                if g and g.name == group_or_id.name and g.center then
+                    if g.center.x == gx and g.center.y == gy then
+                        id = k
+                        break
+                    end
+                end
+            end
+        end
+    end
+
+    if not groups[id] then
+        return false
+    end
+
+    local visual = module.get_module("visual")
+    visual.clear_entity_group(ps, id)
+    groups[id] = nil
+    return true
+end
+
 function entity_group.add_boundary(player, ps, visual, boundary, entity, surface_index)
     -- must be at least 3 points in boundary
     if #boundary < 3 then
@@ -141,6 +196,7 @@ function entity_group.add_boundary(player, ps, visual, boundary, entity, surface
     local group_id = tostring(entity_name) .. "@" .. tostring(center.x) .. "," .. tostring(center.y)
 
     ps.entity_groups[group_id] = {
+        id = group_id,
         name = entity_name,
         type = entity_type,
         surface_index = surface_index,

@@ -28,7 +28,8 @@ local function init_modules()
         constructor_bot = constructor_bot,
         mapper_bot = mapper_bot,
         repairer_bot = repairer_bot,
-        entity_group = entity_group
+        entity_group = entity_group,
+        visual = visual
     })
 end
 
