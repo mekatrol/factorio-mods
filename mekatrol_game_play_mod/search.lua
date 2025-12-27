@@ -104,9 +104,9 @@ local function sort_entities_by_position(entities, pos)
 end
 
 local function find_entity(player, ps, bot, pos, surf)
-    ps.next_survey_entities = ps.next_survey_entities or {}
+    bot.task.next_survey_entities = bot.task.next_survey_entities or {}
 
-    local next_entities = ps.next_survey_entities
+    local next_entities = bot.task.next_survey_entities
 
     -- if there are any queued then remove until a valid one is found
     while #next_entities > 0 do

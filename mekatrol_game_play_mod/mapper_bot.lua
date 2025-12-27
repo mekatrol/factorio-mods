@@ -15,8 +15,11 @@ local BOT_TASKS = config.tasks
 function mapper_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME)
 
-    ps.bots[BOT_NAME].task.search_spiral = ps.bots[BOT_NAME].task.search_spiral or nil
-    ps.bots[BOT_NAME].task.survey_entity = ps.bots[BOT_NAME].task.survey_entity or nil
+    local bot = ps.bots[BOT_NAME]
+
+    bot.task.search_spiral = bot.task.search_spiral or nil
+    bot.task.survey_entity = bot.task.survey_entity or nil
+    bot.task.next_survey_entities = bot.task.next_survey_entities or {}
 end
 
 function mapper_bot.destroy_state(player, ps)
@@ -39,9 +42,9 @@ function mapper_bot.set_bot_task(player, ps, new_task)
         -- clear the next_task and target position when switching tasks
         bot.task.next_task = nil
         bot.task.target_position = nil
-        bot.search_spiral = nil
-        bot.survey_entity = nil
-        bot.next_survey_entities = {}
+        bot.task.search_spiral = nil
+        bot.task.survey_entity = nil
+        bot.task.next_survey_entities = {}
         return
     end
 
