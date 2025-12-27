@@ -26,7 +26,7 @@ function repairer_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function repairer_bot.set_bot_task(player, ps, new_task)
+function repairer_bot.set_bot_task(player, ps, new_task, next_task)
     local bot = ps.bots[BOT_NAME]
 
     -- Validate task
@@ -37,6 +37,10 @@ function repairer_bot.set_bot_task(player, ps, new_task)
 
     -- set the new current_task
     bot.task.current_task = new_task
+
+    if next_task then
+        bot.task.next_task = next_task
+    end
 end
 
 function repairer_bot.update(player, ps, state, visual, tick)

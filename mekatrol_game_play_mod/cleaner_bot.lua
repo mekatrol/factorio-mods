@@ -1,5 +1,6 @@
 local cleaner_bot = {}
 
+local clean = require("clean")
 local common_bot = require("common_bot")
 local config = require("config")
 local follow = require("follow")
@@ -26,7 +27,7 @@ function cleaner_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function cleaner_bot.set_bot_task(player, ps, new_task)
+function cleaner_bot.set_bot_task(player, ps, new_task, next_task)
     local bot = ps.bots[BOT_NAME]
 
     -- Validate task
@@ -37,6 +38,10 @@ function cleaner_bot.set_bot_task(player, ps, new_task)
 
     -- set the new current_task
     bot.task.current_task = new_task
+
+    if next_task then
+        bot.task.next_task = next_task
+    end
 end
 
 function cleaner_bot.update(player, ps, state, visual, tick)
@@ -55,6 +60,8 @@ function cleaner_bot.update(player, ps, state, visual, tick)
         follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
+    elseif bot.task.current_task == "clean" then
+        clean.update(player, ps, bot)
     end
 
     -- Throttle overlay updates

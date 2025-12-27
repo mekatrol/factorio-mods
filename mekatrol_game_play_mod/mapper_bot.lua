@@ -34,7 +34,7 @@ function mapper_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function mapper_bot.set_bot_task(player, ps, new_task)
+function mapper_bot.set_bot_task(player, ps, new_task, next_task)
     local bot = ps.bots[BOT_NAME]
 
     -- Validate task
@@ -65,6 +65,11 @@ function mapper_bot.set_bot_task(player, ps, new_task)
     if new_task == "survey" then
         bot.task.next_task = "search"
     end
+
+    if next_task then
+        bot.task.next_task = next_task
+    end
+
 end
 
 function mapper_bot.toggle_task(player, ps)

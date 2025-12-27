@@ -1,6 +1,7 @@
 local follow = {}
 
 local config = require("config")
+local module = require("module")
 local positioning = require("positioning")
 
 local BOT_CONF = config.bot
@@ -59,6 +60,11 @@ function follow.update(player, ps, state, bot, y_offset)
     }
 
     positioning.move_entity_towards(player, bot.entity, target_pos)
+
+    if bot.task.next_task then
+        local bot_module = module.get_module(bot.name)
+        bot_module.set_bot_task(player, ps, bot.task.next_task)
+    end
 end
 
 return follow
