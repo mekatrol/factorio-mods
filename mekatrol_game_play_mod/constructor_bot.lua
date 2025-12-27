@@ -3,6 +3,7 @@ local constructor_bot = {}
 local common_bot = require("common_bot")
 local config = require("config")
 local follow = require("follow")
+local move_to = require("move_to")
 local util = require("util")
 
 local BOT_CONF = config.bot
@@ -52,6 +53,8 @@ function constructor_bot.update(player, ps, state, visual, tick)
     -- Task behavior step
     if bot.task.current_task == "follow" then
         follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
+    elseif bot.task.current_task == "move_to" then
+        move_to.update(player, ps, bot)
     end
 
     -- Throttle overlay updates
