@@ -57,9 +57,10 @@ function clean.update(player, ps, bot)
         type = "item-entity"
     }
 
+    local bot_module = module.get_module(bot.name)
+
     if not items or #items == 0 then
         -- return to follow and then try cleaning again
-        local bot_module = module.get_module(bot.name)
         bot_module.set_bot_task(player, ps, "follow", "clean")
         return
     end
@@ -97,8 +98,7 @@ function clean.update(player, ps, bot)
     if picked_any then
         local total = get_total_carried(player, bot)
         if total > 0 and (bot.task.current_task == "idle" or pdata.mode == "roam") then
-            
-            pdata.mode = "pickup"
+            bot_module.set_bot_task(player, ps, "pickup", "clean")
         end
     end
 end
