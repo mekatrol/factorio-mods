@@ -79,6 +79,38 @@ local function on_toggle_mapper_bot_task(event)
     mapper_bot.toggle_task(player, ps)
 end
 
+local function set_bot_state(player, bot_name, new_task)
+    local ps = state.get_player_state(player.index)
+
+    if not ps.bot_enabled then
+        util.print(player, "red", "bot not enabled")
+        return
+    end
+
+    common_bot.issue_task(player, ps, bot_name, new_task)
+end
+
+local function register_commands()
+    -- a generic command: /bot <name> <task>
+    if not commands.commands["bot"] then
+        commands.add_command("bot", "Usage: /bot <cleaner|repairer|mapper|constructor> <task>", function(cmd)
+            local player = game.get_player(cmd.player_index)
+            if not (player and player.valid) then
+                return
+            end
+
+            local p = cmd.parameter or ""
+            local bot_name, task = string.match(p, "^(%S+)%s+(%S+)$")
+            if not bot_name then
+                util.print(player, "yellow", "Usage: /bot <name> <task>")
+                return
+            end
+
+            set_bot_state(player, bot_name, task)
+        end)
+    end
+end
+
 ----------------------------------------------------------------------
 -- Event: Entity died
 ----------------------------------------------------------------------
@@ -153,11 +185,13 @@ end
 script.on_init(function()
     init_modules()
     state.ensure_storage_tables()
+    register_commands()
 end)
 
 script.on_configuration_changed(function(_)
     init_modules()
     state.ensure_storage_tables()
+    register_commands()
 end)
 
 ----------------------------------------------------------------------

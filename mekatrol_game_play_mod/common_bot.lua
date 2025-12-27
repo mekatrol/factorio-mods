@@ -1,6 +1,7 @@
 local common_bot = {}
 
 local config = require("config")
+local module = require("module")
 local util = require("util")
 
 local BOT_CONF = config.bot
@@ -114,6 +115,18 @@ function common_bot.update(player, bot, bot_conf, tick)
     if target_pos then
         common_bot.draw_line(player, bot, bot.entity.position, target_pos, line_color)
     end
+end
+
+function common_bot.issue_task(player, ps, bot_name, new_task)
+    local bot_module = module.get_module(bot_name)
+
+    if not bot_module then
+        util.print(player, "red", "bot module not found for bot name: %s", bot_name)
+        return
+    end
+
+    bot_module.set_bot_task(player, ps, new_task)
+    util.print(player, "green", "%s -> %s", bot_name, new_task)
 end
 
 function common_bot.clear_light(bot)
