@@ -9,14 +9,14 @@ local BOT_CONF = config.bot
 -- This module contains code common to all bots in this mod
 -------------------------------------------------------------------------------------------------------
 
-function common_bot.get_modes(player, ps, state, visual, bot_name)
+function common_bot.get_tasks(player, ps, state, visual, bot_name)
     local bot = state.get_bot_by_name(player, ps, bot_name)
 
     if not (bot and bot.task) then
         return nil, nil
     end
 
-    return bot.task.current_mode, bot.task.next_mode
+    return bot.task.current_task, bot.task.next_task
 end
 
 function common_bot.init_state(player, ps, bot_name)
@@ -25,8 +25,8 @@ function common_bot.init_state(player, ps, bot_name)
         entity = nil,
         task = {
             target_position = nil,
-            current_mode = "follow",
-            next_mode = nil
+            current_task = "follow",
+            next_task = nil
         },
         visual = {
             highlight = nil,
@@ -84,7 +84,7 @@ function common_bot.update(player, bot, bot_conf, tick)
         a = 0.1
     }
 
-    if bot.task.current_mode == "search" then
+    if bot.task.current_task == "search" then
         radius = BOT_CONF.search.detection_radius
         radius_color = {
             r = 0,
@@ -93,7 +93,7 @@ function common_bot.update(player, bot, bot_conf, tick)
             a = 0.8
         }
         line_color = radius_color
-    elseif bot.task.current_mode == "survey" then
+    elseif bot.task.current_task == "survey" then
         radius = BOT_CONF.survey.radius
         radius_color = {
             r = 1.0,

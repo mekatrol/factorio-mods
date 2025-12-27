@@ -6,7 +6,7 @@ local positioning = require("positioning")
 local BOT_CONF = config.bot
 
 ----------------------------------------------------------------------
--- Follow mode
+-- Follow task
 ----------------------------------------------------------------------
 
 function follow.update(player, ps, state, bot, y_offset)

@@ -11,7 +11,7 @@ local BOT_CONF = config.bot
 local DETECTION_RADIUS = BOT_CONF.search.detection_radius / 3
 
 ----------------------------------------------------------------------
--- Search mode
+-- Search task
 ----------------------------------------------------------------------
 
 local function init_spiral(ps, bpos)
@@ -167,14 +167,14 @@ function search.update(player, ps, state, bot)
             -- record what we found (optional, but useful for overlay/debug)
             bot.task.survey_entity = entity
 
-            -- move to the entity and then switch to survey mode
+            -- move to the entity and then switch to survey task
             -- to survey the entity group
             bot.task.target_position = {
                 x = entity.position.x,
                 y = entity.position.y
             }
 
-            -- switch to move_to mode
+            -- switch to move_to task
             local bot_module = module.get_module(bot.name)
             bot_module.set_bot_task(player, ps, "move_to")
 
@@ -186,7 +186,7 @@ function search.update(player, ps, state, bot)
 
         target_pos = search.pick_new_search_target_spiral(ps, bot.entity.position)
 
-        -- move to the entity and then swtich to survey mode
+        -- move to the entity and then swtich to survey task
         bot.task.target_position = target_pos
     end
 

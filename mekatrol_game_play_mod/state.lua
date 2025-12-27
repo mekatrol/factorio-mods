@@ -2,7 +2,7 @@
 --
 -- Responsibilities:
 --   - Own persistent per-player bot state in `storage.mekatrol_game_play_bot[player_index]`
---   - Provide helpers to create/destroy bot and change bot mode
+--   - Provide helpers to create/destroy bot and change bot task
 local state = {}
 
 local config = require("config")
@@ -14,7 +14,7 @@ local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
 
 local BOT_CONF = config.bot
-local BOT_MODES = config.modes
+local BOT_TASKS = config.tasks
 local BOT_NAMES = config.bot_names
 
 ----------------------------------------------------------------------
@@ -87,34 +87,34 @@ function state.get_player_state(player_index)
 end
 
 ----------------------------------------------------------------------
--- Mode setting
+-- Task setting
 ----------------------------------------------------------------------
 
-function state.set_bot_task(player, ps, bot, new_mode)
-    -- Validate mode
-    if not BOT_MODES.index[new_mode] then
-        new_mode = "follow"
+function state.set_bot_task(player, ps, bot, new_task)
+    -- Validate task
+    if not BOT_TASKS.index[new_task] then
+        new_task = "follow"
     end
 
-    -- set the new current_mode
-    bot.task.current_mode = new_mode
+    -- set the new current_task
+    bot.task.current_task = new_task
 
-    -- Follow mode: no fixed target.
-    if new_mode == "follow" then
-        -- clear the next_mode and target position when switching modes
-        bot.task.next_mode = nil
+    -- Follow task: no fixed target.
+    if new_task == "follow" then
+        -- clear the next_task and target position when switching tasks
+        bot.task.next_task = nil
         bot.task.target_position = nil
 
         return
     end
 
-    if new_mode == "search" then
-        bot.task.next_mode = "survey"
+    if new_task == "search" then
+        bot.task.next_task = "survey"
         return
     end
 
-    if new_mode == "survey" then
-        bot.task.next_mode = "search"
+    if new_task == "survey" then
+        bot.task.next_task = "search"
     end
 end
 

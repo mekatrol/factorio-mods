@@ -65,16 +65,16 @@ config.bot = {
 }
 
 ----------------------------------------------------------------------
--- BOT_MODES
+-- BOT_TASKS
 ----------------------------------------------------------------------
 
-config.modes = {
+config.tasks = {
     list = {"follow", "search", "survey", "move_to"},
     index = {}
 }
 
-for i, mode in ipairs(config.modes.list) do
-    config.modes.index[mode] = i
+for i, task in ipairs(config.tasks.list) do
+    config.tasks.index[task] = i
 end
 
 config.bot_names = {"mapper", "repairer", "constructor", "cleaner"}

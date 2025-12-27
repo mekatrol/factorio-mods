@@ -26,8 +26,8 @@ function cleaner_bot.update(player, ps, state, visual, tick)
     -- perform updates common to all bots
     common_bot.update(player, bot, bot_conf, tick)
 
-    -- Mode behavior step
-    if bot.task.current_mode == "follow" then
+    -- Task behavior step
+    if bot.task.current_task == "follow" then
         follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     end
 

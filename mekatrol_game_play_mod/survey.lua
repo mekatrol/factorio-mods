@@ -211,7 +211,7 @@ local function start_trace_from_found(ps, bot)
 end
 
 ----------------------------------------------------------------------
--- Survey mode
+-- Survey task
 ----------------------------------------------------------------------
 
 function survey.perform_survey_scan(player, ps, bot, tick)
@@ -243,9 +243,9 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     return true
 end
 
-local function switch_to_next_mode(player, ps, state, bot)
+local function switch_to_next_task(player, ps, state, bot)
     local bot_module = module.get_module(bot.name)
-    bot_module.set_bot_task(player, ps, bot.task.next_mode or "search")
+    bot_module.set_bot_task(player, ps, bot.task.next_task or "search")
     bot.task.target_position = nil
     bot.task.survey_trace = nil
     bot.task.survey_entity = nil
@@ -378,8 +378,8 @@ local function trace_step(player, ps, state, visual, bot)
             -- add to boundary group
             entitygroup.add_boundary(player, ps, visual, boundary, name, surf.index)
 
-            -- Switch back to survey mode to find next entity
-            switch_to_next_mode(player, ps, state, bot)
+            -- Switch back to survey task to find next entity
+            switch_to_next_task(player, ps, state, bot)
             return nil
         end
 
@@ -437,8 +437,8 @@ function survey.update(player, ps, state, visual, bot, tick)
     if entitygroup.is_survey_single_target(bot.task.survey_entity) then
         entitygroup.add_single_tile_entity_group(player, ps, visual, bot.entity.surface_index, bot.task.survey_entity)
 
-        -- Switch back to survey mode to find next entity
-        switch_to_next_mode(player, ps, state, bot)
+        -- Switch back to survey task to find next entity
+        switch_to_next_task(player, ps, state, bot)
     else
         -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
         survey.perform_survey_scan(player, ps, bot, tick)

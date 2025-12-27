@@ -18,7 +18,7 @@ local repairer_bot = require("repairer_bot")
 
 -- Config aliases.
 local BOT_CONF = config.bot
-local BOT_MODES = config.modes
+local BOT_TASKS = config.tasks
 local BOT_NAMES = config.bot_names
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
@@ -64,7 +64,7 @@ local function on_toggle_bot(event)
     end
 end
 
-local function on_cycle_mapper_bot_mode(event)
+local function on_toggle_mapper_bot_task(event)
     local player = game.get_player(event.player_index)
     if not (player and player.valid) then
         return
@@ -76,7 +76,7 @@ local function on_cycle_mapper_bot_mode(event)
         return
     end
 
-    mapper_bot.toggle_mode(player, ps)
+    mapper_bot.toggle_task(player, ps)
 end
 
 ----------------------------------------------------------------------
@@ -165,7 +165,7 @@ end)
 ----------------------------------------------------------------------
 
 script.on_event("mekatrol-game-play-bot-toggle", on_toggle_bot)
-script.on_event("mekatrol-game-play-bot-next-mode", on_cycle_mapper_bot_mode)
+script.on_event("mekatrol-game-play-mapper-bot-toggle-task", on_toggle_mapper_bot_task)
 
 script.on_event(defines.events.on_entity_died, on_entity_died)
 script.on_event(defines.events.on_player_removed, on_player_removed)
@@ -203,26 +203,26 @@ script.on_event(defines.events.on_tick, function(event)
         mapper_bot.update(player, ps, state, visual, tick)
         repairer_bot.update(player, ps, state, visual, tick)
 
-        local cleaner_current_mode, cleaner_next_mode = common_bot.get_modes(player, ps, state, visual, "cleaner")
-        local cleaner_current_mode_line = string.format("cleaner: %s→%s", cleaner_current_mode or "nil",
-            cleaner_next_mode or "nil")
-        overlay_lines[#overlay_lines + 1] = cleaner_current_mode_line
+        local cleaner_current_task, cleaner_next_task = common_bot.get_tasks(player, ps, state, visual, "cleaner")
+        local cleaner_current_task_line = string.format("cleaner: %s→%s", cleaner_current_task or "nil",
+            cleaner_next_task or "nil")
+        overlay_lines[#overlay_lines + 1] = cleaner_current_task_line
 
-        local constructor_current_mode, constructor_next_mode =
-            common_bot.get_modes(player, ps, state, visual, "constructor")
-        local constructor_current_mode_line = string.format("constructor: %s→%s", constructor_current_mode or "nil",
-            constructor_next_mode or "nil")
-        overlay_lines[#overlay_lines + 1] = constructor_current_mode_line
+        local constructor_current_task, constructor_next_task =
+            common_bot.get_tasks(player, ps, state, visual, "constructor")
+        local constructor_current_task_line = string.format("constructor: %s→%s", constructor_current_task or "nil",
+            constructor_next_task or "nil")
+        overlay_lines[#overlay_lines + 1] = constructor_current_task_line
 
-        local mapper_current_mode, mapper_next_mode = common_bot.get_modes(player, ps, state, visual, "mapper")
-        local mapper_current_mode_line = string.format("mapper: %s→%s", mapper_current_mode or "nil",
-            mapper_next_mode or "nil")
-        overlay_lines[#overlay_lines + 1] = mapper_current_mode_line
+        local mapper_current_task, mapper_next_task = common_bot.get_tasks(player, ps, state, visual, "mapper")
+        local mapper_current_task_line = string.format("mapper: %s→%s", mapper_current_task or "nil",
+            mapper_next_task or "nil")
+        overlay_lines[#overlay_lines + 1] = mapper_current_task_line
 
-        local repairer_current_mode, repairer_next_mode = common_bot.get_modes(player, ps, state, visual, "repairer")
-        local repairer_current_mode_line = string.format("repairer: %s→%s", repairer_current_mode or "nil",
-            repairer_next_mode or "nil")
-        overlay_lines[#overlay_lines + 1] = repairer_current_mode_line
+        local repairer_current_task, repairer_next_task = common_bot.get_tasks(player, ps, state, visual, "repairer")
+        local repairer_current_task_line = string.format("repairer: %s→%s", repairer_current_task or "nil",
+            repairer_next_task or "nil")
+        overlay_lines[#overlay_lines + 1] = repairer_current_task_line
     else
         overlay_lines[#overlay_lines + 1] = "bot is currently disabled"
     end

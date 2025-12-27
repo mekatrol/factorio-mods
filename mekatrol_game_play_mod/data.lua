@@ -1,29 +1,3 @@
-----------------------------------------------------------------------
--- data.lua
---
--- This file defines:
---  1) A custom hotkey input ("mekatrol-game-play-bot-toggle") that is
---     used to toggle the game-play bot via control scripts.
---  2) A custom hotkey input ("mekatrol-game-play-bot-next-mode") that
---     cycles the bot's behavior mode.
---  3) An invisible helper entity ("mekatrol-game-play-bot") that acts
---     as a script-controlled pseudo-robot, implemented as a
---     simple-entity-with-owner.
---
--- The helper entity:
---   * Is non-interactable for the player.
---   * Can be attacked by enemies.
---   * Is intended solely for use by control logic.
-----------------------------------------------------------------------
-----------------------------------------------------------------------
--- HOTKEYS
---
--- 1) "mekatrol-game-play-bot-toggle"
---      - Toggle creation/destruction of the bot.
--- 2) "mekatrol-game-play-bot-next-mode"
---      - Cycle through behavior modes:
---          follow -> search -> follow -> ...
-----------------------------------------------------------------------
 data:extend({{
     type = "custom-input",
     name = "mekatrol-game-play-bot-toggle",
@@ -34,17 +8,16 @@ data:extend({{
     -- "none" so the key press is not consumed by script only.
     consuming = "none"
 }, {
-    -- Second hotkey: cycle bot modes.
+    -- Second hotkey: toggle mapper bot tasks.
     --
-    -- This hotkey is used to change the bot's behavior mode
+    -- This hotkey is used to change the bot's task
     -- without destroying/recreating the entity:
     --   * follow
     --   * search
     --
-    -- The control script will interpret this as "advance to the
-    -- next mode in the list".
+    -- The control script will interpret this as "toggle task".
     type = "custom-input",
-    name = "mekatrol-game-play-bot-next-mode",
+    name = "mekatrol-game-play-mapper-bot-toggle-task",
 
     -- Default key combination: Ctrl + Shift + H
     key_sequence = "CONTROL + SHIFT + H",
