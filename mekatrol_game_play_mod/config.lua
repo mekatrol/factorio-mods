@@ -64,19 +64,6 @@ config.bot = {
     }
 }
 
-----------------------------------------------------------------------
--- BOT_TASKS
-----------------------------------------------------------------------
-
-config.tasks = {
-    list = {"follow", "search", "survey", "move_to"},
-    index = {}
-}
-
-for i, task in ipairs(config.tasks.list) do
-    config.tasks.index[task] = i
-end
-
 config.bot_names = {"mapper", "repairer", "constructor", "cleaner"}
 
 function config.get_bot_config(bot_name)

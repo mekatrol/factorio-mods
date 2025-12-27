@@ -14,7 +14,6 @@ local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
 
 local BOT_CONF = config.bot
-local BOT_TASKS = config.tasks
 local BOT_NAMES = config.bot_names
 
 ----------------------------------------------------------------------
@@ -84,38 +83,6 @@ function state.get_player_state(player_index)
     ps.visual.overlay_texts = ps.visual.overlay_texts or {}
 
     return ps
-end
-
-----------------------------------------------------------------------
--- Task setting
-----------------------------------------------------------------------
-
-function state.set_bot_task(player, ps, bot, new_task)
-    -- Validate task
-    if not BOT_TASKS.index[new_task] then
-        new_task = "follow"
-    end
-
-    -- set the new current_task
-    bot.task.current_task = new_task
-
-    -- Follow task: no fixed target.
-    if new_task == "follow" then
-        -- clear the next_task and target position when switching tasks
-        bot.task.next_task = nil
-        bot.task.target_position = nil
-
-        return
-    end
-
-    if new_task == "search" then
-        bot.task.next_task = "survey"
-        return
-    end
-
-    if new_task == "survey" then
-        bot.task.next_task = "search"
-    end
 end
 
 ----------------------------------------------------------------------

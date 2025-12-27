@@ -10,7 +10,15 @@ local util = require("util")
 
 local BOT_CONF = config.bot
 local BOT_NAME = "mapper"
-local BOT_TASKS = config.tasks
+
+local BOT_TASKS = {
+    list = {"follow", "search", "survey", "move_to"},
+    index = {}
+}
+
+for i, task in ipairs(BOT_TASKS.list) do
+    BOT_TASKS.index[task] = i
+end
 
 function mapper_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME)
@@ -31,7 +39,8 @@ function mapper_bot.set_bot_task(player, ps, new_task)
 
     -- Validate task
     if not BOT_TASKS.index[new_task] then
-        new_task = "follow"
+        util.print(player, "red", "task '%s' not found for bot name: '%s'", bot.name)
+        return
     end
 
     -- set the new current_task

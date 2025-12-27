@@ -5,6 +5,7 @@ local module = require("module")
 local util = require("util")
 
 local BOT_CONF = config.bot
+local BOT_NAMES = config.bot_names
 
 -------------------------------------------------------------------------------------------------------
 -- This module contains code common to all bots in this mod
@@ -117,7 +118,7 @@ function common_bot.update(player, bot, bot_conf, tick)
     end
 end
 
-function common_bot.issue_task(player, ps, bot_name, new_task)
+local function issue_task(player, ps, bot_name, new_task)
     local bot_module = module.get_module(bot_name)
 
     if not bot_module then
@@ -126,6 +127,17 @@ function common_bot.issue_task(player, ps, bot_name, new_task)
     end
 
     bot_module.set_bot_task(player, ps, new_task)
+end
+
+function common_bot.issue_task(player, ps, bot_name, new_task)
+    if bot_name == "all" then
+        for _, name in ipairs(BOT_NAMES) do
+            issue_task(player, ps, name, new_task)
+        end
+    else
+        issue_task(player, ps, bot_name, new_task)
+    end
+
     util.print(player, "green", "%s -> %s", bot_name, new_task)
 end
 

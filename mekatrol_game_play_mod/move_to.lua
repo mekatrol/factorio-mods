@@ -23,7 +23,8 @@ function move_to.update(player, ps, bot)
 
         -- We don't want an endless loop if target position is nil and task is "move_to"
         if task == "move_to" then
-            util.print(player, "red", "Switching from 'move_to' to 'follow' task to stop endless 'move_to' loop...")
+            util.print(player, "red",
+                "Switching bot '%s' from 'move_to' to 'follow' task to stop endless 'move_to' loop...", bot.name)
             task = "follow"
         end
 
@@ -41,7 +42,7 @@ function move_to.update(player, ps, bot)
 
     -- reached target, if so move to next task
     if dx * dx + dy * dy <= step * step then
-        local new_task = bot.task.next_task or "follow"       
+        local new_task = bot.task.next_task or "follow"
         bot_module.set_bot_task(player, ps, new_task)
     end
 end

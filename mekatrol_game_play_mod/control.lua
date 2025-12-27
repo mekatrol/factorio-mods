@@ -18,7 +18,6 @@ local repairer_bot = require("repairer_bot")
 
 -- Config aliases.
 local BOT_CONF = config.bot
-local BOT_TASKS = config.tasks
 local BOT_NAMES = config.bot_names
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
