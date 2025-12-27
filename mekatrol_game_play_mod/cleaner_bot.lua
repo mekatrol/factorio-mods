@@ -16,7 +16,7 @@ function cleaner_bot.destroy_state(player, ps)
 end
 
 function cleaner_bot.update(player, ps, state, visual, tick)
-    local bot = state.get_bot_by_name(player, ps, BOT_NAME)
+    local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
 
     if not (bot and bot.entity and bot.entity.valid) then

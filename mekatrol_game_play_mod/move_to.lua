@@ -2,15 +2,18 @@
 local move_to = {}
 
 local config = require("config")
+local module = require("module")
 local positioning = require("positioning")
 local util = require("util")
 
 local BOT_CONF = config.bot
 
-function move_to.update(player, ps, state, bot)
+function move_to.update(player, ps, bot)
     if not (player and player.valid and ps and bot and bot.entity and bot.entity.valid) then
         return
     end
+
+    local bot_module = module.get_module(bot.name)
 
     local target_pos = bot.task.target_position
 
@@ -24,7 +27,7 @@ function move_to.update(player, ps, state, bot)
             mode = "follow"
         end
 
-        state.set_bot_task(player, ps, bot, mode)
+        bot_module.set_bot_task(player, ps, mode)
         return
     end
 
@@ -38,8 +41,8 @@ function move_to.update(player, ps, state, bot)
 
     -- reached target, if so move to next mode
     if dx * dx + dy * dy <= step * step then
-        local new_mode = bot.task.next_mode or "follow"
-        state.set_bot_task(player, ps, bot, new_mode)
+        local new_mode = bot.task.next_mode or "follow"       
+        bot_module.set_bot_task(player, ps, new_mode)
     end
 end
 

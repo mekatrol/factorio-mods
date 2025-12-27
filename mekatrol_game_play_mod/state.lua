@@ -14,7 +14,7 @@ local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
 
 local BOT_CONF = config.bot
-local MODES = config.modes
+local BOT_MODES = config.modes
 local BOT_NAMES = config.bot_names
 
 ----------------------------------------------------------------------
@@ -90,15 +90,9 @@ end
 -- Mode setting
 ----------------------------------------------------------------------
 
-function state.set_mapper_bot_task(player, ps, bot, new_mode)
-    bot.search_spiral = nil
-    bot.survey_entity = nil
-    bot.next_survey_entities = {}
-end
-
 function state.set_bot_task(player, ps, bot, new_mode)
     -- Validate mode
-    if not MODES.index[new_mode] then
+    if not BOT_MODES.index[new_mode] then
         new_mode = "follow"
     end
 
@@ -111,9 +105,6 @@ function state.set_bot_task(player, ps, bot, new_mode)
         bot.task.next_mode = nil
         bot.task.target_position = nil
 
-        if bot.name == "mapper" then
-            state.set_mapper_bot_task(player, ps, bot, new_mode)
-        end
         return
     end
 

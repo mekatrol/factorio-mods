@@ -2,6 +2,7 @@ local search = {}
 
 local config = require("config")
 local entitygroup = require("entitygroup")
+local module = require("module")
 local polygon = require("polygon")
 local positioning = require("positioning")
 local util = require("util")
@@ -174,7 +175,8 @@ function search.update(player, ps, state, bot)
             }
 
             -- switch to move_to mode
-            state.set_bot_task(player, ps, bot, "move_to")
+            local bot_module = module.get_module(bot.name)
+            bot_module.set_bot_task(player, ps, "move_to")
 
             -- reset search spiral so searching restarts cleanly after
             bot.task.search_spiral = nil

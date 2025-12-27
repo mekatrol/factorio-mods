@@ -2,6 +2,7 @@ local common_bot = require("common_bot")
 local config = require("config")
 local entitygroup = require("entitygroup")
 local follow = require("follow")
+local module = require("module")
 local move_to = require("move_to")
 local polygon = require("polygon")
 local search = require("search")
@@ -17,16 +18,28 @@ local repairer_bot = require("repairer_bot")
 
 -- Config aliases.
 local BOT_CONF = config.bot
-local MODES = config.modes
+local BOT_MODES = config.modes
 local BOT_NAMES = config.bot_names
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
+
+local function init_modules()
+    module.init_module({
+        cleaner_bot = cleaner_bot,
+        constructor_bot = constructor_bot,
+        mapper_bot = mapper_bot,
+        repairer_bot = repairer_bot
+    })
+end
 
 ----------------------------------------------------------------------
 -- Hotkey handlers
 ----------------------------------------------------------------------
 
 local function on_toggle_bot(event)
+    -- make sure modules for DI are loaded
+    init_modules()
+
     local p = game.get_player(event.player_index)
     if not (p and p.valid) then
         return
@@ -63,17 +76,7 @@ local function on_cycle_mapper_bot_mode(event)
         return
     end
 
-    local bot = state.get_bot_by_name(player, ps, "mapper")
-
-    -- default to search
-    local new_mode = "search"
-
-    -- if not in follow mode then set to follow mode
-    if not (bot.task.current_mode == "follow") then
-        new_mode = "follow"
-    end
-
-    state.set_bot_task(player, ps, bot, new_mode)
+    mapper_bot.toggle_mode(player, ps)
 end
 
 ----------------------------------------------------------------------
@@ -148,10 +151,12 @@ end
 ----------------------------------------------------------------------
 
 script.on_init(function()
+    init_modules()
     state.ensure_storage_tables()
 end)
 
 script.on_configuration_changed(function(_)
+    init_modules()
     state.ensure_storage_tables()
 end)
 

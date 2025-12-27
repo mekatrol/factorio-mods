@@ -2,6 +2,7 @@ local survey = {}
 
 local config = require("config")
 local entitygroup = require("entitygroup")
+local module = require("module")
 local polygon = require("polygon")
 local positioning = require("positioning")
 local util = require("util")
@@ -243,7 +244,8 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 end
 
 local function switch_to_next_mode(player, ps, state, bot)
-    state.set_bot_task(player, ps, bot, bot.task.next_mode or "search")
+    local bot_module = module.get_module(bot.name)
+    bot_module.set_bot_task(player, ps, bot.task.next_mode or "search")
     bot.task.target_position = nil
     bot.task.survey_trace = nil
     bot.task.survey_entity = nil
