@@ -103,7 +103,7 @@ local function sort_entities_by_position(entities, pos)
 end
 
 local function find_entity(player, ps, bot, pos, surf)
-    local entitygroup = module.get_module("entitygroup")
+    local entity_group = module.get_module("entity_group")
     
     bot.task.next_survey_entities = bot.task.next_survey_entities or {}
 
@@ -119,7 +119,7 @@ local function find_entity(player, ps, bot, pos, surf)
         if e and e.valid then
 
             -- recheck this entity may have been added prior to boundary for this area created
-            if not entitygroup.is_in_any_entity_group(ps, surf.index, e) then
+            if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
                 return e
             end
         end
@@ -136,9 +136,9 @@ local function find_entity(player, ps, bot, pos, surf)
     local next_found_entity = nil
 
     for _, e in ipairs(found) do
-        if e.valid and e ~= bot.entity and e ~= char and not entitygroup.is_survey_ignore_target(e) then
+        if e.valid and e ~= bot.entity and e ~= char and not entity_group.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
-            if not entitygroup.is_in_any_entity_group(ps, surf.index, e) then
+            if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
                 if not next_found_entity then
                     next_found_entity = e
                 else

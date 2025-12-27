@@ -7,7 +7,7 @@ local key_for = {
     logistics = "logistics_bot",
     mapper = "mapper_bot",
     repairer = "repairer_bot",
-    entitygroup = "entitygroup"
+    entity_group = "entity_group"
 }
 
 module.modules = {}

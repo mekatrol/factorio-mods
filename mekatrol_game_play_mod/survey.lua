@@ -372,15 +372,15 @@ local function trace_step(player, ps, state, visual, bot)
         end
 
         if tr.started_edge and tr.p_tx == tr.start_tx and tr.p_ty == tr.start_ty and nx == tr.p1_tx and ny == tr.p1_ty then
-            local entitygroup = module.get_module("entitygroup")
+            local entity_group = module.get_module("entity_group")
             
             -- Completed loop: persist + render group.
-            entitygroup.ensure_entity_groups(ps)
+            entity_group.ensure_entity_groups(ps)
 
             local boundary = tr.boundary or {}
 
             -- add to boundary group
-            entitygroup.add_boundary(player, ps, visual, boundary, entity, surf.index)
+            entity_group.add_boundary(player, ps, visual, boundary, entity, surf.index)
 
             -- Switch back to survey task to find next entity
             switch_to_next_task(player, ps, state, bot)
@@ -403,7 +403,7 @@ function survey.update(player, ps, state, visual, bot, tick)
         return
     end
 
-    local entitygroup = module.get_module("entitygroup")
+    local entity_group = module.get_module("entity_group")
 
     -- If we are tracing, drive movement purely from the trace state machine.
     ensure_trace(ps, bot)
@@ -440,8 +440,8 @@ function survey.update(player, ps, state, visual, bot, tick)
     end
 
     -- For single-tile survey targets (e.g. crude-oil), just add it as self contained polygon
-    if entitygroup.is_survey_single_target(bot.task.survey_entity) then
-        entitygroup.add_single_tile_entity_group(player, ps, visual, bot.entity.surface_index, bot.task.survey_entity)
+    if entity_group.is_survey_single_target(bot.task.survey_entity) then
+        entity_group.add_single_tile_entity_group(player, ps, visual, bot.entity.surface_index, bot.task.survey_entity)
 
         -- Switch back to survey task to find next entity
         switch_to_next_task(player, ps, state, bot)

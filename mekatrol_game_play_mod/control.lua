@@ -1,6 +1,6 @@
 local common_bot = require("common_bot")
 local config = require("config")
-local entitygroup = require("entitygroup")
+local entity_group = require("entity_group")
 local follow = require("follow")
 local module = require("module")
 local move_to = require("move_to")
@@ -28,7 +28,7 @@ local function init_modules()
         constructor_bot = constructor_bot,
         mapper_bot = mapper_bot,
         repairer_bot = repairer_bot,
-        entitygroup = entitygroup
+        entity_group = entity_group
     })
 end
 
@@ -58,9 +58,9 @@ local function on_toggle_bot(event)
     end
 
     if has_any then
-        state.destroy_player_bot(p, visual, entitygroup.clear_entity_groups)
+        state.destroy_player_bot(p, visual, entity_group.clear_entity_groups)
     else
-        state.create_player_bot(p, visual, entitygroup.clear_entity_groups)
+        state.create_player_bot(p, visual, entity_group.clear_entity_groups)
     end
 end
 
@@ -148,7 +148,7 @@ local function on_entity_died(event)
         if match then
             local player = game.get_player(idx)
             if player and player.valid then
-                state.destroy_player_bot(player, visual, entitygroup.clear_entity_groups)
+                state.destroy_player_bot(player, visual, entity_group.clear_entity_groups)
                 util.print(player, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
@@ -175,7 +175,7 @@ local function on_player_removed(event)
 
     local p = game.get_player(idx)
     if p and p.valid then
-        state.destroy_player_bot(p, visual, entitygroup.clear_entity_groups)
+        state.destroy_player_bot(p, visual, entity_group.clear_entity_groups)
     else
         -- Player entity is gone; best-effort cleanup of any remaining bots.
         if ps.bots then

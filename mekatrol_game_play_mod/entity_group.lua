@@ -1,13 +1,13 @@
-local entitygroup = {}
+local entity_group = {}
 
 local polygon = require("polygon")
 local util = require("util")
 
-function entitygroup.clear_entity_groups(ps)
+function entity_group.clear_entity_groups(ps)
     ps.entity_groups = {}
 end
 
-function entitygroup.ensure_entity_groups(ps)
+function entity_group.ensure_entity_groups(ps)
     ps.entity_groups = ps.entity_groups or {}
 end
 
@@ -17,7 +17,7 @@ local ignore_entities = {
     ["unit"] = true
 }
 
-function entitygroup.is_survey_ignore_target(e)
+function entity_group.is_survey_ignore_target(e)
     if not e or not e.valid then
         return true
     end
@@ -33,7 +33,7 @@ function entitygroup.is_survey_ignore_target(e)
     return false
 end
 
-function entitygroup.is_survey_single_target(entity)
+function entity_group.is_survey_single_target(entity)
     if not entity or not entity.valid then
         return true
     end
@@ -66,7 +66,7 @@ function entitygroup.is_survey_single_target(entity)
     return false
 end
 
-function entitygroup.is_in_any_entity_group(ps, surface_index, entity)
+function entity_group.is_in_any_entity_group(ps, surface_index, entity)
     local groups = ps.entity_groups
 
     if not groups then
@@ -96,7 +96,7 @@ function entitygroup.is_in_any_entity_group(ps, surface_index, entity)
     return false
 end
 
-function entitygroup.add_boundary(player, ps, visual, boundary, entity, surface_index)
+function entity_group.add_boundary(player, ps, visual, boundary, entity, surface_index)
     -- must be at least 3 points in boundary
     if #boundary < 3 then
         return
@@ -132,11 +132,11 @@ function entitygroup.add_boundary(player, ps, visual, boundary, entity, surface_
     -- Draw polygon + label (clears any prior render for this group_id)
     visual.draw_entity_group(player, ps, group_id, entity_name, entity_type, boundary, center)
 
-    entitygroup.merge_overlapping_groups(player, ps, visual)
+    entity_group.merge_overlapping_groups(player, ps, visual)
 end
 
-function entitygroup.add_single_tile_entity_group(player, ps, visual, surface_index, entity)
-    entitygroup.ensure_entity_groups(ps)
+function entity_group.add_single_tile_entity_group(player, ps, visual, surface_index, entity)
+    entity_group.ensure_entity_groups(ps)
 
     local pos = entity.position
 
@@ -161,7 +161,7 @@ function entitygroup.add_single_tile_entity_group(player, ps, visual, surface_in
             y = pos.y + size
         }}
 
-        entitygroup.add_boundary(player, ps, visual, boundary, entity, surface_index)
+        entity_group.add_boundary(player, ps, visual, boundary, entity, surface_index)
 
         return
     end
@@ -188,11 +188,11 @@ function entitygroup.add_single_tile_entity_group(player, ps, visual, surface_in
         y = pos.y + height
     }}
 
-    entitygroup.add_boundary(player, ps, visual, boundary, entity, surface_index)
+    entity_group.add_boundary(player, ps, visual, boundary, entity, surface_index)
 end
 
-function entitygroup.merge_overlapping_groups(player, ps, visual)
-    entitygroup.ensure_entity_groups(ps)
+function entity_group.merge_overlapping_groups(player, ps, visual)
+    entity_group.ensure_entity_groups(ps)
 
     local groups = ps.entity_groups
     local keys = {}
@@ -236,4 +236,4 @@ function entitygroup.merge_overlapping_groups(player, ps, visual)
     end
 end
 
-return entitygroup
+return entity_group
