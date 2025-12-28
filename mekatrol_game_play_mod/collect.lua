@@ -107,7 +107,7 @@ local function pickup(player, ps, bot)
             if inventory.insert_stack_into_player(player, ent, ent.stack) then
                 moved_any = true
             end
-        elseif ent.type == "simple-entity-with-owner" then
+        elseif ent.type == "simple-entity-with-owner" or ent.type == "resource" then
             if inventory.mine_to_player(player, ent) then
                 moved_any = true
             end

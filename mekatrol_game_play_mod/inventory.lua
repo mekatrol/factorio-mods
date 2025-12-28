@@ -113,37 +113,37 @@ function inventory.transfer_to_player(player, ent, inv)
         end
     end
 
-    -- destroy the created inventory
-    inv.destroy()
-
-    -- destroy if empty
-    if moved_any and inv.is_empty() and ent.valid then
-        ent.destroy()
-    end
-
     return moved_any
 end
 
 function inventory.mine_to_player(player, ent)
     -- entity must be minable
-    if not (ent.valid and ent.minable) then
-        return
+    if not (ent and ent.valid and ent.minable) then
+        return false
     end
 
-    local inv = game.create_inventory(1)
+    -- Cache position/surface in case mining destroys the entity
+    local surface = ent.surface
+    local position = ent.position
 
+    local inv = game.create_inventory(32) -- more than 1 slot to be safe
     local ok = ent.mine {
         inventory = inv
     }
-
     if not ok then
-        return
+        inv.destroy()
+        return false
     end
 
-    -- transfer to player
-    local moved_any = inventory.transfer_to_player(player, ent, inv)
+    -- Use cached surface/position if ent becomes invalid
+    local spill_ent = (ent and ent.valid) and ent or {
+        surface = surface,
+        position = position,
+        valid = true
+    }
 
-    -- destroy the created inventory
+    local moved_any = inventory.transfer_to_player(player, spill_ent, inv)
+
     inv.destroy()
 
     return moved_any
@@ -151,14 +151,17 @@ end
 
 function inventory.transfer_container_to_player(player, ent)
     local inv = ent.get_inventory(defines.inventory.chest)
-
     if not inv then
         util.print(player, "red", "no chest inventory: name=%s type=%s", ent.name, ent.type)
         return false
     end
 
-    -- transfer to player
     local moved_any = inventory.transfer_to_player(player, ent, inv)
+
+    -- Only containers should be destroyed when emptied
+    if moved_any and inv.is_empty() and ent.valid then
+        ent.destroy()
+    end
 
     return moved_any
 end
