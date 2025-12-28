@@ -28,4 +28,22 @@ function util.hash_combine(h, v)
     return h
 end
 
+function util.parse_kv_list(s)
+    -- Supports: "coal=500 iron-plate=200" (space-separated)
+    local out = {}
+
+    if not s or s == "" then
+        return out
+    end
+
+    for token in string.gmatch(s, "%S+") do
+        local name, count_s = string.match(token, "^([^=]+)=(%d+)$")
+        if name and count_s then
+            out[name] = tonumber(count_s)
+        end
+    end
+
+    return out
+end
+
 return util

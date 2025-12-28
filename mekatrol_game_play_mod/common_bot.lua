@@ -122,7 +122,7 @@ function common_bot.update(player, bot, bot_conf, tick)
     end
 end
 
-local function issue_task(player, ps, bot_name, new_task)
+local function issue_task(player, ps, bot_name, new_task, next_task, args)
     local bot_module = module.get_module(bot_name)
 
     if not bot_module then
@@ -130,16 +130,18 @@ local function issue_task(player, ps, bot_name, new_task)
         return
     end
 
-    bot_module.set_bot_task(player, ps, new_task, nil)
+    util.print(player, "red", "args: %s", args)
+
+    bot_module.set_bot_task(player, ps, new_task, next_task, args)
 end
 
-function common_bot.issue_task(player, ps, bot_name, new_task)
+function common_bot.issue_task(player, ps, bot_name, new_task, next_task, args)
     if bot_name == "all" then
         for _, name in ipairs(BOT_NAMES) do
-            issue_task(player, ps, name, new_task)
+            issue_task(player, ps, name, new_task, next_task, args)
         end
     else
-        issue_task(player, ps, bot_name, new_task)
+        issue_task(player, ps, bot_name, new_task, next_task, args)
     end
 end
 

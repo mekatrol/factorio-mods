@@ -36,7 +36,7 @@ function constructor_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function constructor_bot.set_bot_task(player, ps, new_task, next_task)
+function constructor_bot.set_bot_task(player, ps, new_task, next_task, args)
     local bot = ps.bots[BOT_NAME]
 
     new_task = full_task_name(new_task)
@@ -48,6 +48,14 @@ function constructor_bot.set_bot_task(player, ps, new_task, next_task)
         return
     end
 
+    if args then
+        local arg_pairs = util.parse_kv_list(args)
+
+        for name, count in pairs(arg_pairs) do
+            util.print(player, "yellow", "constructor bot arg: %s=%s", name, count)
+        end
+    end
+
     -- set the new current_task
     bot.task.current_task = new_task
 
@@ -57,6 +65,10 @@ function constructor_bot.set_bot_task(player, ps, new_task, next_task)
     if bot.task.current_task == "follow" then
         bot.task.target_position = nil
     end
+end
+
+function constructor_bot.get_queued_task(player, ps)
+    return nil, nil
 end
 
 function constructor_bot.update(player, ps, state, visual, tick)

@@ -38,7 +38,7 @@ function logistics_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function logistics_bot.set_bot_task(player, ps, new_task, next_task)
+function logistics_bot.set_bot_task(player, ps, new_task, next_task, args)
     local bot = ps.bots[BOT_NAME]
 
     new_task = full_task_name(new_task)
@@ -48,6 +48,14 @@ function logistics_bot.set_bot_task(player, ps, new_task, next_task)
     if not BOT_TASKS.index[new_task] then
         util.print(player, "red", "task '%s' not found for bot name: '%s'", new_task, bot.name)
         return
+    end
+
+    if args then
+        local arg_pairs = util.parse_kv_list(args)
+
+        for name, count in pairs(arg_pairs) do
+            util.print(player, "yellow", "logistics bot arg: %s=%s", name, count)
+        end
     end
 
     -- set the new current_task
@@ -61,7 +69,7 @@ function logistics_bot.set_bot_task(player, ps, new_task, next_task)
     end
 end
 
-function logistics_bot.queued_task(player, ps)
+function logistics_bot.get_queued_task(player, ps)
     local entity_group = module.get_module("entity_group")
 
     -- always collect space ship items as a priority

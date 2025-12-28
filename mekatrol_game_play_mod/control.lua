@@ -67,8 +67,7 @@ local function on_toggle_bot(event)
     end
 end
 
-local function set_bot_state(player, bot_name, new_task)
-    local ps = state.get_player_state(player.index)
+local function full_bot_name(bot_name)
 
     -- convert short hand bot name to long bot name
     if bot_name == "a" then
@@ -83,12 +82,18 @@ local function set_bot_state(player, bot_name, new_task)
         bot_name = "repairer"
     end
 
+    return bot_name
+end
+
+local function set_bot_state(player, bot_name, new_task, args)
+    local ps = state.get_player_state(player.index)
+
     if not ps.bot_enabled then
         util.print(player, "red", "bot not enabled")
         return
     end
-
-    common_bot.issue_task(player, ps, bot_name, new_task)
+    
+    common_bot.issue_task(player, ps, bot_name, new_task, nil, args)
 end
 
 local function command(cmd)
@@ -98,13 +103,20 @@ local function command(cmd)
     end
 
     local p = cmd.parameter or ""
-    local bot_name, task = string.match(p, "^(%S+)%s+(%S+)$")
+
+    -- Allow: "<bot> <task> [args...]"
+    local bot_name, task, args = string.match(p, "^(%S+)%s+(%S+)%s*(.*)$")
+    
     if not bot_name then
-        util.print(player, "yellow", "Usage: /bot <name> <task>")
+        util.print(player, "yellow", "Usage: /b <c|l|m|r> <task> [args]")
         return
     end
 
-    set_bot_state(player, bot_name, task)
+    -- Normalize short task names, if you use them
+    bot_name = full_bot_name(bot_name)
+
+    -- Default behavior: /b <name> <task> <args>
+    set_bot_state(player, bot_name, task, args)
 end
 
 local function register_commands()

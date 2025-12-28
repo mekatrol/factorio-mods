@@ -44,7 +44,7 @@ function mapper_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function mapper_bot.set_bot_task(player, ps, new_task, next_task)
+function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
     local bot = ps.bots[BOT_NAME]
 
     new_task = full_task_name(new_task)
@@ -54,6 +54,14 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task)
     if not BOT_TASKS.index[new_task] then
         util.print(player, "red", "task '%s' not found for bot name: '%s'", new_task, bot.name)
         return
+    end
+
+    if args then
+        local arg_pairs = util.parse_kv_list(args)
+
+        for name, count in pairs(arg_pairs) do
+            util.print(player, "yellow", "mapper bot arg: %s=%s", name, count)
+        end
     end
 
     -- set the new current_task
@@ -95,6 +103,10 @@ function mapper_bot.toggle_task(player, ps)
     end
 
     mapper_bot.set_bot_task(player, ps, new_task, nil)
+end
+
+function mapper_bot.get_queued_task(player, ps)
+    return nil, nil
 end
 
 function mapper_bot.update(player, ps, state, visual, tick)

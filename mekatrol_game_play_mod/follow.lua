@@ -19,8 +19,8 @@ function follow.update(player, ps, state, bot, y_offset)
     local bot_module = module.get_module(bot.name)
 
     -- does the bot have another queued task
-    if bot_module.queued_task then
-        local queued_new_task, queued_next_task = bot_module.queued_task(player, ps, bot)
+    if bot_module.get_queued_task then
+        local queued_new_task, queued_next_task = bot_module.get_queued_task(player, ps, bot)
 
         if queued_new_task then
             bot_module.set_bot_task(player, ps, queued_new_task, queued_next_task)
