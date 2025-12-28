@@ -122,31 +122,47 @@ function inventory.mine_to_player(player, ent)
         return false
     end
 
-    -- Cache position/surface in case mining destroys the entity
-    local surface = ent.surface
-    local position = ent.position
+    -- Create a temporary script inventory
+    local inv = game.create_inventory(32)
 
-    local inv = game.create_inventory(32) -- more than 1 slot to be safe
+    -- Mine into script inventory (does NOT require player proximity)
     local ok = ent.mine {
         inventory = inv
     }
+
     if not ok then
         inv.destroy()
         return false
     end
 
-    -- Use cached surface/position if ent becomes invalid
-    local spill_ent = (ent and ent.valid) and ent or {
-        surface = surface,
-        position = position,
-        valid = true
-    }
+    -- Move mined items into player inventory
+    local player_inv = player.get_main_inventory()
+    if player_inv then
+        for i = 1, #inv do
+            local s = inv[i]
+            if s and s.valid_for_read then
+                local inserted = player_inv.insert {
+                    name = s.name,
+                    count = s.count
+                }
 
-    local moved_any = inventory.transfer_to_player(player, spill_ent, inv)
+                if inserted < s.count then
+                    -- spill remainder near the mined entity
+                    ent.surface.spill_item_stack {
+                        position = ent.position,
+                        stack = {
+                            name = s.name,
+                            count = s.count - inserted
+                        },
+                        enable_looted = true
+                    }
+                end
+            end
+        end
+    end
 
     inv.destroy()
-
-    return moved_any
+    return true
 end
 
 function inventory.transfer_container_to_player(player, ent)
