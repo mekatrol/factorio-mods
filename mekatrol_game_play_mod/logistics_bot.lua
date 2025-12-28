@@ -50,14 +50,6 @@ function logistics_bot.set_bot_task(player, ps, new_task, next_task, args)
         return
     end
 
-    if args then
-        local arg_pairs = util.parse_kv_list(args)
-
-        for name, count in pairs(arg_pairs) do
-            util.print(player, "yellow", "logistics bot arg: %s=%s", name, count)
-        end
-    end
-
     -- set the new current_task
     bot.task.current_task = new_task
 
@@ -67,6 +59,9 @@ function logistics_bot.set_bot_task(player, ps, new_task, next_task, args)
     if bot.task.current_task == "follow" then
         bot.task.target_position = nil
     end
+
+    -- set args
+    bot.task.args = util.parse_kv_list(args) or {}
 end
 
 function logistics_bot.get_queued_task(player, ps)

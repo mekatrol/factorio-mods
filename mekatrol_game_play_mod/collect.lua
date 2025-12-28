@@ -143,6 +143,14 @@ function collect.update(player, ps, bot)
     local entity_group = module.get_module("entity_group")
     local bot_module = module.get_module(bot.name)
 
+    if bot.task.args then
+        for name, count in pairs(bot.task.args) do
+            if name == "coal" and count > 0 then
+                util.print(player, "yellow", "logistics bot arg: %s=%s", name, count)
+            end
+        end
+    end
+
     if bot.task.current_task == "pickup" then
         pickup(player, ps, bot)
         return

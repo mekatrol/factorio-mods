@@ -56,14 +56,6 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
         return
     end
 
-    if args then
-        local arg_pairs = util.parse_kv_list(args)
-
-        for name, count in pairs(arg_pairs) do
-            util.print(player, "yellow", "mapper bot arg: %s=%s", name, count)
-        end
-    end
-
     -- set the new current_task
     bot.task.current_task = new_task
 
@@ -89,6 +81,9 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
 
     -- set new next_task
     bot.task.next_task = next_task
+
+    -- set args
+    bot.task.args = util.parse_kv_list(args) or {}
 end
 
 function mapper_bot.toggle_task(player, ps)

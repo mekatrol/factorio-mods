@@ -32,7 +32,8 @@ function common_bot.init_state(player, ps, bot_name, init_task)
         task = {
             target_position = nil,
             current_task = init_task,
-            next_task = nil
+            next_task = nil,
+            args = {}
         },
         visual = {
             highlight = nil,
