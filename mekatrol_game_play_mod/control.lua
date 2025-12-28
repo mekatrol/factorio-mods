@@ -213,6 +213,12 @@ script.on_event(defines.events.on_player_removed, on_player_removed)
 -- Tick handler
 ----------------------------------------------------------------------
 
+local function get_tasks(player, ps, bot_name)
+    local current_task, next_task = common_bot.get_tasks(player, ps, state, visual, bot_name)
+    local line = string.format("%s: %s→%s", bot_name, current_task or "nil", next_task or "nil")
+    return line
+end
+
 script.on_event(defines.events.on_tick, function(event)
     if event.tick % BOT_CONF.update_interval ~= 0 then
         return
@@ -242,26 +248,10 @@ script.on_event(defines.events.on_tick, function(event)
         mapper_bot.update(player, ps, state, visual, tick)
         repairer_bot.update(player, ps, state, visual, tick)
 
-        local constructor_current_task, constructor_next_task =
-            common_bot.get_tasks(player, ps, state, visual, "constructor")
-        local constructor_current_task_line = string.format("constructor: %s→%s", constructor_current_task or "nil",
-            constructor_next_task or "nil")
-        overlay_lines[#overlay_lines + 1] = constructor_current_task_line
-
-        local logistics_current_task, logistics_next_task = common_bot.get_tasks(player, ps, state, visual, "logistics")
-        local logistics_current_task_line = string.format("logistics: %s→%s", logistics_current_task or "nil",
-            logistics_next_task or "nil")
-        overlay_lines[#overlay_lines + 1] = logistics_current_task_line
-
-        local mapper_current_task, mapper_next_task = common_bot.get_tasks(player, ps, state, visual, "mapper")
-        local mapper_current_task_line = string.format("mapper: %s→%s", mapper_current_task or "nil",
-            mapper_next_task or "nil")
-        overlay_lines[#overlay_lines + 1] = mapper_current_task_line
-
-        local repairer_current_task, repairer_next_task = common_bot.get_tasks(player, ps, state, visual, "repairer")
-        local repairer_current_task_line = string.format("repairer: %s→%s", repairer_current_task or "nil",
-            repairer_next_task or "nil")
-        overlay_lines[#overlay_lines + 1] = repairer_current_task_line
+        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "constructor")
+        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "logistics")
+        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "mapper")
+        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "repairer")
     else
         overlay_lines[#overlay_lines + 1] = "bot is currently disabled"
     end

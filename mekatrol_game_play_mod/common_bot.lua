@@ -141,8 +141,6 @@ function common_bot.issue_task(player, ps, bot_name, new_task)
     else
         issue_task(player, ps, bot_name, new_task)
     end
-
-    util.print(player, "green", "%s -> %s", bot_name, new_task)
 end
 
 function common_bot.clear_light(bot)
