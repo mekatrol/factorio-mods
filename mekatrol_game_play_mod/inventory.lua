@@ -55,7 +55,7 @@ function inventory.get_player_main_inventory(player)
     return nil
 end
 
-function inventory.insert_stack_into_player(player, stack, ent)
+function inventory.insert_stack_into_player(player, ent, stack)
     if not (stack and stack.valid_for_read) then
         return 0
     end
@@ -105,7 +105,7 @@ function inventory.transfer_to_player(player, ent, inv)
     for i = 1, #inv do
         local stack = inv[i]
         if stack and stack.valid_for_read then
-            local inserted = inventory.insert_stack_into_player(player, stack, ent)
+            local inserted = inventory.insert_stack_into_player(player, ent, stack)
 
             if inserted > 0 then
                 moved_any = true

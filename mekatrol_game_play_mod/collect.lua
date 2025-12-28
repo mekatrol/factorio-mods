@@ -121,50 +121,13 @@ function collect.update(player, ps, bot)
 
         for _, ent in pairs(ents) do
             if ent.type == "item-entity" then
-                local stack = ent.stack
-
-                if stack and stack.valid_for_read then
-                    -- Cache for debugging (safe even if stack becomes invalid later)
-                    local name = stack.name
-                    local before_count = stack.count
-
-                    util.print(player, "red", "ground (before): %s (%s)", name, before_count)
-
-                    local inv = player.get_main_inventory()
-                    if inv then
-                        local free = inv.get_insertable_count(name)
-
-                        if free > 0 then
-                            local take = math.min(before_count, free)
-                            local inserted = inv.insert {
-                                name = name,
-                                count = take
-                            }
-
-                            if inserted > 0 then
-                                moved_any = true
-
-                                if inserted == before_count then
-                                    -- ent/stack becomes invalid after destroy; only use cached values
-                                    util.print(player, "red", "ground (moved all): %s (%s)", name, inserted)
-                                    ent.destroy()
-                                else
-                                    local after_count = before_count - inserted
-                                    stack.count = after_count -- may still be valid-for-read (non-zero)
-
-                                    util.print(player, "red", "ground (moved): %s moved (%s) left (%s)", name, inserted,
-                                        after_count)
-                                end
-                            else
-                                util.print(player, "red", "ground (no insert): %s free (%s)", name, free)
-                            end
-                        else
-                            util.print(player, "red", "ground (no space): %s (%s)", name, before_count)
-                        end
-                    end
+                if inventory.insert_stack_into_player(player, ent, ent.stack) then
+                    moved_any = true
                 end
             elseif ent.type == "simple-entity-with-owner" then
-                inventory.mine_to_player(player, ent)
+                if inventory.mine_to_player(player, ent) then
+                    moved_any = true
+                end
             else
                 if inventory.transfer_container_to_player(player, ent) then
                     moved_any = true
