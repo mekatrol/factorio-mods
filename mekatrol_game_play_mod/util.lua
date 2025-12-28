@@ -28,6 +28,35 @@ function util.hash_combine(h, v)
     return h
 end
 
+function util.tile_normalised_position(pos)
+    -- normalise the position corner of tile for which the position is contained
+    local tx = math.floor(pos.x)
+    local ty = math.floor(pos.y)
+
+    return {
+        x = tx,
+        y = ty
+    }
+end
+
+function util.tile_center_position(pos)
+    -- normalise the position corner of tile for which the position is contained
+    local tx = math.floor(pos.x)
+    local ty = math.floor(pos.y)
+
+    -- return center of tile (normalised + 0.5)
+    return {
+        x = tx + 0.5,
+        y = ty + 0.5
+    }
+end
+
+function util.generated_id(ent)
+    local pos = util.tile_normalised_position(ent.position)
+    local id = string.format("%d.%d.%d", ent.surface.index, pos.x, pos.y)
+    return id
+end
+
 function util.parse_kv_list(args)
     local kv_args = {}
 

@@ -140,7 +140,7 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount)
     local products = mineable and mineable.products
     local first = products and products[1]
     local item_name = first and first.name
-    
+
     if not item_name then
         util.print(player, "red", "resource has no mineable product: %s", ent.name)
         return 0
@@ -150,6 +150,13 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount)
     if want < 1 then
         want = 1
     end
+
+    local pos = ent.position
+    local name = ent.name
+    local id = util.generated_id(ent)
+
+    util.print(player, "red", "ent name: %s, ent id: %s, product name: %s, product amt: %s", name, id,
+        item_name, ent.amount)
 
     local mined_units = math.min(want, ent.amount)
 
@@ -162,7 +169,7 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount)
         name = item_name,
         count = mined_units
     }
-    
+
     local remainder = mined_units - inserted
 
     if remainder > 0 then
@@ -178,6 +185,10 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount)
 
     -- reduce the resource amount by what we actually produced (inserted + spilled)
     ent.amount = ent.amount - mined_units
+
+    util.print(player, "yellow", "ent name: %s, ent id: %s, product name: %s, product amt: %s", name, id,
+        item_name, ent.amount)
+
     if ent.amount <= 0 and ent.valid then
         ent.deplete()
     end
