@@ -135,34 +135,13 @@ function inventory.mine_to_player(player, ent)
         return false
     end
 
-    -- Move mined items into player inventory
-    local player_inv = player.get_main_inventory()
-    if player_inv then
-        for i = 1, #inv do
-            local s = inv[i]
-            if s and s.valid_for_read then
-                local inserted = player_inv.insert {
-                    name = s.name,
-                    count = s.count
-                }
+    -- transfer to player
+    local moved_any = inventory.transfer_to_player(player, ent, inv)
 
-                if inserted < s.count then
-                    -- spill remainder near the mined entity
-                    ent.surface.spill_item_stack {
-                        position = ent.position,
-                        stack = {
-                            name = s.name,
-                            count = s.count - inserted
-                        },
-                        enable_looted = true
-                    }
-                end
-            end
-        end
-    end
-
+    -- destroy the created inventory
     inv.destroy()
-    return true
+
+    return moved_any
 end
 
 function inventory.transfer_container_to_player(player, ent)
@@ -172,6 +151,7 @@ function inventory.transfer_container_to_player(player, ent)
         return false
     end
 
+    -- transfer to player
     local moved_any = inventory.transfer_to_player(player, ent, inv)
 
     -- Only containers should be destroyed when emptied
