@@ -34,9 +34,9 @@ local function add_to_carried(bot, name, count)
     if count <= 0 then
         return
     end
-
-    bot.carried_items = bot.carried_items or {}
-    local t = bot.carried_items
+    bot.tasks = bot.tasks or {}
+    bot.tasks.carried_items = bot.tasks.carried_items or {}
+    local t = bot.tasks.carried_items
     t[name] = (t[name] or 0) + count
 end
 
@@ -165,8 +165,8 @@ function collect.update(player, ps, bot)
                                     name = name,
                                     count = take
                                 }
-
                                 if inserted > 0 then
+                                    moved_any = true
                                     if inserted == stack_count then
                                         ent.destroy()
                                     else
@@ -254,7 +254,7 @@ function collect.update(player, ps, bot)
 
     for _, ent in pairs(items) do
         if ent.valid and ent.stack and ent.stack.valid_for_read then
-            local free = get_free_capacity(player, ps)
+            local free = get_free_capacity(player, bot)
             if free <= 0 then
                 -- No more capacity at all; stop picking up.
                 break
@@ -265,7 +265,7 @@ function collect.update(player, ps, bot)
             local take = math.min(stack_count, free)
 
             if take > 0 then
-                add_to_carried(ps, name, take)
+                add_to_carried(bot, name, take)
 
                 if take == stack_count then
                     -- Took it all, remove the entity.

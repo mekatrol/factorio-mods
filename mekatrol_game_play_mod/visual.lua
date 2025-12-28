@@ -292,7 +292,7 @@ function visual.draw_entity_group(player, ps, group_id, name, type, boundary, ce
 
     local name_label = nil
     local type_label = nil
-    local draw_label = false
+    local draw_label = true
 
     if center and draw_label then
         local center_minus = {

@@ -195,6 +195,7 @@ end)
 
 script.on_load(function(_)
     init_modules()
+    register_commands()
 end)
 
 ----------------------------------------------------------------------

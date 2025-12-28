@@ -53,6 +53,10 @@ function constructor_bot.set_bot_task(player, ps, new_task, next_task)
 
     -- set new next_task
     bot.task.next_task = next_task
+
+    if bot.task.current_task == "follow" then
+        bot.task.target_position = nil
+    end
 end
 
 function constructor_bot.update(player, ps, state, visual, tick)
