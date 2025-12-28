@@ -4,6 +4,7 @@ local collect = require("collect")
 local common_bot = require("common_bot")
 local config = require("config")
 local follow = require("follow")
+local module = require("module")
 local move_to = require("move_to")
 local util = require("util")
 
@@ -11,7 +12,7 @@ local BOT_CONF = config.bot
 local BOT_NAME = "logistics"
 
 local BOT_TASKS = {
-    list = {"follow", "collect", "move_to", "pick_up"},
+    list = {"follow", "collect", "move_to", "pickup"},
     index = {}
 }
 
@@ -60,6 +61,19 @@ function logistics_bot.set_bot_task(player, ps, new_task, next_task)
     end
 end
 
+function logistics_bot.queued_task(player, ps)
+    local entity_group = module.get_module("entity_group")
+
+    -- always collect space ship items as a priority
+    local g = entity_group.get_group_entity_name_starts_with(ps, "crash-site-spaceship")
+
+    if g then
+        return "collect", nil
+    end
+
+    return nil, nil
+end
+
 function logistics_bot.update(player, ps, state, visual, tick)
     local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
@@ -76,7 +90,7 @@ function logistics_bot.update(player, ps, state, visual, tick)
         follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
-    elseif bot.task.current_task == "collect" or bot.task.current_task == "pick_up" then
+    elseif bot.task.current_task == "collect" or bot.task.current_task == "pickup" then
         collect.update(player, ps, bot)
     end
 

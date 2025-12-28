@@ -84,99 +84,67 @@ local function find_pickup_entities(player, ps, surface, group)
     return filter_player_and_bots(player, ps, ents)
 end
 
+local function pickup(player, ps, bot)
+    local inventory = module.get_module("inventory")
+    local entity_group = module.get_module("entity_group")
+    local bot_module = module.get_module(bot.name)
+
+    local g = bot.task.pickup_group
+
+    if not g then
+        bot_module.set_bot_task(player, ps, "collect", nil)
+        return
+    end
+
+    local surface = bot.entity.surface
+
+    local ents = find_pickup_entities(player, ps, surface, g)
+
+    local moved_any = false
+
+    for _, ent in pairs(ents) do
+        if ent.type == "item-entity" then
+            if inventory.insert_stack_into_player(player, ent, ent.stack) then
+                moved_any = true
+            end
+        elseif ent.type == "simple-entity-with-owner" then
+            if inventory.mine_to_player(player, ent) then
+                moved_any = true
+            end
+        else
+            if inventory.transfer_container_to_player(player, ent) then
+                moved_any = true
+            end
+        end
+    end
+
+    -- group is finished if there are no items
+    local remaining = find_pickup_entities(player, ps, surface, g)
+    if not remaining or #remaining == 0 then
+        entity_group.remove_group(player, ps, g)
+        bot.task.pickup_group = nil
+        bot_module.set_bot_task(player, ps, "collect", nil)
+        return
+    end
+
+    -- If nothing moved this tick but stuff remains, we’re likely blocked by full inventory.
+    -- Bail out so we don't spin forever.
+    if not moved_any then
+        bot.task.pickup_group = nil
+        bot_module.set_bot_task(player, ps, "collect", nil)
+    end
+end
+
 function collect.update(player, ps, bot)
     if not (bot and bot.entity and bot.entity.valid) then
         return
     end
 
-    local surface = bot.entity.surface
-    if not surface then
-        return false
-    end
-
-    local items = nil
-
-    local inventory = module.get_module("inventory")
     local entity_group = module.get_module("entity_group")
     local bot_module = module.get_module(bot.name)
 
-    if bot.task.current_task == "pick_up" then
-        local g = bot.task.pick_up_group
-
-        if not g then
-            bot_module.set_bot_task(player, ps, "collect", nil)
-            return
-        end
-
-        local ents = find_pickup_entities(player, ps, surface, g)
-        if not ents or #ents == 0 then
-            -- Nothing in the area at all, treat as done
-            entity_group.remove_group(player, ps, g)
-            bot.task.pick_up_group = nil
-            bot_module.set_bot_task(player, ps, "collect", nil)
-            return
-        end
-
-        local moved_any = false
-
-        for _, ent in pairs(ents) do
-            if ent.type == "item-entity" then
-                if inventory.insert_stack_into_player(player, ent, ent.stack) then
-                    moved_any = true
-                end
-            elseif ent.type == "simple-entity-with-owner" then
-                if inventory.mine_to_player(player, ent) then
-                    moved_any = true
-                end
-            else
-                if inventory.transfer_container_to_player(player, ent) then
-                    moved_any = true
-                end
-            end
-        end
-
-        -- Determine whether the group is finished:
-        -- finished if there are no ground items and no non-empty containers left nearby.
-        local remaining = find_pickup_entities(player, ps, surface, g)
-        local any_left = false
-
-        if remaining and #remaining > 0 then
-            for _, ent in pairs(remaining) do
-                if ent.valid then
-                    if ent.type == "item-entity" then
-                        -- any ground item left means not finished
-                        any_left = true
-                        break
-                    elseif ent.type == "simple-entity-with-owner" then
-                        if ent.valid and ent.minable then
-                            any_left = true
-                        end
-                    else
-                        -- check if it has any chest inventory with something inside
-                        local inv = ent.get_inventory(defines.inventory.chest)
-                        if inv and not inv.is_empty() then
-                            any_left = true
-                            break
-                        end
-                    end
-                end
-            end
-        end
-
-        if not any_left then
-            entity_group.remove_group(player, ps, g)
-            bot.task.pick_up_group = nil
-            bot_module.set_bot_task(player, ps, "collect", nil)
-            return
-        end
-
-        -- If nothing moved this tick but stuff remains, we’re likely blocked by full inventory.
-        -- Bail out so we don't spin forever.
-        if not moved_any then
-            bot.task.pick_up_group = nil
-            bot_module.set_bot_task(player, ps, "collect", nil)
-        end
-
+    if bot.task.current_task == "pickup" then
+        pickup(player, ps, bot)
         return
     end
 
@@ -185,63 +153,12 @@ function collect.update(player, ps, bot)
 
     if g then
         bot.task.target_position = g.center
-        bot.task.pick_up_group = g
-        bot_module.set_bot_task(player, ps, "move_to", "pick_up")
+        bot.task.pickup_group = g
+        bot_module.set_bot_task(player, ps, "move_to", "pickup")
         return
     end
 
-    if not items then
-        items = surface.find_entities_filtered {
-            position = bot.entity.position,
-            radius = 1.0,
-            type = "item-entity"
-        }
-
-        items = filter_player_and_bots(player, ps, items)
-    end
-
-    if not items or #items == 0 then
-        -- return to follow and then try collecting again
-        -- bot_module.set_bot_task(player, ps, "follow", nil)
-        return
-    end
-
-    local picked_any = false
-
-    for _, ent in pairs(items) do
-        if ent.valid and ent.stack and ent.stack.valid_for_read then
-            local free = get_free_capacity(player, bot)
-            if free <= 0 then
-                -- No more capacity at all; stop picking up.
-                break
-            end
-
-            local name = ent.stack.name
-            local stack_count = ent.stack.count
-            local take = math.min(stack_count, free)
-
-            if take > 0 then
-                add_to_carried(bot, name, take)
-
-                if take == stack_count then
-                    -- Took it all, remove the entity.
-                    ent.destroy()
-                else
-                    -- Partially consume this ground stack.
-                    ent.stack.count = stack_count - take
-                end
-
-                picked_any = true
-            end
-        end
-    end
-
-    if picked_any then
-        local total = get_total_carried(player, bot)
-        if total > 0 and (bot.task.current_task == "idle") then
-            bot_module.set_bot_task(player, ps, "pickup", nil)
-        end
-    end
+    bot_module.set_bot_task(player, ps, "follow", nil)
 end
 
 return collect

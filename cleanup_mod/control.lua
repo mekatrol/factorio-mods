@@ -465,7 +465,7 @@ end
 
 -- Pick up all item entities within a small radius around the bot.
 -- Returns true if at least one item was picked up.
-local function pick_up_nearby_items(player, bot, pdata)
+local function pickup_nearby_items(player, bot, pdata)
     if not (bot and bot.valid) then
         return false
     end
@@ -600,7 +600,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     ------------------------------------------------------------------
     -- Look for items near the bot and pick them up.
     ------------------------------------------------------------------
-    pick_up_nearby_items(player, bot, pdata)
+    pickup_nearby_items(player, bot, pdata)
 
     ------------------------------------------------------------------
     -- Decide what we are trying to do next:

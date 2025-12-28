@@ -16,6 +16,18 @@ function follow.update(player, ps, state, bot, y_offset)
         return
     end
 
+    local bot_module = module.get_module(bot.name)
+
+    -- does the bot have another queued task
+    if bot_module.queued_task then
+        local queued_new_task, queued_next_task = bot_module.queued_task(player, ps, bot)
+
+        if queued_new_task then
+            bot_module.set_bot_task(player, ps, queued_new_task, queued_next_task)
+            return
+        end
+    end
+
     local ppos = player.position
     local bpos = bot.entity.position
 
@@ -63,7 +75,6 @@ function follow.update(player, ps, state, bot, y_offset)
     positioning.move_entity_towards(player, bot.entity, target_pos)
 
     if bot.task.next_task then
-        local bot_module = module.get_module(bot.name)
         bot_module.set_bot_task(player, ps, bot.task.next_task, nil)
     end
 end
