@@ -193,6 +193,10 @@ script.on_configuration_changed(function(_)
     register_commands()
 end)
 
+script.on_load(function(_)
+    init_modules()
+end)
+
 ----------------------------------------------------------------------
 -- Event registration
 ----------------------------------------------------------------------
