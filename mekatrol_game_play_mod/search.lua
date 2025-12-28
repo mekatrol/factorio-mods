@@ -177,7 +177,7 @@ function search.update(player, ps, state, bot)
 
             -- switch to move_to task
             local bot_module = module.get_module(bot.name)
-            bot_module.set_bot_task(player, ps, "move_to", bot.task.next_task)
+            bot_module.set_bot_task(player, ps, "move_to", bot.task.next_task, bot.task.args)
 
             -- reset search spiral so searching restarts cleanly after
             bot.task.search_spiral = nil

@@ -244,7 +244,7 @@ end
 
 local function switch_to_next_task(player, ps, state, bot)
     local bot_module = module.get_module(bot.name)
-    bot_module.set_bot_task(player, ps, bot.task.next_task or "search", nil)
+    bot_module.set_bot_task(player, ps, bot.task.next_task or "search", nil, bot.task.args)
     bot.task.target_position = nil
     bot.task.survey_trace = nil
     bot.task.survey_entity = nil

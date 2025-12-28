@@ -83,7 +83,7 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
     bot.task.next_task = next_task
 
     -- set args
-    bot.task.args = util.parse_kv_list(args) or {}
+    bot.task.args = args or bot.task.args or {}
 end
 
 function mapper_bot.toggle_task(player, ps)
@@ -97,7 +97,7 @@ function mapper_bot.toggle_task(player, ps)
         new_task = "follow"
     end
 
-    mapper_bot.set_bot_task(player, ps, new_task, nil)
+    mapper_bot.set_bot_task(player, ps, new_task, nil, bot.task.args)
 end
 
 function mapper_bot.get_queued_task(player, ps)

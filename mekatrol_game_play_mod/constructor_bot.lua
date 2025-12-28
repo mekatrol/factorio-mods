@@ -58,8 +58,8 @@ function constructor_bot.set_bot_task(player, ps, new_task, next_task, args)
         bot.task.target_position = nil
     end
 
-    -- set args
-    bot.task.args = util.parse_kv_list(args) or {}
+    -- set args (use new args, or existing args or default args)
+    bot.task.args = args or bot.task.args or {}
 end
 
 function constructor_bot.get_queued_task(player, ps)

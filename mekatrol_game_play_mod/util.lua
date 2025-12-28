@@ -29,21 +29,28 @@ function util.hash_combine(h, v)
 end
 
 function util.parse_kv_list(args)
-    -- Supports: "coal=500 iron-plate=200" (space-separated)
-    local out = {}
+    local kv_args = {}
 
-    if not args or args == "" then
-        return out
-    end
+    args = tostring(args or "")
 
-    for token in string.gmatch(args, "%S+") do
+    -- Accept either whitespace or commas as separators: "coal=500,iron-plate=200"
+    for token in string.gmatch(args, "[^%s,;]+") do
         local name, count_s = string.match(token, "^([^=]+)=(%d+)$")
-        if name and count_s then
-            out[name] = tonumber(count_s)
+
+        if name and count_s then            
+            kv_args[name] = tonumber(count_s)
         end
     end
 
-    return out
+    return kv_args
+end
+
+function util.table_size(t)
+    local n = 0
+    for _ in pairs(t) do
+        n = n + 1
+    end
+    return n
 end
 
 return util

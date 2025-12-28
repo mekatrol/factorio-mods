@@ -92,7 +92,7 @@ local function set_bot_state(player, bot_name, new_task, args)
         util.print(player, "red", "bot not enabled")
         return
     end
-    
+
     common_bot.issue_task(player, ps, bot_name, new_task, nil, args)
 end
 
@@ -106,7 +106,7 @@ local function command(cmd)
 
     -- Allow: "<bot> <task> [args...]"
     local bot_name, task, args = string.match(p, "^(%S+)%s+(%S+)%s*(.*)$")
-    
+
     if not bot_name then
         util.print(player, "yellow", "Usage: /b <c|l|m|r> <task> [args]")
         return
@@ -115,8 +115,13 @@ local function command(cmd)
     -- Normalize short task names, if you use them
     bot_name = full_bot_name(bot_name)
 
+    local kv_args = {}
+    if args then
+        kv_args = util.parse_kv_list(args)
+    end
+
     -- Default behavior: /b <name> <task> <args>
-    set_bot_state(player, bot_name, task, args)
+    set_bot_state(player, bot_name, task, kv_args)
 end
 
 local function register_commands()
@@ -233,8 +238,8 @@ script.on_event(defines.events.on_player_removed, on_player_removed)
 ----------------------------------------------------------------------
 
 local function get_tasks(player, ps, bot_name)
-    local current_task, next_task = common_bot.get_tasks(player, ps, state, visual, bot_name)
-    local line = string.format("%s: %s→%s", bot_name, current_task or "nil", next_task or "nil")
+    local current_task, next_task, other = common_bot.get_tasks(player, ps, state, visual, bot_name)
+    local line = string.format("%s: %s→%s%s", bot_name, current_task or "nil", next_task or "nil", other or "")
     return line
 end
 

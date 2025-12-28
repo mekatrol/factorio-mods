@@ -18,7 +18,12 @@ function common_bot.get_tasks(player, ps, state, visual, bot_name)
         return nil, nil
     end
 
-    return bot.task.current_task, bot.task.next_task
+    local other = nil
+    if bot_name == "logistics" and bot.task.pickup_name then
+        other = string.format(" [%s: %s]", bot.task.pickup_name, bot.task.pickup_remaining)
+    end
+
+    return bot.task.current_task, bot.task.next_task, other
 end
 
 function common_bot.init_state(player, ps, bot_name, init_task)
@@ -130,8 +135,6 @@ local function issue_task(player, ps, bot_name, new_task, next_task, args)
         util.print(player, "red", "bot module not found for bot name: %s", bot_name)
         return
     end
-
-    util.print(player, "red", "args: %s", args)
 
     bot_module.set_bot_task(player, ps, new_task, next_task, args)
 end

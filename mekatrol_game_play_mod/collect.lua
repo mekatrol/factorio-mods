@@ -92,7 +92,7 @@ local function pickup(player, ps, bot)
     local g = bot.task.pickup_group
 
     if not g then
-        bot_module.set_bot_task(player, ps, "collect", nil)
+        bot_module.set_bot_task(player, ps, "collect", nil, bot.task.args)
         return
     end
 
@@ -123,7 +123,7 @@ local function pickup(player, ps, bot)
     if not remaining or #remaining == 0 then
         entity_group.remove_group(player, ps, g)
         bot.task.pickup_group = nil
-        bot_module.set_bot_task(player, ps, "collect", nil)
+        bot_module.set_bot_task(player, ps, "collect", nil, bot.task.args)
         return
     end
 
@@ -131,8 +131,30 @@ local function pickup(player, ps, bot)
     -- Bail out so we don't spin forever.
     if not moved_any then
         bot.task.pickup_group = nil
-        bot_module.set_bot_task(player, ps, "collect", nil)
+        bot_module.set_bot_task(player, ps, "collect", nil, bot.task.args)
     end
+end
+
+function collect.try_pickup_item(player, ps, bot, name, count)
+    local entity_group = module.get_module("entity_group")
+    local bot_module = module.get_module(bot.name)
+
+    -- always collect space ship items as a priority
+    local g = entity_group.get_group_entity_name_starts_with(ps, name)
+
+    if g then
+        bot.task.target_position = g.center
+        bot.task.pickup_group = g
+        bot.task.pickup_name = name
+        bot.task.pickup_remaining = count
+        bot_module.set_bot_task(player, ps, "move_to", "pickup", bot.task.args)
+        return true
+    end
+
+    bot.task.pickup_name = name
+    bot.task.pickup_remaining = count
+
+    return false
 end
 
 function collect.update(player, ps, bot)
@@ -143,11 +165,15 @@ function collect.update(player, ps, bot)
     local entity_group = module.get_module("entity_group")
     local bot_module = module.get_module(bot.name)
 
-    if bot.task.args then
-        for name, count in pairs(bot.task.args) do
-            if name == "coal" and count > 0 then
-                util.print(player, "yellow", "logistics bot arg: %s=%s", name, count)
-            end
+    if util.table_size(bot.task.args) > 0 then
+        -- get first arg
+        local name, count = next(bot.task.args)
+
+        -- remove it from the table
+        bot.task.args[name] = nil
+
+        if collect.try_pickup_item(player, ps, bot, name, count) then
+            return
         end
     end
 
@@ -156,17 +182,19 @@ function collect.update(player, ps, bot)
         return
     end
 
-    -- always collect space ship items as a priority
-    local g = entity_group.get_group_entity_name_starts_with(ps, "crash-site-spaceship")
+    if not bot.task.pickup_name then
+        return
+    end
+
+    -- always collect space ship items as a priority ("crash-site-spaceship")
+    local g = entity_group.get_group_entity_name_starts_with(ps, bot.task.pickup_name)
 
     if g then
         bot.task.target_position = g.center
         bot.task.pickup_group = g
-        bot_module.set_bot_task(player, ps, "move_to", "pickup")
+        bot_module.set_bot_task(player, ps, "move_to", "pickup", bot.task.args)
         return
     end
-
-    bot_module.set_bot_task(player, ps, "follow", nil)
 end
 
 return collect

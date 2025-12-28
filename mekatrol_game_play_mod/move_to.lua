@@ -28,7 +28,7 @@ function move_to.update(player, ps, bot)
             task = "follow"
         end
 
-        bot_module.set_bot_task(player, ps, task, nil)
+        bot_module.set_bot_task(player, ps, task, nil, bot.task.args)
         return
     end
 
@@ -43,7 +43,7 @@ function move_to.update(player, ps, bot)
     -- reached target, if so move to next task
     if dx * dx + dy * dy <= step * step then
         local new_task = bot.task.next_task or "follow"
-        bot_module.set_bot_task(player, ps, new_task, nil)
+        bot_module.set_bot_task(player, ps, new_task, nil, bot.task.args)
     end
 end
 

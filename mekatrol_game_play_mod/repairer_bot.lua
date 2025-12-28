@@ -59,7 +59,7 @@ function repairer_bot.set_bot_task(player, ps, new_task, next_task, args)
     end
 
     -- set args
-    bot.task.args = util.parse_kv_list(args) or {}
+    bot.task.args = args or bot.task.args or {}
 end
 
 function repairer_bot.get_queued_task(player, ps)

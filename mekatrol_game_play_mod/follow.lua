@@ -23,7 +23,7 @@ function follow.update(player, ps, state, bot, y_offset)
         local queued_new_task, queued_next_task = bot_module.get_queued_task(player, ps, bot)
 
         if queued_new_task then
-            bot_module.set_bot_task(player, ps, queued_new_task, queued_next_task)
+            bot_module.set_bot_task(player, ps, queued_new_task, queued_next_task, bot.task.args)
             return
         end
     end
@@ -75,7 +75,7 @@ function follow.update(player, ps, state, bot, y_offset)
     positioning.move_entity_towards(player, bot.entity, target_pos)
 
     if bot.task.next_task then
-        bot_module.set_bot_task(player, ps, bot.task.next_task, nil)
+        bot_module.set_bot_task(player, ps, bot.task.next_task, nil, bot.task.args)
     end
 end
 

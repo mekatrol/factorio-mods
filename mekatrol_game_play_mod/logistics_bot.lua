@@ -32,6 +32,12 @@ end
 
 function logistics_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME, "collect")
+
+    local bot = ps.bots[BOT_NAME]
+
+    bot.task.pickup_group = bot.task.pickup_group or nil
+    bot.task.pickup_name = bot.task.pickup_name or nil
+    bot.task.pickup_remaining = bot.task.pickup_remaining or 0
 end
 
 function logistics_bot.destroy_state(player, ps)
@@ -61,19 +67,10 @@ function logistics_bot.set_bot_task(player, ps, new_task, next_task, args)
     end
 
     -- set args
-    bot.task.args = util.parse_kv_list(args) or {}
+    bot.task.args = args or bot.task.args or {}
 end
 
 function logistics_bot.get_queued_task(player, ps)
-    local entity_group = module.get_module("entity_group")
-
-    -- always collect space ship items as a priority
-    local g = entity_group.get_group_entity_name_starts_with(ps, "crash-site-spaceship")
-
-    if g then
-        return "collect", nil
-    end
-
     return nil, nil
 end
 
