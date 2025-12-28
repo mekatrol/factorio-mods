@@ -120,107 +120,103 @@ function collect.update(player, ps, bot)
         local moved_any = false
 
         for _, ent in pairs(ents) do
-            if ent.valid then
-                if ent.type == "item-entity" then
-                    local stack = ent.stack
+            if ent.type == "item-entity" then
+                local stack = ent.stack
 
-                    util.print(player, "yellow", "item-entity: %s (%s)", stack.name, stack.count)
+                if stack and stack.valid_for_read then
+                    -- Cache for debugging (safe even if stack becomes invalid later)
+                    local name = stack.name
+                    local before_count = stack.count
 
-                    if stack and stack.valid_for_read then
-                        -- Cache for debugging (safe even if stack becomes invalid later)
-                        local name = stack.name
-                        local before_count = stack.count
+                    util.print(player, "red", "ground (before): %s (%s)", name, before_count)
 
-                        util.print(player, "red", "ground (before): %s (%s)", name, before_count)
+                    local inv = player.get_main_inventory()
+                    if inv then
+                        local free = inv.get_insertable_count(name)
 
-                        local inv = player.get_main_inventory()
-                        if inv then
-                            local free = inv.get_insertable_count(name)
+                        if free > 0 then
+                            local take = math.min(before_count, free)
+                            local inserted = inv.insert {
+                                name = name,
+                                count = take
+                            }
 
-                            if free > 0 then
-                                local take = math.min(before_count, free)
-                                local inserted = inv.insert {
-                                    name = name,
-                                    count = take
-                                }
+                            if inserted > 0 then
+                                moved_any = true
 
-                                if inserted > 0 then
-                                    moved_any = true
-
-                                    if inserted == before_count then
-                                        -- ent/stack becomes invalid after destroy; only use cached values
-                                        util.print(player, "red", "ground (moved all): %s (%s)", name, inserted)
-                                        ent.destroy()
-                                    else
-                                        local after_count = before_count - inserted
-                                        stack.count = after_count -- may still be valid-for-read (non-zero)
-
-                                        util.print(player, "red", "ground (moved): %s moved (%s) left (%s)", name,
-                                            inserted, after_count)
-                                    end
+                                if inserted == before_count then
+                                    -- ent/stack becomes invalid after destroy; only use cached values
+                                    util.print(player, "red", "ground (moved all): %s (%s)", name, inserted)
+                                    ent.destroy()
                                 else
-                                    util.print(player, "red", "ground (no insert): %s free (%s)", name, free)
+                                    local after_count = before_count - inserted
+                                    stack.count = after_count -- may still be valid-for-read (non-zero)
+
+                                    util.print(player, "red", "ground (moved): %s moved (%s) left (%s)", name, inserted,
+                                        after_count)
                                 end
                             else
-                                util.print(player, "red", "ground (no space): %s (%s)", name, before_count)
+                                util.print(player, "red", "ground (no insert): %s free (%s)", name, free)
                             end
+                        else
+                            util.print(player, "red", "ground (no space): %s (%s)", name, before_count)
                         end
                     end
-                elseif ent.type == "simple-entity-with-owner" then
-                    if ent.valid and ent.minable then
-                        local tmp = game.create_inventory(1)
+                end
+            elseif ent.type == "simple-entity-with-owner" then
+                if ent.valid and ent.minable then
+                    local tmp = game.create_inventory(1)
 
-                        local ok = ent.mine {
-                            inventory = tmp
-                        }
+                    local ok = ent.mine {
+                        inventory = tmp
+                    }
 
-                        if ok then
-                            moved_any = true
+                    if ok then
+                        moved_any = true
 
-                            local player_inv = player.get_main_inventory()
+                        local player_inv = player.get_main_inventory()
 
-                            if player_inv then
-                                for i = 1, #tmp do
-                                    local s = tmp[i]
-                                    if s and s.valid_for_read then
-                                        local name = s.name
-                                        local count = s.count
-                                        local inserted = player_inv.insert {
+                        if player_inv then
+                            for i = 1, #tmp do
+                                local s = tmp[i]
+                                if s and s.valid_for_read then
+                                    local name = s.name
+                                    local count = s.count
+                                    local inserted = player_inv.insert {
+                                        name = name,
+                                        count = count
+                                    }
+
+                                    util.print(player, "red", "mined: %s (%s) inserted (%s)", name, count, inserted)
+
+                                    if inserted > 0 then
+                                        s.count = s.count - inserted
+                                    end
+
+                                    -- If player inventory is full, spill the remainder to ground
+                                    if s.valid_for_read and s.count > 0 then
+                                        ent.surface.spill_item_stack(ent.position, {
                                             name = name,
-                                            count = count
-                                        }
-
-                                        util.print(player, "red", "mined: %s (%s) inserted (%s)", name, count, inserted)
-
-                                        if inserted > 0 then
-                                            s.count = s.count - inserted
-                                        end
-
-                                        -- If player inventory is full, spill the remainder to ground
-                                        if s.valid_for_read and s.count > 0 then
-                                            ent.surface.spill_item_stack(ent.position, {
-                                                name = name,
-                                                count = s.count
-                                            }, true, nil, false)
-                                            s.clear()
-                                        end
+                                            count = s.count
+                                        }, true, nil, false)
+                                        s.clear()
                                     end
                                 end
                             end
-                        else
-                            util.print(player, "red", "mine failed: %s (%s)", ent.name, ent.type)
                         end
-
-                        tmp.destroy()
                     else
-                        util.print(player, "red", "not minable: %s (%s)", ent.name, ent.type)
+                        util.print(player, "red", "mine failed: %s (%s)", ent.name, ent.type)
                     end
 
-                    ::continue::
+                    tmp.destroy()
                 else
-                    if inventory.transfer_container_to_player(player, ent) then
-                        moved_any = true
-                    end
+                    util.print(player, "red", "not minable: %s (%s)", ent.name, ent.type)
+                end
+
+                ::continue::
+            else
+                if inventory.transfer_container_to_player(player, ent) then
+                    moved_any = true
                 end
             end
         end

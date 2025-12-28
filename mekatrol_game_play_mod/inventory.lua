@@ -15,23 +15,6 @@ local function insert_into_player(player, name, count)
     }
 end
 
-local function insert_stack_into_player(player, stack)
-    if not (stack and stack.valid_for_read) then
-        return 0
-    end
-
-    local inv = player.get_main_inventory()
-
-    if not inv then
-        return 0
-    end
-
-    return inv.insert {
-        name = stack.name,
-        count = stack.count
-    }
-end
-
 function inventory.get_list(player)
     local lines = {}
 
@@ -72,6 +55,54 @@ function inventory.get_player_main_inventory(player)
     return nil
 end
 
+function inventory.insert_stack_into_player(player, stack, ent)
+    if not (stack and stack.valid_for_read) then
+        return 0
+    end
+
+    local inv = player.get_main_inventory()
+    if not inv then
+        return 0
+    end
+
+    local name = stack.name
+    local count = stack.count
+
+    local inserted = inv.insert {
+        name = name,
+        count = count
+    }
+    local remainder = count - inserted
+
+    -- Remove what we inserted from the source stack (may invalidate it if it hits 0)
+    if inserted > 0 and stack.valid_for_read then
+        stack.count = remainder
+    end
+
+    -- If player inventory is full, spill the remainder to ground
+    if remainder > 0 and ent and ent.valid then
+        ent.surface.spill_item_stack {
+            position = ent.position,
+            stack = {
+                name = name,
+                count = remainder
+            },
+            enable_looted = true
+        }
+
+        -- Clear the source stack if it still exists
+        if stack.valid_for_read then
+            stack.clear()
+        end
+    end
+
+    return inserted
+end
+
+function inventory.transfer_stack_to_player(player, stack, stack)
+    
+end
+
 function inventory.transfer_container_to_player(player, ent)
     local inv = ent.get_inventory(defines.inventory.chest)
 
@@ -83,23 +114,11 @@ function inventory.transfer_container_to_player(player, ent)
     local moved_any = false
 
     for i = 1, #inv do
-        local s = inv[i]
-        if s and s.valid_for_read then
-            local name = s.name
-            local before_count = s.count
+        local stack = inv[i]
+        if stack and stack.valid_for_read then
+            local inserted = inventory.insert_stack_into_player(player, stack, ent)
 
-            util.print(player, "red", "inventory (before): %s (%s)", name, before_count)
-
-            local inserted = insert_stack_into_player(player, s)
             if inserted > 0 then
-                local after_count = before_count - inserted
-
-                -- Update the chest stack first (this can make s invalid_for_read if it becomes 0)
-                s.count = after_count
-
-                -- Print using cached values (never touch s.* here)
-                util.print(player, "red", "inventory (after): %s (%s) moved (%s)", name, after_count, inserted)
-
                 moved_any = true
             end
         end
