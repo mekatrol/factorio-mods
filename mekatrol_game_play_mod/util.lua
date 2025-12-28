@@ -37,7 +37,7 @@ function util.parse_kv_list(args)
     for token in string.gmatch(args, "[^%s,;]+") do
         local name, count_s = string.match(token, "^([^=]+)=(%d+)$")
 
-        if name and count_s then            
+        if name and count_s then
             kv_args[name] = tonumber(count_s)
         end
     end
@@ -46,11 +46,22 @@ function util.parse_kv_list(args)
 end
 
 function util.table_size(t)
-    local n = 0
-    for _ in pairs(t) do
-        n = n + 1
+    if type(t) ~= "table" then
+        return 0
     end
-    return n
+
+    -- If it looks like an array, use length operator
+    local n = #t
+    if n > 0 then
+        return n
+    end
+
+    -- Otherwise count keys (map-style table)
+    local count = 0
+    for _ in pairs(t) do
+        count = count + 1
+    end
+    return count
 end
 
 return util

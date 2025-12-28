@@ -107,8 +107,15 @@ local function pickup(player, ps, bot)
             if inventory.insert_stack_into_player(player, ent, ent.stack) then
                 moved_any = true
             end
-        elseif ent.type == "simple-entity-with-owner" or ent.type == "resource" then
+        elseif ent.type == "simple-entity-with-owner" then
             if inventory.mine_to_player(player, ent) then
+                moved_any = true
+            end
+        elseif ent.type == "resource" then
+            local mined = inventory.harvest_resource_to_player(player, ent, bot.task.pickup_remaining or 1)
+
+            if mined > 0 then
+                bot.task.pickup_remaining = bot.task.pickup_remaining - mined
                 moved_any = true
             end
         else
@@ -116,6 +123,13 @@ local function pickup(player, ps, bot)
                 moved_any = true
             end
         end
+    end
+
+    if bot.task.pickup_remaining <= 0 then
+        bot.task.pickup_group = nil
+        bot.task.pickup_name = nil
+        bot.task.pickup_remaining = 0
+        moved_any = false
     end
 
     -- group is finished if there are no items

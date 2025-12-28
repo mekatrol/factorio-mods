@@ -102,6 +102,9 @@ end
 function inventory.transfer_to_player(player, ent, inv)
     local moved_any = false
 
+    local inv_count = util.table_size(inv)
+    util.print(player, "red", "inv count: %s", inv_count)
+
     for i = 1, #inv do
         local stack = inv[i]
         if stack and stack.valid_for_read then
@@ -116,7 +119,73 @@ function inventory.transfer_to_player(player, ent, inv)
     return moved_any
 end
 
-function inventory.mine_to_player(player, ent)
+function inventory.harvest_resource_to_player(player, ent, requested_amount)
+    if not (player and player.valid) then
+        return 0
+    end
+
+    if not (ent and ent.valid) then
+        return 0
+    end
+
+    if ent.type ~= "resource" then
+        return 0
+    end
+
+    if not ent.amount or ent.amount <= 0 then
+        return 0
+    end
+
+    local mineable = ent.prototype and ent.prototype.mineable_properties
+    local products = mineable and mineable.products
+    local first = products and products[1]
+    local item_name = first and first.name
+    
+    if not item_name then
+        util.print(player, "red", "resource has no mineable product: %s", ent.name)
+        return 0
+    end
+
+    local want = requested_amount or 1
+    if want < 1 then
+        want = 1
+    end
+
+    local mined_units = math.min(want, ent.amount)
+
+    local inv = player.get_main_inventory()
+    if not inv then
+        return 0
+    end
+
+    local inserted = inv.insert {
+        name = item_name,
+        count = mined_units
+    }
+    
+    local remainder = mined_units - inserted
+
+    if remainder > 0 then
+        ent.surface.spill_item_stack {
+            position = ent.position,
+            stack = {
+                name = item_name,
+                count = remainder
+            },
+            enable_looted = true
+        }
+    end
+
+    -- reduce the resource amount by what we actually produced (inserted + spilled)
+    ent.amount = ent.amount - mined_units
+    if ent.amount <= 0 and ent.valid then
+        ent.deplete()
+    end
+
+    return mined_units
+end
+
+function inventory.mine_to_player(player, ent, mine_amount)
     -- entity must be minable
     if not (ent and ent.valid and ent.minable) then
         return false
@@ -125,10 +194,16 @@ function inventory.mine_to_player(player, ent)
     -- Create a temporary script inventory
     local inv = game.create_inventory(32)
 
+    -- Mine at least 1 unit (or more, if you want)
+    local amount = math.min(mine_amount or 1, ent.amount or 1)
+
     -- Mine into script inventory (does NOT require player proximity)
     local ok = ent.mine {
-        inventory = inv
+        inventory = inv,
+        count = amount
     }
+
+    util.print(player, "red", "ent.mine: %s", ok)
 
     if not ok then
         inv.destroy()
