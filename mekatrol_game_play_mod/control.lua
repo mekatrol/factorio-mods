@@ -2,6 +2,7 @@ local common_bot = require("common_bot")
 local config = require("config")
 local entity_group = require("entity_group")
 local follow = require("follow")
+local inventory = require("inventory")
 local module = require("module")
 local move_to = require("move_to")
 local polygon = require("polygon")
@@ -29,7 +30,8 @@ local function init_modules()
         mapper_bot = mapper_bot,
         repairer_bot = repairer_bot,
         entity_group = entity_group,
-        visual = visual
+        visual = visual,
+        inventory = inventory
     })
 end
 
@@ -262,6 +264,12 @@ script.on_event(defines.events.on_tick, function(event)
         overlay_lines[#overlay_lines + 1] = repairer_current_task_line
     else
         overlay_lines[#overlay_lines + 1] = "bot is currently disabled"
+    end
+
+    local lines = inventory.get_list(player)
+
+    for _, line in ipairs(lines) do
+        overlay_lines[#overlay_lines + 1] = line
     end
 
     -------------------------------------------------------------------------------

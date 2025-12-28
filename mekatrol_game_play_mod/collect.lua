@@ -77,6 +77,7 @@ local function insert_stack_into_player(player, stack)
     end
 
     local inv = player.get_main_inventory()
+
     if not inv then
         return 0
     end

@@ -8,6 +8,7 @@ local key_for = {
     mapper = "mapper_bot",
     repairer = "repairer_bot",
     entity_group = "entity_group",
+    inventory = "inventory",
     visual = "visual"
 }
 
