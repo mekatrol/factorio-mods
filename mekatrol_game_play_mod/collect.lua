@@ -40,22 +40,7 @@ local function add_to_carried(bot, name, count)
     t[name] = (t[name] or 0) + count
 end
 
-local function find_pickup_entities(player, ps, surface, group)
-    local ents
-
-    if group.bounding_box then
-        ents = surface.find_entities_filtered {
-            area = group.bounding_box,
-            name = group.name
-        }
-    else
-        ents = surface.find_entities_filtered {
-            position = group.center,
-            name = group.name,
-            radius = 2.0
-        }
-    end
-
+local function filter_player_and_bots(player, ps, ents)
     -- Filter player character safely
     local character = nil
     if player and player.valid then
@@ -78,6 +63,25 @@ local function find_pickup_entities(player, ps, surface, group)
     end
 
     return ents
+end
+
+local function find_pickup_entities(player, ps, surface, group)
+    local ents
+
+    if group.bounding_box then
+        ents = surface.find_entities_filtered {
+            area = group.bounding_box,
+            name = group.name
+        }
+    else
+        ents = surface.find_entities_filtered {
+            position = group.center,
+            name = group.name,
+            radius = 2.0
+        }
+    end
+
+    return filter_player_and_bots(player, ps, ents)
 end
 
 function collect.update(player, ps, bot)
@@ -282,6 +286,8 @@ function collect.update(player, ps, bot)
             radius = 1.0,
             type = "item-entity"
         }
+
+        items = filter_player_and_bots(player, ps, items)
     end
 
     if not items or #items == 0 then
