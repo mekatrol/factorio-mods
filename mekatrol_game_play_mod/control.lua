@@ -91,24 +91,31 @@ local function set_bot_state(player, bot_name, new_task)
     common_bot.issue_task(player, ps, bot_name, new_task)
 end
 
+local function command(cmd)
+    local player = game.get_player(cmd.player_index)
+    if not (player and player.valid) then
+        return
+    end
+
+    local p = cmd.parameter or ""
+    local bot_name, task = string.match(p, "^(%S+)%s+(%S+)$")
+    if not bot_name then
+        util.print(player, "yellow", "Usage: /bot <name> <task>")
+        return
+    end
+
+    set_bot_state(player, bot_name, task)
+end
+
 local function register_commands()
     -- a generic command: /bot <name> <task>
     if not commands.commands["bot"] then
-        commands.add_command("bot", "Usage: /bot <constructor|logistics|mapper|repairer> <task>", function(cmd)
-            local player = game.get_player(cmd.player_index)
-            if not (player and player.valid) then
-                return
-            end
+        commands.add_command("bot", "Usage: /bot <constructor|logistics|mapper|repairer> <task>", command)
+    end
 
-            local p = cmd.parameter or ""
-            local bot_name, task = string.match(p, "^(%S+)%s+(%S+)$")
-            if not bot_name then
-                util.print(player, "yellow", "Usage: /bot <name> <task>")
-                return
-            end
-
-            set_bot_state(player, bot_name, task)
-        end)
+    -- a generic command: /b <name> <task>
+    if not commands.commands["b"] then
+        commands.add_command("b", "Usage: /b <c|l|m|r> <task>", command)
     end
 end
 
