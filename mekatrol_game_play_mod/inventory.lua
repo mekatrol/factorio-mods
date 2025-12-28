@@ -99,18 +99,7 @@ function inventory.insert_stack_into_player(player, stack, ent)
     return inserted
 end
 
-function inventory.transfer_stack_to_player(player, stack, stack)
-    
-end
-
-function inventory.transfer_container_to_player(player, ent)
-    local inv = ent.get_inventory(defines.inventory.chest)
-
-    if not inv then
-        util.print(player, "red", "no chest inventory: name=%s type=%s", ent.name, ent.type)
-        return false
-    end
-
+function inventory.transfer_to_player(player, ent, inv)
     local moved_any = false
 
     for i = 1, #inv do
@@ -124,10 +113,52 @@ function inventory.transfer_container_to_player(player, ent)
         end
     end
 
-    -- Optional: destroy if empty
+    -- destroy the created inventory
+    inv.destroy()
+
+    -- destroy if empty
     if moved_any and inv.is_empty() and ent.valid then
         ent.destroy()
     end
+
+    return moved_any
+end
+
+function inventory.mine_to_player(player, ent)
+    -- entity must be minable
+    if not (ent.valid and ent.minable) then
+        return
+    end
+
+    local inv = game.create_inventory(1)
+
+    local ok = ent.mine {
+        inventory = inv
+    }
+
+    if not ok then
+        return
+    end
+
+    -- transfer to player
+    local moved_any = inventory.transfer_to_player(player, ent, inv)
+
+    -- destroy the created inventory
+    inv.destroy()
+
+    return moved_any
+end
+
+function inventory.transfer_container_to_player(player, ent)
+    local inv = ent.get_inventory(defines.inventory.chest)
+
+    if not inv then
+        util.print(player, "red", "no chest inventory: name=%s type=%s", ent.name, ent.type)
+        return false
+    end
+
+    -- transfer to player
+    local moved_any = inventory.transfer_to_player(player, ent, inv)
 
     return moved_any
 end

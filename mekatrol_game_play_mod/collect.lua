@@ -164,56 +164,7 @@ function collect.update(player, ps, bot)
                     end
                 end
             elseif ent.type == "simple-entity-with-owner" then
-                if ent.valid and ent.minable then
-                    local tmp = game.create_inventory(1)
-
-                    local ok = ent.mine {
-                        inventory = tmp
-                    }
-
-                    if ok then
-                        moved_any = true
-
-                        local player_inv = player.get_main_inventory()
-
-                        if player_inv then
-                            for i = 1, #tmp do
-                                local s = tmp[i]
-                                if s and s.valid_for_read then
-                                    local name = s.name
-                                    local count = s.count
-                                    local inserted = player_inv.insert {
-                                        name = name,
-                                        count = count
-                                    }
-
-                                    util.print(player, "red", "mined: %s (%s) inserted (%s)", name, count, inserted)
-
-                                    if inserted > 0 then
-                                        s.count = s.count - inserted
-                                    end
-
-                                    -- If player inventory is full, spill the remainder to ground
-                                    if s.valid_for_read and s.count > 0 then
-                                        ent.surface.spill_item_stack(ent.position, {
-                                            name = name,
-                                            count = s.count
-                                        }, true, nil, false)
-                                        s.clear()
-                                    end
-                                end
-                            end
-                        end
-                    else
-                        util.print(player, "red", "mine failed: %s (%s)", ent.name, ent.type)
-                    end
-
-                    tmp.destroy()
-                else
-                    util.print(player, "red", "not minable: %s (%s)", ent.name, ent.type)
-                end
-
-                ::continue::
+                inventory.mine_to_player(player, ent)
             else
                 if inventory.transfer_container_to_player(player, ent) then
                     moved_any = true
