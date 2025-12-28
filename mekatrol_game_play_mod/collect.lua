@@ -117,6 +117,10 @@ local function pickup(player, ps, bot)
             if mined > 0 then
                 bot.task.pickup_remaining = bot.task.pickup_remaining - mined
                 moved_any = true
+
+                if bot.task.pickup_remaining <= 0 then
+                    break -- exit the loop immediately so no more tries to mine
+                end
             end
         else
             if inventory.transfer_container_to_player(player, ent) then
