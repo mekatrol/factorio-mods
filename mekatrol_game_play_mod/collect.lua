@@ -45,11 +45,13 @@ local function find_pickup_entities(player, ps, surface, group)
 
     if group.bounding_box then
         ents = surface.find_entities_filtered {
-            area = group.bounding_box
+            area = group.bounding_box,
+            name = group.name
         }
     else
         ents = surface.find_entities_filtered {
             position = group.center,
+            name = group.name,
             radius = 2.0
         }
     end
