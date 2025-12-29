@@ -174,6 +174,14 @@ function search.update(player, ps, state, bot)
                 bot.task.survey_entity = nil
                 bot.task.search_name = search_name
                 bot.task.survey_found_entity = false
+
+                -- try finding the new entity from the current position, and if found just return
+                -- without changing tasks
+                entity = find_entity(player, ps, bot, bpos, surf, search_name)
+                if entity then
+                    bot.task.target_position = nil
+                    return
+                end
             end
 
             if not search_name then

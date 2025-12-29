@@ -110,7 +110,7 @@ function mapper_bot.update(player, ps, state, visual, tick)
 
         local args = {
             -- set the list of items to search for and in the order we want to search
-            ["search_list"] = {"crash-site", "coal", "iron-ore"}
+            ["search_list"] = {"crash-site", "coal", "iron-ore", "stone"}
         }
 
         bot.task.target_position = nil

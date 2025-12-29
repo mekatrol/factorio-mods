@@ -15,7 +15,7 @@ config.bot = {
 
     search = {
         step_distance = 5.0,
-        detection_radius = 32.0
+        detection_radius = 64.0
     },
 
     survey = {
