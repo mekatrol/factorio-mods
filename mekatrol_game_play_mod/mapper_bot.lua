@@ -106,11 +106,26 @@ function mapper_bot.update(player, ps, state, visual, tick)
     if ps.game_phase == "init" then
         ps.game_phase = "done"
 
-        bot.task.search_name = nil
+        bot.task.search_item = {
+            name = nil,
+            amount = 0
+        }
 
         local args = {
             -- set the list of items to search for and in the order we want to search
-            ["search_list"] = {"crash-site", "coal", "iron-ore", "stone"}
+            ["search_list"] = {{
+                name = "crash-site",
+                amount = nil
+            }, {
+                name = "coal",
+                amount = 100
+            }, {
+                name = "iron-ore",
+                amount = 100
+            }, {
+                name = "stone",
+                amount = 100
+            }}
         }
 
         bot.task.target_position = nil

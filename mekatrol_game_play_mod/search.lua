@@ -120,15 +120,15 @@ local function find_entity(player, ps, bot, pos, surf, find_name)
     return next_found_entity
 end
 
-local function get_search_name(player, ps, bot)
-    if bot.task.search_name then
-        return bot.task.search_name
+local function get_search_item(player, ps, bot)
+    if bot.task.search_item.name then
+        return bot.task.search_item
     end
 
     -- try an get next search name in list
-    bot.task.search_name = util.dict_array_pop(bot.task.args, "search_list")
+    bot.task.search_item = util.dict_array_pop(bot.task.args, "search_list")
 
-    return bot.task.search_name
+    return bot.task.search_item
 end
 
 function search.update(player, ps, state, bot)
@@ -143,9 +143,9 @@ function search.update(player, ps, state, bot)
     local bpos = bot.entity.position
 
     if not target_pos then
-        local search_name = get_search_name(player, ps, bot)
+        local search_item = get_search_item(player, ps, bot)
 
-        local entity = find_entity(player, ps, bot, bpos, surf, search_name)
+        local entity = find_entity(player, ps, bot, bpos, surf, search_item.name)
 
         if entity then
             -- record what we found
@@ -165,26 +165,29 @@ function search.update(player, ps, state, bot)
         else
             if bot.task.survey_found_entity then
                 -- clear current name (so the next name will be fetched)
-                bot.task.search_name = nil
+                bot.task.search_item = {
+                    name = nil,
+                    amount = 0
+                }
 
                 -- update search name to next type
-                search_name = get_search_name(player, ps, bot)
+                search_item = get_search_item(player, ps, bot)
 
                 -- clear previous found entity
                 bot.task.survey_entity = nil
-                bot.task.search_name = search_name
+                bot.task.search_item = search_item
                 bot.task.survey_found_entity = false
 
                 -- try finding the new entity from the current position, and if found just return
                 -- without changing tasks
-                entity = find_entity(player, ps, bot, bpos, surf, search_name)
+                entity = find_entity(player, ps, bot, bpos, surf, search_item.name)
                 if entity then
                     bot.task.target_position = nil
                     return
                 end
             end
 
-            if not search_name then
+            if not search_item.name then
                 -- no more search list
                 bot.task.args["search_list"] = nil
 
@@ -210,12 +213,12 @@ function search.update(player, ps, state, bot)
     bot.task.target_position = nil
 
     -- return if no current search name
-    if bot.task.search_name == nil then
+    if bot.task.search_item.name == nil then
         return
     end
 
     bot.task.survey_entity = bot.task.survey_entity or {
-        name = bot.task.search_name
+        name = bot.task.search_item.name
     }
 
     bot.task.survey_found_entity = false

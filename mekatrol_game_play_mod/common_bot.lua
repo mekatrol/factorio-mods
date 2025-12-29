@@ -27,10 +27,10 @@ function common_bot.get_tasks(player, ps, state, visual, bot_name)
         local search_next = "no search"
 
         if search_for_list and #search_for_list > 0 then
-            search_next = search_for_list[1]
+            search_next = search_for_list[1].name
         end
 
-        other = string.format(" [%s:%s]", bot.task.search_name or "no search", search_next)
+        other = string.format(" [%s:%s]", bot.task.search_item.name or "no search", search_next)
     end
 
     return bot.task.current_task, bot.task.next_task, other
