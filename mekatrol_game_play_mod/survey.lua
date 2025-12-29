@@ -223,9 +223,6 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 
     local find_name = bot.task.survey_entity.name
 
-    util.print(player, "red", "bot.task.survey_entity: name=%s, type=%s", bot.task.survey_entity.name,
-        bot.task.survey_entity.type)
-
     local found = util.find_entities(player, bpos, BOT_CONF.search.detection_radius, surf, find_name, true, true)
 
     if #found == 0 then
@@ -441,11 +438,14 @@ function survey.update(player, ps, state, visual, bot, tick)
     if entity_group.is_survey_single_target(bot.task.survey_entity) then
         entity_group.add_single_tile_entity_group(player, ps, visual, bot.entity.surface_index, bot.task.survey_entity)
 
-        -- Switch back to survey task to find next entity
+        -- Switch to next task
         switch_to_next_task(player, ps, state, bot)
     else
         -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
-        survey.perform_survey_scan(player, ps, bot, tick)
+        if not survey.perform_survey_scan(player, ps, bot, tick) then
+            -- Switch to next task
+            switch_to_next_task(player, ps, state, bot)
+        end
     end
 end
 

@@ -207,6 +207,10 @@ function search.update(player, ps, state, bot)
         return
     end
 
+    bot.task.survey_entity = bot.task.survey_entity or {
+        name = bot.task.search_name
+    }
+
     -- switch to survey task once destination reached so that we can survey the location
     bot_module.set_bot_task(player, ps, "survey", "search", bot.task.args)
 end
