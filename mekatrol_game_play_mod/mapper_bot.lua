@@ -38,7 +38,6 @@ function mapper_bot.init_state(player, ps)
     bot.task.search_spiral = bot.task.search_spiral or nil
     bot.task.survey_entity = bot.task.survey_entity or nil
     bot.task.next_survey_entities = bot.task.next_survey_entities or {}
-    bot.task.completed_init_phase = bot.task.completed_init_phase or false
 end
 
 function mapper_bot.destroy_state(player, ps)
@@ -103,18 +102,19 @@ function mapper_bot.update(player, ps, state, visual, tick)
     end
 
     -- are we in init phase of game, and not searching for specified list?
-    if ps.game_phase == "init" and not bot.task.completed_init_phase then
-        bot.task.completed_init_phase = true
+    if ps.game_phase == "init" then
+        ps.game_phase = "done"
+
+        util.print(player, "red", "Game phase is init, creating initial search list")
+        bot.task.search_name = nil
 
         local args = {
             -- set the list of items to search for and in the order we want to search
             ["search_list"] = {"crash-site", "coal", "iron-ore"}
         }
 
+        bot.task.target_position = nil
         mapper_bot.set_bot_task(player, ps, "search", "survey", args)
-
-        -- no game phase next
-        -- ps.game_phase = nil
     end
 
     -- perform updates common to all bots

@@ -20,14 +20,6 @@ function util.print(player_or_game, color, fmt, ...)
     end
 end
 
--- Simple, fast, order-independent hash combiner.
--- Uses 32-bit wrap semantics implemented via Lua numbers.
-function util.hash_combine(h, v)
-    h = h + v * 0x9e3779b1
-    h = h - math.floor(h / 0x100000000) * 0x100000000
-    return h
-end
-
 function util.tile_normalised_position(pos)
     -- normalise the position corner of tile for which the position is contained
     local tx = math.floor(pos.x)
@@ -143,6 +135,28 @@ function util.print_table(player_or_game, t)
     end
 end
 
+function util.array_peek(array)
+    if type(array) ~= "table" then
+        return nil
+    end
+
+    if #array < 1 then
+        return nil
+    end
+
+    return array[1]
+end
+
+function util.array_pop(array)
+    local value = util.array_peek(array)
+
+    if value then
+        table.remove(array, 1)
+    end
+
+    return value
+end
+
 function util.remove_key(t, key)
     -- no table then no remove
     if t == nil then
@@ -161,7 +175,7 @@ function util.remove_key(t, key)
     return false
 end
 
-function util.remove_value(array, value)
+function util.remove_array_value(array, value)
     if type(array) ~= "table" then
         return false
     end
@@ -175,6 +189,108 @@ function util.remove_value(array, value)
     end
 
     return false
+end
+
+function util.peek_dict_value(t, key)
+    local array = util.get_value(t, key)
+
+    if not array then
+        return nil
+    end
+
+    return util.array_peek(array)
+end
+
+function util.dict_array_pop(t, key)
+    local array = util.get_value(t, key)
+
+    if not array then
+        return nil
+    end
+
+    return util.array_pop(array)
+end
+
+function util.filter_player_and_bots(player, ents)
+    -- Filter player character safely
+    local character = nil
+    if player and player.valid then
+        character = player.character -- may be nil, that's fine
+    end
+
+    for i = #ents, 1, -1 do
+        local ent = ents[i]
+
+        -- make sure ent is valid
+        if not ent or not ent.valid then
+            table.remove(ents, i)
+            -- do not remove player
+        elseif character and ent == character then
+            table.remove(ents, i)
+            -- do not remove bot
+        elseif ent.name == "mekatrol-game-play-bot" then
+            table.remove(ents, i)
+        end
+    end
+
+    return ents
+end
+
+function util.sort_entities_by_position(entities, pos)
+    -- sort from nearest to bot to farthest from bot
+    table.sort(entities, function(a, b)
+        local a_valid = a and a.valid
+        local b_valid = b and b.valid
+
+        -- Invalids always go last
+        if not a_valid and not b_valid then
+            return false
+        end
+        if not a_valid then
+            return false
+        end
+        if not b_valid then
+            return true
+        end
+
+        local ax = a.position.x - pos.x
+        local ay = a.position.y - pos.y
+        local bx = b.position.x - pos.x
+        local by = b.position.y - pos.y
+
+        return (ax * ax + ay * ay) < (bx * bx + by * by)
+    end)
+end
+
+function util.find_entities(player, pos, radius, surf, find_name, find_starts_with, sort_by_pos)
+    local found = {}
+
+    if find_name == nil or not find_starts_with then
+        -- find when name is not specified, or not looking for a name that starts with
+        found = surf.find_entities_filtered {
+            position = pos,
+            radius = radius,
+            name = find_name
+        }
+    else
+        -- find when name is specified and caller wants starts with
+        local prefix = find_name
+
+        for _, ent in pairs(surf.find_entities_filtered {
+            position = pos,
+            radius = radius
+        }) do
+            if ent.valid and string.sub(ent.name, 1, #prefix) == prefix then
+                found[#found + 1] = ent
+            end
+        end
+    end
+
+    if sort_by_pos then
+        found = util.filter_player_and_bots(player, found)
+    end
+
+    return util.filter_player_and_bots(player, found)
 end
 
 return util

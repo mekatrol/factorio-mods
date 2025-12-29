@@ -76,32 +76,6 @@ function search.pick_new_search_target_spiral(ps, bpos)
     }
 end
 
-local function sort_entities_by_position(entities, pos)
-    -- sort from nearest to bot to farthest from bot
-    table.sort(entities, function(a, b)
-        local a_valid = a and a.valid
-        local b_valid = b and b.valid
-
-        -- Invalids always go last
-        if not a_valid and not b_valid then
-            return false
-        end
-        if not a_valid then
-            return false
-        end
-        if not b_valid then
-            return true
-        end
-
-        local ax = a.position.x - pos.x
-        local ay = a.position.y - pos.y
-        local bx = b.position.x - pos.x
-        local by = b.position.y - pos.y
-
-        return (ax * ax + ay * ay) < (bx * bx + by * by)
-    end)
-end
-
 local function find_entity(player, ps, bot, pos, surf, find_name)
     local entity_group = module.get_module("entity_group")
 
@@ -112,7 +86,7 @@ local function find_entity(player, ps, bot, pos, surf, find_name)
     -- if there are any queued then remove until a valid one is found
     while #next_entities > 0 do
         -- resort table as different entities may now be closer to bot position
-        sort_entities_by_position(next_entities, pos)
+        util.sort_entities_by_position(next_entities, pos)
 
         local e = table.remove(next_entities, 1)
 
@@ -124,34 +98,13 @@ local function find_entity(player, ps, bot, pos, surf, find_name)
         end
     end
 
-    local found = {}
-
-    if find_name == nil then
-        found = surf.find_entities_filtered {
-            position = pos,
-            radius = BOT_CONF.search.detection_radius,
-            name = find_name
-        }
-    else
-        local prefix = find_name
-
-        for _, ent in pairs(surf.find_entities_filtered {
-            position = pos,
-            radius = BOT_CONF.search.detection_radius
-        }) do
-            if ent.valid and string.sub(ent.name, 1, #prefix) == prefix then
-                found[#found + 1] = ent
-            end
-        end
-    end
-
-    sort_entities_by_position(found, pos)
+    local found = util.find_entities(player, pos, BOT_CONF.search.detection_radius, surf, find_name, true, true)
 
     local char = player.character
     local next_found_entity = nil
 
     for _, e in ipairs(found) do
-        if e.valid and e ~= bot.entity and e ~= char and not entity_group.is_survey_ignore_target(e) then
+        if not entity_group.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
             if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
                 if not next_found_entity then
@@ -168,31 +121,22 @@ local function find_entity(player, ps, bot, pos, surf, find_name)
 end
 
 local function get_search_name(player, ps, bot)
-    local search_name = bot.task.search_name or nil
-
-    if bot.task.current_task == "search" and util.table_size(bot.task.args) > 0 then
-        local search_for_list = util.get_value(bot.task.args, "search_list")
-
-        if search_for_list then
-            if #search_for_list == 0 then
-                -- remove from list
-                bot.task.args["search_for"] = nil
-            else
-                bot.task.search_name = search_for_list[1]
-                search_name = bot.task.search_name
-            end
-        end
-    else
-        search_name = nil
+    if bot.task.search_name then
+        return bot.task.search_name
     end
 
-    return search_name
+    -- try an get next search name in list
+    bot.task.search_name = util.dict_array_pop(bot.task.args, "search_list")
+
+    return bot.task.search_name
 end
 
 function search.update(player, ps, state, bot)
     if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
     end
+
+    local bot_module = module.get_module(bot.name)
 
     local surf = bot.entity.surface
     local target_pos = bot.task.target_position
@@ -214,27 +158,22 @@ function search.update(player, ps, state, bot)
                 y = entity.position.y
             }
 
-            -- switch to move_to task
-            local bot_module = module.get_module(bot.name)
-            bot_module.set_bot_task(player, ps, "move_to", bot.task.next_task, bot.task.args)
-
             -- reset search spiral so searching restarts cleanly after
             bot.task.search_spiral = nil
 
             return
-        else
-            -- once no longer found then remove from search list
-            local search_for_list = util.get_value(bot.task.args, "search_list")
-            
-            if search_name and search_for_list then
-                if search_name == search_for_list[1] then
-                    -- remove from list                    
-                    util.remove_value(search_for_list, search_name)
-                end
-                bot.task.search_name = nil
-            end
+        elseif search_name then
+            -- update search name to next type
+            search_name = get_search_name(player, ps, bot)
 
-            return
+            if not search_name then
+                -- no more search list
+                bot.task.args["search_list"] = nil
+
+                -- return to follow mode
+                bot_module.set_bot_task(player, ps, "follow", nil, bot.task.args)
+                return
+            end
         end
 
         target_pos = search.pick_new_search_target_spiral(ps, bot.entity.position)
@@ -245,16 +184,20 @@ function search.update(player, ps, state, bot)
 
     positioning.move_entity_towards(player, bot.entity, target_pos)
 
-    local dx = target_pos.x - bpos.x
-    local dy = target_pos.y - bpos.y
-    local step = BOT_CONF.movement.step_distance
-
-    if dx * dx + dy * dy > step * step then
+    if not positioning.positions_are_close(target_pos, bpos) then
         return
     end
 
-    util.print(player, "red", "moved to target")
+    -- destination reached, so clear target position
     bot.task.target_position = nil
+
+    -- return if no current search name
+    if bot.task.search_name == nil then
+        return
+    end
+
+    -- switch to survey task once destination reached so that we can survey the location
+    bot_module.set_bot_task(player, ps, "survey", "search", bot.task.args)
 end
 
 return search

@@ -35,8 +35,8 @@ function entity_group.is_survey_ignore_target(e)
 end
 
 function entity_group.is_survey_single_target(entity)
-    if not entity or not entity.valid then
-        return true
+    if not entity or not (entity.name or entity.type) then
+        return false
     end
 
     local single_target_names = {
@@ -48,7 +48,7 @@ function entity_group.is_survey_single_target(entity)
         ["crude-oil"] = true
     }
 
-    if single_target_names[entity.name] then
+    if entity.name and single_target_names[entity.name] then
         return true
     end
 
@@ -60,7 +60,7 @@ function entity_group.is_survey_single_target(entity)
         ["simple-entity-with-owner"] = true
     }
 
-    if single_target_types[entity.type] then
+    if entity.type and single_target_types[entity.type] then
         return true
     end
 

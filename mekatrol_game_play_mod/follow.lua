@@ -58,12 +58,8 @@ function follow.update(player, ps, state, bot, y_offset)
     end
 
     ps.last_player_side_offset_x = so
-
-    local follow = BOT_CONF.movement.follow_distance
-    local dx = ppos.x - bpos.x
-    local dy = ppos.y - bpos.y
-
-    if dx * dx + dy * dy <= follow * follow then
+    
+    if positioning.positions_are_close(ppos, bpos, BOT_CONF.movement.follow_distance) then
         return
     end
 

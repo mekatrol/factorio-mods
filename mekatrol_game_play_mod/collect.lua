@@ -40,31 +40,6 @@ local function add_to_carried(bot, name, count)
     t[name] = (t[name] or 0) + count
 end
 
-local function filter_player_and_bots(player, ps, ents)
-    -- Filter player character safely
-    local character = nil
-    if player and player.valid then
-        character = player.character -- may be nil, that's fine
-    end
-
-    for i = #ents, 1, -1 do
-        local ent = ents[i]
-
-        -- make sure ent is valid
-        if not ent or not ent.valid then
-            table.remove(ents, i)
-            -- do not remove player
-        elseif character and ent == character then
-            table.remove(ents, i)
-            -- do not remove bot
-        elseif ent.name == "mekatrol-game-play-bot" then
-            table.remove(ents, i)
-        end
-    end
-
-    return ents
-end
-
 local function find_pickup_entities(player, ps, surface, group)
     local ents
 
@@ -81,7 +56,7 @@ local function find_pickup_entities(player, ps, surface, group)
         }
     end
 
-    return filter_player_and_bots(player, ps, ents)
+    return util.filter_player_and_bots(player, ents)
 end
 
 local function pickup(player, ps, bot)

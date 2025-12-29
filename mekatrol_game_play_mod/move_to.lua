@@ -33,15 +33,9 @@ function move_to.update(player, ps, bot)
     end
 
     positioning.move_entity_towards(player, bot.entity, target_pos)
+    local bpos = bot.entity.position
 
-    -- auto-exit when reached (same threshold as search)
-    local bp = bot.entity.position
-    local dx = target_pos.x - bp.x
-    local dy = target_pos.y - bp.y
-    local step = BOT_CONF.movement.step_distance
-
-    -- reached target, if so move to next task
-    if dx * dx + dy * dy <= step * step then
+    if positioning.positions_are_close(target_pos, bpos) then
         local new_task = bot.task.next_task or "follow"
         bot_module.set_bot_task(player, ps, new_task, nil, bot.task.args)
     end

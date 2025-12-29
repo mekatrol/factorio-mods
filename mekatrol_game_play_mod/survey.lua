@@ -223,11 +223,10 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 
     local find_name = bot.task.survey_entity.name
 
-    local found = surf.find_entities_filtered {
-        position = bpos,
-        radius = BOT_CONF.survey.radius,
-        name = find_name
-    }
+    util.print(player, "red", "bot.task.survey_entity: name=%s, type=%s", bot.task.survey_entity.name,
+        bot.task.survey_entity.type)
+
+    local found = util.find_entities(player, bpos, BOT_CONF.search.detection_radius, surf, find_name, true, true)
 
     if #found == 0 then
         return false
@@ -410,7 +409,7 @@ function survey.update(player, ps, state, visual, bot, tick)
 
     -- If we are tracing, drive movement purely from the trace state machine.
     ensure_trace(ps, bot)
-    
+
     if bot.task.survey_trace then
         local target_pos = bot.task.target_position
         if not target_pos then
@@ -425,12 +424,8 @@ function survey.update(player, ps, state, visual, bot, tick)
         positioning.move_entity_towards(player, bot.entity, target_pos)
 
         local bpos = bot.entity.position
-        local dx = target_pos.x - bpos.x
-        local dy = target_pos.y - bpos.y
-        local d2 = dx * dx + dy * dy
 
-        local thr = BOT_CONF.survey.arrival_threshold
-        if d2 > (thr * thr) then
+        if not positioning.positions_are_close(target_pos, bpos, BOT_CONF.survey.arrival_threshold) then
             return
         end
 
