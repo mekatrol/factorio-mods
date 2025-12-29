@@ -22,6 +22,8 @@ function common_bot.get_tasks(player, ps, state, visual, bot_name)
     
     if bot_name == "logistics" and bot.task.pickup_name then
         other = string.format(" [%s: %s]", bot.task.pickup_name, bot.task.pickup_remaining)
+    elseif bot_name == "mapper" then
+        other = string.format(" [%s]", bot.task.search_name or "no search")
     end
 
     return bot.task.current_task, bot.task.next_task, other

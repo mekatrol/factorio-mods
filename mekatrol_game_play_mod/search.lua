@@ -102,9 +102,9 @@ local function sort_entities_by_position(entities, pos)
     end)
 end
 
-local function find_entity(player, ps, bot, pos, surf)
+local function find_entity(player, ps, bot, pos, surf, find_name)
     local entity_group = module.get_module("entity_group")
-    
+
     bot.task.next_survey_entities = bot.task.next_survey_entities or {}
 
     local next_entities = bot.task.next_survey_entities
@@ -117,7 +117,6 @@ local function find_entity(player, ps, bot, pos, surf)
         local e = table.remove(next_entities, 1)
 
         if e and e.valid then
-
             -- recheck this entity may have been added prior to boundary for this area created
             if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
                 return e
@@ -125,10 +124,26 @@ local function find_entity(player, ps, bot, pos, surf)
         end
     end
 
-    local found = surf.find_entities_filtered {
-        position = pos,
-        radius = BOT_CONF.search.detection_radius
-    }
+    local found = {}
+
+    if find_name == nil then
+        found = surf.find_entities_filtered {
+            position = pos,
+            radius = BOT_CONF.search.detection_radius,
+            name = find_name
+        }
+    else
+        local prefix = find_name
+
+        for _, ent in pairs(surf.find_entities_filtered {
+            position = pos,
+            radius = BOT_CONF.search.detection_radius
+        }) do
+            if ent.valid and string.sub(ent.name, 1, #prefix) == prefix then
+                found[#found + 1] = ent
+            end
+        end
+    end
 
     sort_entities_by_position(found, pos)
 
@@ -162,9 +177,33 @@ function search.update(player, ps, state, bot)
     local bpos = bot.entity.position
 
     if not target_pos then
-        local entity = find_entity(player, ps, bot, bpos, surf)
+        local search_name = bot.task.search_name or nil
+
+        if bot.task.current_task == "search_list" and util.table_size(bot.task.args) > 0 then
+            local search_for_list = util.get_value(bot.task.args, "search_list")
+
+            if search_for_list then
+                if #search_for_list == 0 then
+                    -- remove from list
+                    bot.task.args["search_for"] = nil
+                else
+                    bot.task.search_name = search_for_list[1]
+                    search_name = bot.task.search_name
+                end
+            end
+        else
+            search_name = nil
+        end
+
+        local entity = find_entity(player, ps, bot, bpos, surf, search_name)
 
         if entity then
+            if search_name then
+                -- if found then remove from search_for list
+                local search_for_list = util.get_value(bot.task.args, "search_list")
+                util.remove_value(search_for_list, search_name)
+            end
+
             -- record what we found (optional, but useful for overlay/debug)
             bot.task.survey_entity = entity
 

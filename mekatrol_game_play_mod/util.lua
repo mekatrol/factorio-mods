@@ -93,4 +93,83 @@ function util.table_size(t)
     return count
 end
 
+function util.get_value(t, key)
+    if type(t) ~= "table" then
+        return nil
+    end
+
+    return t[key]
+end
+
+function util.print_table(player_or_game, t)
+    local color = "yellow"
+
+    if t == nil then
+        util.print(player_or_game, color, "table is nil")
+        return
+    end
+
+    if type(t) ~= "table" then
+        util.print(player_or_game, color, "<not a table>")
+        return
+    end
+
+    -- Detect array (contiguous 1..n)
+    local n = #t
+    local is_array = true
+
+    for k in pairs(t) do
+        if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then
+            is_array = false
+            break
+        end
+    end
+
+    if next(t) == nil then
+        util.print(player_or_game, color, "<empty table>")
+        return
+    end
+
+    util.print(player_or_game, color, "%s:", is_array and "array" or "dict")
+
+    if is_array then
+        for i = 1, n do
+            util.print(player_or_game, color, "  [%d] = %s", i, tostring(t[i]))
+        end
+    else
+        for k, v in pairs(t) do
+            util.print(player_or_game, color, "  [%s] = %s", tostring(k), tostring(v))
+        end
+    end
+end
+
+function util.remove_key(t, key)
+    if type(t) ~= "table" then
+        return false
+    end
+
+    if t[key] ~= nil then
+        t[key] = nil
+        return true
+    end
+
+    return false
+end
+
+function util.remove_value(array, value)
+    if type(array) ~= "table" then
+        return false
+    end
+
+    local n = #array
+    for i = 1, n do
+        if array[i] == value then
+            table.remove(array, i)
+            return true
+        end
+    end
+
+    return false
+end
+
 return util

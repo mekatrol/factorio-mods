@@ -244,7 +244,14 @@ end
 
 local function switch_to_next_task(player, ps, state, bot)
     local bot_module = module.get_module(bot.name)
-    bot_module.set_bot_task(player, ps, bot.task.next_task or "search", nil, bot.task.args)
+
+    local next_task = bot.task.next_task or "search"
+
+    if ps.game_phase == "init" then
+        next_task = bot.task.next_task or "search_list"
+    end
+
+    bot_module.set_bot_task(player, ps, next_task, nil, bot.task.args)
     bot.task.target_position = nil
     bot.task.survey_trace = nil
     bot.task.survey_entity = nil
@@ -373,7 +380,7 @@ local function trace_step(player, ps, state, visual, bot)
 
         if tr.started_edge and tr.p_tx == tr.start_tx and tr.p_ty == tr.start_ty and nx == tr.p1_tx and ny == tr.p1_ty then
             local entity_group = module.get_module("entity_group")
-            
+
             -- Completed loop: persist + render group.
             entity_group.ensure_entity_groups(ps)
 
@@ -407,6 +414,7 @@ function survey.update(player, ps, state, visual, bot, tick)
 
     -- If we are tracing, drive movement purely from the trace state machine.
     ensure_trace(ps, bot)
+    
     if bot.task.survey_trace then
         local target_pos = bot.task.target_position
         if not target_pos then
