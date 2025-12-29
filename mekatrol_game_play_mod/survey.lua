@@ -440,11 +440,17 @@ function survey.update(player, ps, state, visual, bot, tick)
 
         -- Switch to next task
         switch_to_next_task(player, ps, state, bot)
+
+        bot.task.survey_found_entity = true
     else
         -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
         if not survey.perform_survey_scan(player, ps, bot, tick) then
             -- Switch to next task
             switch_to_next_task(player, ps, state, bot)
+
+            bot.task.survey_found_entity = false
+        else
+            bot.task.survey_found_entity = true
         end
     end
 end

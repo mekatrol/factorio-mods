@@ -79,9 +79,9 @@ end
 local function find_entity(player, ps, bot, pos, surf, find_name)
     local entity_group = module.get_module("entity_group")
 
-    bot.task.next_survey_entities = bot.task.next_survey_entities or {}
+    bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
 
-    local next_entities = bot.task.next_survey_entities
+    local next_entities = bot.task.queued_survey_entities
 
     -- if there are any queued then remove until a valid one is found
     while #next_entities > 0 do
@@ -148,7 +148,7 @@ function search.update(player, ps, state, bot)
         local entity = find_entity(player, ps, bot, bpos, surf, search_name)
 
         if entity then
-            -- record what we found (optional, but useful for overlay/debug)
+            -- record what we found
             bot.task.survey_entity = entity
 
             -- move to the entity and then switch to survey task
@@ -163,11 +163,8 @@ function search.update(player, ps, state, bot)
 
             return
         else
-            local name = bot.task.survey_entity.name
-            local prefix = bot.task.search_name
-
-            if name ~= nil and prefix ~= nil and string.sub(name, 1, #prefix) == prefix then
-                -- clean current name
+            if bot.task.survey_found_entity then
+                -- clear current name (so the next name will be fetched)
                 bot.task.search_name = nil
 
                 -- update search name to next type
@@ -175,6 +172,8 @@ function search.update(player, ps, state, bot)
 
                 -- clear previous found entity
                 bot.task.survey_entity = nil
+                bot.task.search_name = search_name
+                bot.task.survey_found_entity = false
             end
 
             if not search_name then
@@ -210,6 +209,8 @@ function search.update(player, ps, state, bot)
     bot.task.survey_entity = bot.task.survey_entity or {
         name = bot.task.search_name
     }
+
+    bot.task.survey_found_entity = false
 
     -- switch to survey task once destination reached so that we can survey the location
     bot_module.set_bot_task(player, ps, "survey", "search", bot.task.args)
