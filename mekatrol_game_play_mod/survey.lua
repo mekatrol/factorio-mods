@@ -229,6 +229,9 @@ function survey.perform_survey_scan(player, ps, bot, tick)
         return false
     end
 
+    -- set survey entity to first found type
+    bot.task.survey_entity = found[1]
+
     -- If we're not already tracing, start.
     ensure_trace(ps, bot)
     if not bot.task.survey_trace then
