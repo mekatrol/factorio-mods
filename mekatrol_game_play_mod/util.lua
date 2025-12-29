@@ -144,6 +144,11 @@ function util.print_table(player_or_game, t)
 end
 
 function util.remove_key(t, key)
+    -- no table then no remove
+    if t == nil then
+        return
+    end
+
     if type(t) ~= "table" then
         return false
     end

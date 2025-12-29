@@ -167,6 +167,28 @@ local function find_entity(player, ps, bot, pos, surf, find_name)
     return next_found_entity
 end
 
+local function get_search_name(player, ps, bot)
+    local search_name = bot.task.search_name or nil
+
+    if bot.task.current_task == "search" and util.table_size(bot.task.args) > 0 then
+        local search_for_list = util.get_value(bot.task.args, "search_list")
+
+        if search_for_list then
+            if #search_for_list == 0 then
+                -- remove from list
+                bot.task.args["search_for"] = nil
+            else
+                bot.task.search_name = search_for_list[1]
+                search_name = bot.task.search_name
+            end
+        end
+    else
+        search_name = nil
+    end
+
+    return search_name
+end
+
 function search.update(player, ps, state, bot)
     if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
@@ -177,33 +199,11 @@ function search.update(player, ps, state, bot)
     local bpos = bot.entity.position
 
     if not target_pos then
-        local search_name = bot.task.search_name or nil
-
-        if bot.task.current_task == "search_list" and util.table_size(bot.task.args) > 0 then
-            local search_for_list = util.get_value(bot.task.args, "search_list")
-
-            if search_for_list then
-                if #search_for_list == 0 then
-                    -- remove from list
-                    bot.task.args["search_for"] = nil
-                else
-                    bot.task.search_name = search_for_list[1]
-                    search_name = bot.task.search_name
-                end
-            end
-        else
-            search_name = nil
-        end
+        local search_name = get_search_name(player, ps, bot)
 
         local entity = find_entity(player, ps, bot, bpos, surf, search_name)
 
         if entity then
-            if search_name then
-                -- if found then remove from search_for list
-                local search_for_list = util.get_value(bot.task.args, "search_list")
-                util.remove_value(search_for_list, search_name)
-            end
-
             -- record what we found (optional, but useful for overlay/debug)
             bot.task.survey_entity = entity
 
@@ -220,6 +220,19 @@ function search.update(player, ps, state, bot)
 
             -- reset search spiral so searching restarts cleanly after
             bot.task.search_spiral = nil
+
+            return
+        else
+            -- once no longer found then remove from search list
+            local search_for_list = util.get_value(bot.task.args, "search_list")
+            
+            if search_name and search_for_list then
+                if search_name == search_for_list[1] then
+                    -- remove from list                    
+                    util.remove_value(search_for_list, search_name)
+                end
+                bot.task.search_name = nil
+            end
 
             return
         end
@@ -240,6 +253,7 @@ function search.update(player, ps, state, bot)
         return
     end
 
+    util.print(player, "red", "moved to target")
     bot.task.target_position = nil
 end
 

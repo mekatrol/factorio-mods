@@ -247,10 +247,6 @@ local function switch_to_next_task(player, ps, state, bot)
 
     local next_task = bot.task.next_task or "search"
 
-    if ps.game_phase == "init" then
-        next_task = bot.task.next_task or "search_list"
-    end
-
     bot_module.set_bot_task(player, ps, next_task, nil, bot.task.args)
     bot.task.target_position = nil
     bot.task.survey_trace = nil

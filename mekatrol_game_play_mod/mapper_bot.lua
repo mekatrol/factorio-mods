@@ -12,7 +12,7 @@ local BOT_CONF = config.bot
 local BOT_NAME = "mapper"
 
 local BOT_TASKS = {
-    list = {"follow", "search", "search_list", "survey", "move_to"},
+    list = {"follow", "search", "survey", "move_to"},
     index = {}
 }
 
@@ -38,6 +38,7 @@ function mapper_bot.init_state(player, ps)
     bot.task.search_spiral = bot.task.search_spiral or nil
     bot.task.survey_entity = bot.task.survey_entity or nil
     bot.task.next_survey_entities = bot.task.next_survey_entities or {}
+    bot.task.completed_init_phase = bot.task.completed_init_phase or false
 end
 
 function mapper_bot.destroy_state(player, ps)
@@ -64,7 +65,6 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
         -- clear the next_task and target position when switching tasks
         bot.task.target_position = nil
         bot.task.search_spiral = nil
-        bot.task.search_name = nil
         bot.task.survey_entity = nil
         bot.task.next_survey_entities = {}
     end
@@ -103,13 +103,15 @@ function mapper_bot.update(player, ps, state, visual, tick)
     end
 
     -- are we in init phase of game, and not searching for specified list?
-    if ps.game_phase == "init" and (bot.task.current_task == "follow" or bot.task.current_task == "search") then
+    if ps.game_phase == "init" and not bot.task.completed_init_phase then
+        bot.task.completed_init_phase = true
+
         local args = {
             -- set the list of items to search for and in the order we want to search
             ["search_list"] = {"crash-site", "coal", "iron-ore"}
         }
 
-        mapper_bot.set_bot_task(player, ps, "search_list", "survey", args)
+        mapper_bot.set_bot_task(player, ps, "search", "survey", args)
 
         -- no game phase next
         -- ps.game_phase = nil
@@ -123,7 +125,7 @@ function mapper_bot.update(player, ps, state, visual, tick)
         follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
-    elseif bot.task.current_task == "search" or bot.task.current_task == "search_list" then
+    elseif bot.task.current_task == "search" then
         search.update(player, ps, state, bot)
     elseif bot.task.current_task == "survey" then
         survey.update(player, ps, state, visual, bot, tick)

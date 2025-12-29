@@ -19,11 +19,18 @@ function common_bot.get_tasks(player, ps, state, visual, bot_name)
     end
 
     local other = nil
-    
+
     if bot_name == "logistics" and bot.task.pickup_name then
         other = string.format(" [%s: %s]", bot.task.pickup_name, bot.task.pickup_remaining)
     elseif bot_name == "mapper" then
-        other = string.format(" [%s]", bot.task.search_name or "no search")
+        local search_for_list = util.get_value(bot.task.args, "search_list")
+        local search_next = "no search"
+
+        if #search_for_list > 0 then
+            search_next = search_for_list[1]
+        end
+
+        other = string.format(" [%s:%s]", bot.task.search_name or "no search", search_next)
     end
 
     return bot.task.current_task, bot.task.next_task, other
