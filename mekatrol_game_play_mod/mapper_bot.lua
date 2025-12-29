@@ -112,6 +112,17 @@ function mapper_bot.update(player, ps, state, visual, tick)
         return
     end
 
+    -- are we ini init phase?
+    if ps.game_phase == "init" and bot.task.current_task ~= "search" then
+        mapper_bot.set_bot_task(player, ps, "search", nil, {
+            -- set the list of items to search for and in the order we want to search
+            ["search_list"] = {"crash-site", "coal", "iron-ore"}
+        })
+
+        -- no game phase next
+        -- ps.game_phase = nil
+    end
+
     -- perform updates common to all bots
     common_bot.update(player, bot, bot_conf, tick)
 

@@ -59,6 +59,8 @@ function state.get_player_state(player_index)
             last_player_position = nil,
             last_player_side_offset_x = -BOT_CONF.movement.side_offset_distance,
 
+            game_phase = "init",
+
             overlay_next_tick = nil,
 
             visual = {
@@ -69,6 +71,8 @@ function state.get_player_state(player_index)
         storage.mekatrol_game_play_bot[player_index] = ps
         return ps
     end
+
+    ps.game_phase = ps.game_phase or "init"
 
     ps.bots = ps.bots or {}
 

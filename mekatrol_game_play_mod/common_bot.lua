@@ -19,6 +19,7 @@ function common_bot.get_tasks(player, ps, state, visual, bot_name)
     end
 
     local other = nil
+    
     if bot_name == "logistics" and bot.task.pickup_name then
         other = string.format(" [%s: %s]", bot.task.pickup_name, bot.task.pickup_remaining)
     end
