@@ -39,6 +39,11 @@ function mapper_bot.init_state(player, ps)
     bot.task.survey_entity = bot.task.survey_entity or nil
     bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
     bot.task.survey_found_entity = bot.task.survey_found_entity or false
+
+    bot.task.search_item = bot.task.search_item or {
+        name = nil,
+        find_many = false
+    }
 end
 
 function mapper_bot.destroy_state(player, ps)
