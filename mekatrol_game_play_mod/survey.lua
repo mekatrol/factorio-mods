@@ -249,7 +249,6 @@ local function switch_to_next_task(player, ps, state, bot)
     bot_module.set_bot_task(player, ps, next_task, nil, bot.task.args)
     bot.task.target_position = nil
     bot.task.survey_trace = nil
-    bot.task.survey_entity = nil
 end
 
 local function trace_step(player, ps, state, visual, bot)

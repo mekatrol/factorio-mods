@@ -162,9 +162,20 @@ function search.update(player, ps, state, bot)
             bot.task.search_spiral = nil
 
             return
-        elseif search_name then
-            -- update search name to next type
-            search_name = get_search_name(player, ps, bot)
+        else
+            local name = bot.task.survey_entity.name
+            local prefix = bot.task.search_name
+
+            if name ~= nil and prefix ~= nil and string.sub(name, 1, #prefix) == prefix then
+                -- clean current name
+                bot.task.search_name = nil
+
+                -- update search name to next type
+                search_name = get_search_name(player, ps, bot)
+
+                -- clear previous found entity
+                bot.task.survey_entity = nil
+            end
 
             if not search_name then
                 -- no more search list

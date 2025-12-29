@@ -105,7 +105,6 @@ function mapper_bot.update(player, ps, state, visual, tick)
     if ps.game_phase == "init" then
         ps.game_phase = "done"
 
-        util.print(player, "red", "Game phase is init, creating initial search list")
         bot.task.search_name = nil
 
         local args = {
