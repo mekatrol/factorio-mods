@@ -112,14 +112,17 @@ local function pickup(player, ps, bot)
                 moved_any = true
             end
         elseif ent.type == "resource" then
-            local mined = inventory.harvest_resource_to_player(player, ent, bot.task.pickup_remaining or 1)
+            bot.task.mining_progress = bot.task.mining_progress or {}
+
+            local mined = inventory.harvest_resource_to_player(player, ent, bot.task.pickup_remaining or 1,
+                bot.task.mining_progress)
 
             if mined > 0 then
                 bot.task.pickup_remaining = bot.task.pickup_remaining - mined
                 moved_any = true
 
                 if bot.task.pickup_remaining <= 0 then
-                    break -- exit the loop immediately so no more tries to mine
+                    break
                 end
             end
         else
@@ -133,6 +136,7 @@ local function pickup(player, ps, bot)
         bot.task.pickup_group = nil
         bot.task.pickup_name = nil
         bot.task.pickup_remaining = 0
+        bot.task.mining_progress = {}
         moved_any = false
     end
 

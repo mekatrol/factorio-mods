@@ -119,7 +119,7 @@ function inventory.transfer_to_player(player, ent, inv)
     return moved_any
 end
 
-function inventory.harvest_resource_to_player(player, ent, requested_amount)
+function inventory.harvest_resource_to_player(player, ent, requested_amount, progress_by_id)
     if not (player and player.valid) then
         return 0
     end
@@ -153,18 +153,69 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount)
 
     local pos = ent.position
     local name = ent.name
+    local start_amount = ent.amount
     local id = util.generated_id(ent)
-
-    util.print(player, "red", "ent name: %s, ent id: %s, product name: %s, product amt: %s", name, id,
-        item_name, ent.amount)
-
-    local mined_units = math.min(want, ent.amount)
 
     local inv = player.get_main_inventory()
     if not inv then
         return 0
     end
 
+    -- mining_time is seconds per 1 "resource unit" at mining speed 1.0
+    local mining_time = (mineable and mineable.mining_time) or 1.0
+    if mining_time <= 0 then
+        mining_time = 1.0
+    end
+
+    -- Best-effort: derive a "player-like" mining speed multiplier.
+    local speed = 1.0
+
+    if player.character and player.character.valid then
+        speed = speed * (1.0 + player.character.character_mining_speed_modifier)
+    end
+
+    -- Progress store per resource id
+    progress_by_id = progress_by_id or {}
+    local id = util.generated_id(ent)
+
+    local p = progress_by_id[id]
+    if not p then
+        p = {
+            progress = 0.0,
+            last_tick = game.tick
+        }
+        progress_by_id[id] = p
+    end
+
+    local now = game.tick
+    local dt_ticks = now - (p.last_tick or now)
+
+    if dt_ticks < 0 then
+        dt_ticks = 0
+    end
+
+    p.last_tick = now
+
+    -- Convert to seconds (Factorio tick = 1/60s)
+    local dt_seconds = dt_ticks / 60.0
+
+    -- Increase progress by (speed * time / mining_time)
+    p.progress = (p.progress or 0.0) + (speed * dt_seconds / mining_time)
+
+    -- How many whole units can we mine this tick?
+    local mined_units = math.floor(p.progress)
+
+    if mined_units <= 0 then
+        return 0
+    end
+
+    -- Consume progress for units mined
+    p.progress = p.progress - mined_units
+
+    -- Cap by requested and remaining in the resource entity
+    mined_units = math.min(mined_units, want, ent.amount)
+
+    -- Insert/spill results (keeps your existing simplistic 1:1 mapping)
     local inserted = inv.insert {
         name = item_name,
         count = mined_units
@@ -186,11 +237,15 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount)
     -- reduce the resource amount by what we actually produced (inserted + spilled)
     ent.amount = ent.amount - mined_units
 
-    util.print(player, "yellow", "ent name: %s, ent id: %s, product name: %s, product amt: %s", name, id,
-        item_name, ent.amount)
+    -- util.print(player, "yellow",
+    --     "ent name: %s, ent id: %s, product name: %s, product amt: %s (%s: %s), mined: %s, inserted: %s, remainder: %s",
+    --     name, id, item_name, ent.amount, start_amount, ent.amount - start_amount, mined_units, inserted, remainder)
 
     if ent.amount <= 0 and ent.valid then
         ent.deplete()
+
+        -- cleanup progress table entry
+        progress_by_id[id] = nil
     end
 
     return mined_units
