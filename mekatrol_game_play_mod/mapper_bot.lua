@@ -108,23 +108,23 @@ function mapper_bot.update(player, ps, state, visual, tick)
 
         bot.task.search_item = {
             name = nil,
-            amount = 0
+            find_many = false
         }
 
         local args = {
             -- set the list of items to search for and in the order we want to search
             ["search_list"] = {{
                 name = "crash-site",
-                amount = nil
+                find_many = true
             }, {
                 name = "coal",
-                amount = 100
+                find_many = false
             }, {
                 name = "iron-ore",
-                amount = 100
+                find_many = false
             }, {
                 name = "stone",
-                amount = 100
+                find_many = false
             }}
         }
 

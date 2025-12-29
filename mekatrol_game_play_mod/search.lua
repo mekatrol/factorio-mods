@@ -76,29 +76,31 @@ function search.pick_new_search_target_spiral(ps, bpos)
     }
 end
 
-local function find_entity(player, ps, bot, pos, surf, find_name)
+local function find_entity(player, ps, bot, pos, surf, search_item)
     local entity_group = module.get_module("entity_group")
 
     bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
 
     local next_entities = bot.task.queued_survey_entities
 
-    -- if there are any queued then remove until a valid one is found
-    while #next_entities > 0 do
-        -- resort table as different entities may now be closer to bot position
+    if search_item.find_many then
+        -- re-sort table as different entities may now be closer to bot position
         util.sort_entities_by_position(next_entities, pos)
 
-        local e = table.remove(next_entities, 1)
+        -- if there are any queued then remove until a valid one is found
+        while #next_entities > 0 do
+            local e = table.remove(next_entities, 1)
 
-        if e and e.valid then
-            -- recheck this entity may have been added prior to boundary for this area created
-            if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
-                return e
+            if e and e.valid then
+                -- recheck this entity may have been added prior to boundary for this area created
+                if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
+                    return e
+                end
             end
         end
     end
 
-    local found = util.find_entities(player, pos, BOT_CONF.search.detection_radius, surf, find_name, true, true)
+    local found = util.find_entities(player, pos, BOT_CONF.search.detection_radius, surf, search_item.name, true, true)
 
     local char = player.character
     local next_found_entity = nil
@@ -126,7 +128,10 @@ local function get_search_item(player, ps, bot)
     end
 
     -- try an get next search name in list
-    bot.task.search_item = util.dict_array_pop(bot.task.args, "search_list")
+    bot.task.search_item = util.dict_array_pop(bot.task.args, "search_list") or {
+        name = nil,
+        find_many = false
+    }
 
     return bot.task.search_item
 end
@@ -145,7 +150,29 @@ function search.update(player, ps, state, bot)
     if not target_pos then
         local search_item = get_search_item(player, ps, bot)
 
-        local entity = find_entity(player, ps, bot, bpos, surf, search_item.name)
+        -- did survey find one and we are only looking for one?
+        if bot.task.survey_found_entity and search_item.find_many == false then
+            bot.task.survey_found_entity = false
+
+            -- found one so move to next name
+            bot.task.search_item = {
+                name = nil,
+                find_many = false
+            }
+
+            search_item = get_search_item(player, ps, bot)
+        end
+
+        if search_item.name == nil then
+            -- no more search list
+            bot.task.args["search_list"] = nil
+
+            -- return to follow mode
+            bot_module.set_bot_task(player, ps, "follow", nil, bot.task.args)
+            return
+        end
+
+        local entity = find_entity(player, ps, bot, bpos, surf, search_item)
 
         if entity then
             -- record what we found
@@ -167,7 +194,7 @@ function search.update(player, ps, state, bot)
                 -- clear current name (so the next name will be fetched)
                 bot.task.search_item = {
                     name = nil,
-                    amount = 0
+                    find_many = false
                 }
 
                 -- update search name to next type
@@ -180,7 +207,7 @@ function search.update(player, ps, state, bot)
 
                 -- try finding the new entity from the current position, and if found just return
                 -- without changing tasks
-                entity = find_entity(player, ps, bot, bpos, surf, search_item.name)
+                entity = find_entity(player, ps, bot, bpos, surf, search_item)
                 if entity then
                     bot.task.target_position = nil
                     return
