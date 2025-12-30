@@ -452,8 +452,10 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         trace_state.has_started_edge_trace = true
 
         -- Advance to the first edge step.
-        trace_state.current_tile_x, trace_state.current_tile_y, trace_state.backtrack_tile_x, trace_state.backtrack_tile_y =
-            next_tile_x, next_tile_y, next_backtrack_x, next_backtrack_y
+        trace_state.current_tile_x = next_tile_x
+        trace_state.current_tile_y = next_tile_y
+        trace_state.backtrack_tile_x = next_backtrack_x
+        trace_state.backtrack_tile_y = next_backtrack_y
 
         -- Record boundary point for rendering/storage
         trace_state.boundary_points_world_positions[#trace_state.boundary_points_world_positions + 1] =
@@ -462,22 +464,28 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         return world_position_at_tile_center(trace_state.current_tile_x, trace_state.current_tile_y)
     end
 
+    --------------------------------------------------------------------
+    -- Phase 2: Moore boundary trace until closure
+    --------------------------------------------------------------------
     if trace_state.phase == "edge" then
         -- Closed when we are back at start AND the next step would be p1.
-        local nx, ny, nbx, nby = moore_trace_next_boundary_tile(surface, tracked_entity_name,
-            trace_state.current_tile_x, trace_state.current_tile_y, trace_state.backtrack_tile_x,
-            trace_state.backtrack_tile_y)
-        if not nx then
+        local next_tile_x, next_tile_y, next_backtrack_x, next_backtrack_y =
+            moore_trace_next_boundary_tile(surface, tracked_entity_name, trace_state.current_tile_x,
+                trace_state.current_tile_y, trace_state.backtrack_tile_x, trace_state.backtrack_tile_y)
+
+        if not next_tile_x then
             bot.task.survey_trace = nil
             return nil
         end
 
+        -- Closure condition:
+        --   We are back at the start tile AND the next step would be the first edge step tile.
         if trace_state.has_started_edge_trace and trace_state.current_tile_x == trace_state.start_boundary_tile_x and
-            trace_state.current_tile_y == trace_state.start_boundary_tile_y and nx == trace_state.first_edge_step_tile_x and
-            ny == trace_state.first_edge_step_tile_y then
+            trace_state.current_tile_y == trace_state.start_boundary_tile_y and next_tile_x ==
+            trace_state.first_edge_step_tile_x and next_tile_y == trace_state.first_edge_step_tile_y then
             local entity_group = module.get_module("entity_group")
 
-            -- Completed loop: persist + render group.
+            -- Completed loop: persist + render the boundary group.
             entity_group.ensure_entity_groups(player_state)
 
             local boundary = trace_state.boundary_points_world_positions or {}
@@ -485,13 +493,14 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             -- add to boundary group
             entity_group.add_boundary(player, player_state, visual, boundary, target_entity, surface.index)
 
-            -- Switch back to survey task to find next entity
+            -- Move on to the next task (typically to search for the next entity).
             switch_bot_to_next_task(player, player_state, bot)
             return nil
         end
 
+        -- Advance the Moore trace state.
         trace_state.current_tile_x, trace_state.current_tile_y, trace_state.backtrack_tile_x, trace_state.backtrack_tile_y =
-            nx, ny, nbx, nby
+            next_tile_x, next_tile_y, next_backtrack_x, next_backtrack_y
 
         -- Record boundary point for rendering/storage
         trace_state.boundary_points_world_positions[#trace_state.boundary_points_world_positions + 1] =
