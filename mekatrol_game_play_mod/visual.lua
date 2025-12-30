@@ -48,6 +48,10 @@ function visual.clear_survey_trace(ps, trace_id)
         return
     end
 
+    if t.area_label and t.area_label.valid then
+        t.area_label:destroy()
+    end
+
     if t.lines then
         for _, obj in pairs(t.lines) do
             if obj and obj.valid then
@@ -208,14 +212,16 @@ function visual.append_survey_trace(player, ps, trace_id, points)
         t = {
             count = 0,
             points = {},
-            lines = {}
+            lines = {},
+            area_label = nil
         }
         ps.visual.survey_traces[trace_id] = t
     end
 
     local start_index = (t.count or 0) + 1
     if start_index > #points then
-        return
+        -- still update the area label for the current trace
+        start_index = #points + 1
     end
 
     -- Draw new points
@@ -253,6 +259,51 @@ function visual.append_survey_trace(player, ps, trace_id, points)
     end
 
     t.count = #points
+
+    -- Update / create live area label while tracing (treats the polyline as a polygon by closing last->first)
+    local area = 0
+    if #points >= 3 then
+        area = polygon.polygon_area(points)
+    end
+
+    -- Label position: average of points, slightly below
+    local cx = 0
+    local cy = 0
+    for i = 1, #points do
+        cx = cx + points[i].x
+        cy = cy + points[i].y
+    end
+    cx = cx / math.max(#points, 1)
+    cy = cy / math.max(#points, 1)
+
+    local label_text = string.format("Area: %.1f", area)
+    local label_target = {
+        x = cx,
+        y = cy + 0.85
+    }
+
+    if t.area_label and t.area_label.valid then
+        t.area_label.text = label_text
+        t.area_label.target = label_target
+    else
+        t.area_label = rendering.draw_text {
+            text = label_text,
+            surface = player.surface,
+            target = label_target,
+            color = {
+                r = 1.0,
+                g = 1.0,
+                b = 1.0,
+                a = 0.95
+            },
+            scale = 1.4,
+            alignment = "center",
+            vertical_alignment = "middle",
+            draw_on_ground = false,
+            only_in_alt_mode = false,
+            players = {player.index}
+        }
+    end
 end
 
 function visual.update_overlay(player, ps, lines)
