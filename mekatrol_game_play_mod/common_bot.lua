@@ -7,6 +7,102 @@ local util = require("util")
 local BOT_CONF = config.bot
 local BOT_NAMES = config.bot_names
 
+local function chart_area(force, surface, pos, radius)
+    local area = {{pos.x - radius, pos.y - radius}, {pos.x + radius, pos.y + radius}}
+    force.chart(surface, area)
+end
+
+local function update_bot_reveal(player, bot, tick)
+    local force = player.force
+
+    -- tune these
+    local radius = 48 -- tiles to reveal around each bot
+    local cooldown_ticks = 60 -- 1s
+    local min_move_sq = 8 * 8 -- only re-chart if moved >= 8 tiles
+
+    if bot and bot.entity and bot.entity.valid then
+        bot.reveal = bot.reveal or {
+            next_tick = 0,
+            last_pos = nil
+        }
+
+        if tick >= (bot.reveal.next_tick or 0) then
+            local pos = bot.entity.position
+            local last = bot.reveal.last_pos
+
+            local moved = true
+            if last then
+                local dx = pos.x - last.x
+                local dy = pos.y - last.y
+                moved = (dx * dx + dy * dy) >= min_move_sq
+            end
+
+            if moved then
+                chart_area(force, bot.entity.surface, pos, radius)
+                bot.reveal.last_pos = {
+                    x = pos.x,
+                    y = pos.y
+                }
+            end
+
+            bot.reveal.next_tick = tick + cooldown_ticks
+        end
+    end
+end
+
+local function ensure_bot_map_tag(player, bot, icon_item_name, text)
+    if not (player and player.valid) then
+        return
+    end
+    if not (bot and bot.entity and bot.entity.valid) then
+        return
+    end
+
+    local force = player.force
+    local surface = bot.entity.surface
+    local pos = bot.entity.position
+
+    bot.visual = bot.visual or {}
+    local tag = bot.visual.map_tag
+
+    if tag and tag.valid then
+        -- update as the bot moves
+        tag.position = pos
+        tag.text = text
+        -- tag.icon is writable in Factorio 2; set if you want to change it dynamically
+        return
+    end
+
+    bot.visual.map_tag = force.add_chart_tag(surface, {
+        position = pos,
+        text = text,
+        icon = {
+            type = "item",
+            name = icon_item_name
+        } -- or type="entity"/"virtual"/"technology"
+    })
+end
+
+local function destroy_bot_map_tag(bot)
+    if bot and bot.visual and bot.visual.map_tag and bot.visual.map_tag.valid then
+        bot.visual.map_tag.destroy()
+    end
+    if bot and bot.visual then
+        bot.visual.map_tag = nil
+    end
+end
+
+local function issue_task(player, ps, bot_name, new_task, next_task, args)
+    local bot_module = module.get_module(bot_name)
+
+    if not bot_module then
+        util.print(player, "red", "bot module not found for bot name: %s", bot_name)
+        return
+    end
+
+    bot_module.set_bot_task(player, ps, new_task, next_task, args)
+end
+
 -------------------------------------------------------------------------------------------------------
 -- This module contains code common to all bots in this mod
 -------------------------------------------------------------------------------------------------------
@@ -70,6 +166,9 @@ function common_bot.destroy_state(player, ps, bot_name)
         -- probably already destroyed or did not exist
         return
     end
+
+    -- destroy the bot tag
+    destroy_bot_map_tag(bot)
 
     common_bot.clear_lines(bot)
     common_bot.clear_highlight(bot)
@@ -140,17 +239,9 @@ function common_bot.update(player, bot, bot_conf, tick)
     if target_pos then
         common_bot.draw_line(player, bot, bot.entity.position, target_pos, line_color)
     end
-end
 
-local function issue_task(player, ps, bot_name, new_task, next_task, args)
-    local bot_module = module.get_module(bot_name)
-
-    if not bot_module then
-        util.print(player, "red", "bot module not found for bot name: %s", bot_name)
-        return
-    end
-
-    bot_module.set_bot_task(player, ps, new_task, next_task, args)
+    update_bot_reveal(player, bot, tick)
+    ensure_bot_map_tag(player, bot, "construction-robot", string.upper(string.sub(bot.name, 1, 1)))
 end
 
 function common_bot.issue_task(player, ps, bot_name, new_task, next_task, args)
