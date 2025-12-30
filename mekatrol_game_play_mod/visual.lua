@@ -4,13 +4,67 @@ local MOD_NAME = "mekatrol_game_play_mod"
 local visual = {}
 
 local config = require("config")
+local polygon = require("polygon")
 local util = require("util")
 
 local BOT_NAMES = config.bot_names
 
+local SURVEY_TRACE_EDGE_COLOR = {
+    r = 0.85,
+    g = 0.85,
+    b = 0.85,
+    a = 0.65
+} -- light grey
+local SURVEY_TRACE_START_COLOR = {
+    r = 1.00,
+    g = 0.00,
+    b = 1.00,
+    a = 0.95
+} -- magenta
+local SURVEY_TRACE_POINT_COLOR = {
+    r = 1.00,
+    g = 0.40,
+    b = 0.70,
+    a = 0.90
+} -- pink
+
 local function ensure_entity_groups_table(ps)
     ps.visual = ps.visual or {}
     ps.visual.entity_groups = ps.visual.entity_groups or {}
+end
+
+local function ensure_survey_traces_table(ps)
+    ps.visual = ps.visual or {}
+    ps.visual.survey_traces = ps.visual.survey_traces or {}
+end
+
+function visual.clear_survey_trace(ps, trace_id)
+    if not (ps and ps.visual and ps.visual.survey_traces and trace_id) then
+        return
+    end
+
+    local t = ps.visual.survey_traces[trace_id]
+    if not t then
+        return
+    end
+
+    if t.lines then
+        for _, obj in pairs(t.lines) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+    end
+
+    if t.points then
+        for _, obj in pairs(t.points) do
+            if obj and obj.valid then
+                obj:destroy()
+            end
+        end
+    end
+
+    ps.visual.survey_traces[trace_id] = nil
 end
 
 function visual.clear_overlay(ps)
@@ -56,6 +110,10 @@ function visual.clear_entity_groups(ps)
         if g.type_label and g.type_label.valid then
             g.type_label:destroy()
         end
+
+        if g.area_label and g.area_label.valid then
+            g.area_label:destroy()
+        end
     end
 
     ps.visual.entity_groups = {}
@@ -87,9 +145,12 @@ function visual.clear_entity_group(ps, group_id)
         g.type_label:destroy()
     end
 
+    if g.area_label and g.area_label.valid then
+        g.area_label:destroy()
+    end
+
     ps.visual.entity_groups[group_id] = nil
 end
-
 
 function visual.clear_player_light(ps)
     if not (ps and ps.visual) then
@@ -103,7 +164,6 @@ function visual.clear_player_light(ps)
 
     ps.visual.player_light = nil
 end
-
 
 -- Compute the world-space position that corresponds
 -- to the top-left corner of the screen for this player.
@@ -134,6 +194,65 @@ local function get_screen_top_left_world(player)
         x = cx - half_w_tiles,
         y = cy - half_h_tiles
     }
+end
+
+function visual.append_survey_trace(player, ps, trace_id, points)
+    if not (player and player.valid and ps and trace_id and points) then
+        return
+    end
+
+    ensure_survey_traces_table(ps)
+
+    local t = ps.visual.survey_traces[trace_id]
+    if not t then
+        t = {
+            count = 0,
+            points = {},
+            lines = {}
+        }
+        ps.visual.survey_traces[trace_id] = t
+    end
+
+    local start_index = (t.count or 0) + 1
+    if start_index > #points then
+        return
+    end
+
+    -- Draw new points
+    for i = start_index, #points do
+        local p = points[i]
+        local is_start = (i == 1)
+
+        t.points[#t.points + 1] = rendering.draw_circle {
+            surface = player.surface,
+            target = p,
+            color = is_start and SURVEY_TRACE_START_COLOR or SURVEY_TRACE_POINT_COLOR,
+            radius = 0.18,
+            filled = true,
+            draw_on_ground = true,
+            only_in_alt_mode = false,
+            players = {player.index}
+        }
+
+        -- Draw edge from previous point to this point
+        if i > 1 then
+            local a = points[i - 1]
+            local b = p
+
+            t.lines[#t.lines + 1] = rendering.draw_line {
+                surface = player.surface,
+                from = a,
+                to = b,
+                color = SURVEY_TRACE_EDGE_COLOR,
+                width = 2,
+                draw_on_ground = true,
+                only_in_alt_mode = false,
+                players = {player.index}
+            }
+        end
+    end
+
+    t.count = #points
 end
 
 function visual.update_overlay(player, ps, lines)
@@ -293,6 +412,7 @@ function visual.draw_entity_group(player, ps, group_id, name, type, boundary, ce
     local name_label = nil
     local type_label = nil
     local draw_label = true
+    local area_label = nil
 
     if center and draw_label then
         local center_minus = {
@@ -303,6 +423,11 @@ function visual.draw_entity_group(player, ps, group_id, name, type, boundary, ce
         local center_plus = {
             x = center.x,
             y = center.y + 0.4
+        }
+
+        local center_plus_plus = {
+            x = center.x,
+            y = center.y + 1.2
         }
 
         name_label = rendering.draw_text {
@@ -340,15 +465,38 @@ function visual.draw_entity_group(player, ps, group_id, name, type, boundary, ce
             only_in_alt_mode = false,
             players = {player.index}
         }
+
+        local area = 0
+        if boundary and #boundary >= 3 then
+            area = polygon.polygon_area(boundary)
+        end
+
+        area_label = rendering.draw_text {
+            text = string.format("Area: %.1f", area),
+            surface = player.surface,
+            target = center_plus_plus,
+            color = {
+                r = 1,
+                g = 1,
+                b = 1,
+                a = 0.95
+            },
+            scale = 1.6,
+            alignment = "center",
+            vertical_alignment = "middle",
+            draw_on_ground = false,
+            only_in_alt_mode = false,
+            players = {player.index}
+        }
     end
 
     ps.visual.entity_groups[group_id] = {
         lines = lines,
         name_label = name_label,
-        type_label = type_label
+        type_label = type_label,
+        area_label = area_label
     }
 end
-
 
 function visual.draw_player_light(player, ps)
     if not (player and player.valid and ps and ps.visual) then

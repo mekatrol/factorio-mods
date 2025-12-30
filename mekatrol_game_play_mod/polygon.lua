@@ -317,6 +317,29 @@ function polygon.polygons_intersect(a, b)
     return false
 end
 
+function polygon.polygon_area(points)
+    if not points or #points < 3 then
+        return 0
+    end
+
+    local n = #points
+    if n >= 2 and polygon.points_equal(points[1], points[n]) then
+        n = n - 1
+        if n < 3 then
+            return 0
+        end
+    end
+
+    local sum = 0
+    for i = 1, n do
+        local a = points[i]
+        local b = points[(i % n) + 1]
+        sum = sum + (a.x * b.y - b.x * a.y)
+    end
+
+    return math.abs(sum) * 0.5
+end
+
 function polygon.merge_polygons(a, b, opts)
     opts = opts or {}
     local points = {}
