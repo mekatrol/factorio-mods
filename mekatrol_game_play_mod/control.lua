@@ -263,9 +263,14 @@ script.on_event(defines.events.on_tick, function(event)
     visual.draw_player_light(player, ps)
 
     ps.overlay_next_tick = event.tick + OVERLAY_UPDATE_TICKS
+
     local overlay_lines = {"[game play mod]:", string.format("game phase: %s", ps.game_phase or "none")}
 
     if ps.bot_enabled and ps.bots then
+        local bot = ps.bots["mapper"]
+        overlay_lines[#overlay_lines + 1] = string.format("q: %s, f: %s", #bot.task.queued_survey_entities,
+            #bot.task.future_survey_entities)
+
         local tick = event.tick
         constructor_bot.update(player, ps, state, visual, tick)
         logistics_bot.update(player, ps, state, visual, tick)

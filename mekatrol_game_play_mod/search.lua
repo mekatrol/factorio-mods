@@ -121,6 +121,7 @@ local function filter_entities(entities, filter_name)
         entities[i] = nil
     end
 
+    return filtered_entities
 end
 
 local function find_entity(player, ps, bot, pos, surface, search_item)
@@ -146,7 +147,7 @@ local function find_entity(player, ps, bot, pos, surface, search_item)
                     return e
                 end
             end
-        end        
+        end
     end
 
     local search_for_list = util.get_value(bot.task.args, "search_list")
@@ -275,6 +276,7 @@ function search.update(player, ps, state, bot)
                 -- try finding the new entity from the current position, and if found just return
                 -- without changing tasks
                 entity = find_entity(player, ps, bot, bpos, surf, search_item)
+
                 if entity then
                     bot.task.target_position = nil
                     return
@@ -288,6 +290,19 @@ function search.update(player, ps, state, bot)
                 -- return to follow mode
                 bot_module.set_bot_task(player, ps, "follow", nil, bot.task.args)
                 return
+            end
+
+            if #bot.task.queued_survey_entities == 0 then
+
+                -- check future entities for the entity name we are searching for
+                local future_queued = filter_entities(bot.task.future_survey_entities, search_item.name)
+
+                util.print(player, "red", "future had: %s count of %s", search_item.name, #future_queued)
+
+                if future_queued and #future_queued > 0 then
+                    bot.task.queued_survey_entities = future_queued
+                    return
+                end
             end
         end
 
