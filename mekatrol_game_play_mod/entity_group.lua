@@ -213,6 +213,10 @@ end
 function entity_group.add_single_tile_entity_group(player, ps, visual, surface_index, entity)
     entity_group.ensure_entity_groups(ps)
 
+    if not (entity and entity.valid) then
+        return
+    end
+
     local pos = entity.position
 
     -- Prefer selection_box (matches what players consider the entity's "size"),
