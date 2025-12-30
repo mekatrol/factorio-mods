@@ -344,27 +344,31 @@ local function advance_trace_one_step(player, player_state, visual, bot)
 
     local surface = bot.entity.surface
 
+    --------------------------------------------------------------------
+    -- Phase 1: walk north until the next tile north is outside
+    --------------------------------------------------------------------
     if trace_state.phase == "north" then
         -- Walk due north until the next tile does NOT contain the resource.
-        local tile_x, tile_y = tile_coordinates_from_world_position(bot.entity.position)
+        local current_tile_x, current_tile_y = tile_coordinates_from_world_position(bot.entity.position)
 
-        local MAX_NORTH_STUCK = 30 -- adjust (30 attempts is usually enough)
+        -- Detect “stuck” (not changing tiles) to avoid infinite loops.
+        local MAXIMUM_NORTH_PHASE_STUCK_ATTEMPTS = 30 -- adjust (30 attempts is usually enough)
 
-        if tile_x == trace_state.north_last_tx and tile_y == trace_state.north_last_ty then
-            trace_state.north_stuck_attempts = (trace_state.north_stuck_attempts or 0) + 1
-            if trace_state.north_stuck_attempts >= MAX_NORTH_STUCK then
+        if current_tile_x == trace_state.north_phase_last_tile_x and current_tile_y == trace_state.north_phase_last_tile_y then
+            trace_state.north_phase_stuck_attempts = (trace_state.north_phase_stuck_attempts or 0) + 1
+            if trace_state.north_phase_stuck_attempts >= MAXIMUM_NORTH_PHASE_STUCK_ATTEMPTS then
                 -- Abort trace; survey will restart when it finds the resource again
                 bot.task.survey_trace = nil
                 return nil
             end
         else
-            trace_state.north_last_tx = tile_x
-            trace_state.north_last_ty = tile_y
-            trace_state.north_stuck_attempts = 0
+            trace_state.north_phase_last_tile_x = current_tile_x
+            trace_state.north_phase_last_tile_y = current_tile_y
+            trace_state.north_phase_stuck_attempts = 0
         end
 
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
-        if not tile_contains_tracked_entity(surface, tracked_entity_name, tile_x, tile_y) then
+        if not tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, current_tile_y) then
             local found_tx, found_ty = find_nearest_tile_containing_entity(surface, tracked_entity_name,
                 bot.entity.position, math.ceil(BOT_CONFIGURATION.survey.radius) + 1)
             if found_tx then
@@ -378,14 +382,14 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             return nil
         end
 
-        local next_ty = tile_y - 1 -- due north in Factorio coords
-        if tile_contains_tracked_entity(surface, tracked_entity_name, tile_x, next_ty) then
-            return world_position_at_tile_center(tile_x, next_ty)
+        local next_ty = current_tile_y - 1 -- due north in Factorio coords
+        if tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, next_ty) then
+            return world_position_at_tile_center(current_tile_x, next_ty)
         end
 
         -- Next tile north is outside: current tile is our "north edge" start.
-        trace_state.start_tx = tile_x
-        trace_state.start_ty = tile_y
+        trace_state.start_tx = current_tile_x
+        trace_state.start_ty = current_tile_y
 
         -- Ensure we start on a boundary tile; if not, search nearby for one (tight, local).
         if not tile_is_boundary_tile(surface, tracked_entity_name, trace_state.start_tx, trace_state.start_ty) then
