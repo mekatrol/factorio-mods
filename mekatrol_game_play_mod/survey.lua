@@ -62,29 +62,47 @@ local function tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y
     return #entities_found > 0
 end
 
--- A boundary tile is an "inside" tile with at least one 4-neighbor "outside" tile.
-local function is_boundary_tile(surface, entity_name, tile_x, tile_y)
+--- A boundary tile is an “inside tile” with at least one 4-neighbor “outside tile”.
+--- 4-neighbors: north, east, south, west.
+--- @param surface LuaSurface
+--- @param entity_name string|nil
+--- @param tile_x integer
+--- @param tile_y integer
+--- @return boolean
+local function tile_is_boundary_tile(surface, entity_name, tile_x, tile_y)
+    -- Must be inside first.
     if not tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y) then
         return false
     end
 
-    -- 4-neighbors
+    -- North
     if not tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y - 1) then
         return true
-    end -- north
+    end
+    -- East
     if not tile_contains_tracked_entity(surface, entity_name, tile_x + 1, tile_y) then
         return true
-    end -- east
+    end
+    -- South
     if not tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y + 1) then
         return true
-    end -- south
+    end
+    -- West
     if not tile_contains_tracked_entity(surface, entity_name, tile_x - 1, tile_y) then
         return true
-    end -- west
+    end
 
     return false
 end
 
+--- Search outward from a given world position for any nearby tile containing the target entity.
+--- This is used to “snap back” to a valid inside tile if the bot drifted off the resource area.
+--- @param surface LuaSurface
+--- @param entity_name string
+--- @param world_position table {x=number, y=number}
+--- @param maximum_search_radius_tiles integer
+--- @return integer|nil found_tile_x
+--- @return integer|nil found_tile_y
 local function find_nearest_tile_containing_entity(surface, entity_name, world_position, maximum_search_radius_tiles)
     local center_tile_x, center_tile_y = tile_coordinates_from_world_position(world_position)
 
@@ -93,6 +111,7 @@ local function find_nearest_tile_containing_entity(surface, entity_name, world_p
             for delta_y = -radius_tiles, radius_tiles do
                 local candidate_tile_x = center_tile_x + delta_x
                 local candidate_tile_y = center_tile_y + delta_y
+
                 if tile_contains_tracked_entity(surface, entity_name, candidate_tile_x, candidate_tile_y) then
                     return candidate_tile_x, candidate_tile_y
                 end
@@ -115,9 +134,9 @@ end
 -- Stop when we return to p0 and next == p1.
 ----------------------------------------------------------------------
 
--- Clockwise neighbor order (Moore neighborhood):
--- 0: NW, 1: N, 2: NE, 3: E, 4: SE, 5: S, 6: SW, 7: W
-local N8 = {{
+-- Clockwise Moore-neighbourhood order:
+--   1: NW, 2: N, 3: NE, 4: E, 5: SE, 6: S, 7: SW, 8: W
+local MOORE_NEIGHBOR_OFFSETS_CLOCKWISE = {{
     dx = -1,
     dy = -1
 }, -- NW
@@ -151,37 +170,61 @@ local N8 = {{
 } -- W
 }
 
-local function neighbor_index(from_tx, from_ty, to_tx, to_ty)
-    local dx = to_tx - from_tx
-    local dy = to_ty - from_ty
-    for i = 1, 8 do
-        local n = N8[i]
-        if n.dx == dx and n.dy == dy then
-            return i
+--- Find the 1..8 neighbor index for a tile-to-tile step.
+--- @param from_tile_x integer
+--- @param from_tile_y integer
+--- @param to_tile_x integer
+--- @param to_tile_y integer
+--- @return integer|nil neighbor_index_1_to_8
+local function moore_neighbor_index(from_tile_x, from_tile_y, to_tile_x, to_tile_y)
+    local delta_x = to_tile_x - from_tile_x
+    local delta_y = to_tile_y - from_tile_y
+
+    for neighbor_index = 1, 8 do
+        local neighbor_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbor_index]
+        if neighbor_offset.dx == delta_x and neighbor_offset.dy == delta_y then
+            return neighbor_index
         end
     end
+
     return nil
 end
 
-local function moore_next(surface, entity_name, p_tx, p_ty, b_tx, b_ty)
-    -- start scanning from the neighbor *after* backtrack neighbor, clockwise
-    local b_idx = neighbor_index(p_tx, p_ty, b_tx, b_ty) or 8 -- default W
-    local start_idx = (b_idx % 8) + 1
+--- Compute the next boundary tile using Moore-neighborhood boundary tracing.
+--- @param surface LuaSurface
+--- @param entity_name string|nil
+--- @param current_tile_x integer
+--- @param current_tile_y integer
+--- @param backtrack_tile_x integer
+--- @param backtrack_tile_y integer
+--- @return integer|nil next_tile_x
+--- @return integer|nil next_tile_y
+--- @return integer|nil next_backtrack_tile_x
+--- @return integer|nil next_backtrack_tile_y
+local function moore_trace_next_boundary_tile(surface, entity_name, current_tile_x, current_tile_y, backtrack_tile_x,
+    backtrack_tile_y)
+    -- Start scanning from the neighbor after the backtrack neighbor, clockwise.
+    local backtrack_neighbor_index = moore_neighbor_index(current_tile_x, current_tile_y, backtrack_tile_x,
+        backtrack_tile_y) or 8 -- default to W if unknown
 
-    for step = 0, 7 do
-        local i = ((start_idx - 1 + step) % 8) + 1
-        local n = N8[i]
-        local ntx = p_tx + n.dx
-        local nty = p_ty + n.dy
+    local first_scan_neighbor_index = (backtrack_neighbor_index % 8) + 1
 
-        if is_boundary_tile(surface, entity_name, ntx, nty) then
-            -- New backtrack is the neighbor just before i (counterclockwise)
-            local prev_i = ((i - 2) % 8) + 1
-            local pn = N8[prev_i]
-            local nb_tx = p_tx + pn.dx
-            local nb_ty = p_ty + pn.dy
+    for scan_step = 0, 7 do
+        local neighbor_index = ((first_scan_neighbor_index - 1 + scan_step) % 8) + 1
+        local neighbor_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbor_index]
 
-            return ntx, nty, nb_tx, nb_ty
+        local candidate_tile_x = current_tile_x + neighbor_offset.dx
+        local candidate_tile_y = current_tile_y + neighbor_offset.dy
+
+        if tile_is_boundary_tile(surface, entity_name, candidate_tile_x, candidate_tile_y) then
+            -- Backtrack becomes the neighbor immediately before the chosen neighbor (counterclockwise).
+            local counterclockwise_neighbor_index = ((neighbor_index - 2) % 8) + 1
+            local counterclockwise_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[counterclockwise_neighbor_index]
+
+            local next_backtrack_x = current_tile_x + counterclockwise_offset.dx
+            local next_backtrack_y = current_tile_y + counterclockwise_offset.dy
+
+            return candidate_tile_x, candidate_tile_y, next_backtrack_x, next_backtrack_y
         end
     end
 
@@ -329,13 +372,13 @@ local function trace_step(player, ps, state, visual, bot)
         tr.start_ty = tile_y
 
         -- Ensure we start on a boundary tile; if not, search nearby for one (tight, local).
-        if not is_boundary_tile(surf, entity_name, tr.start_tx, tr.start_ty) then
+        if not tile_is_boundary_tile(surf, entity_name, tr.start_tx, tr.start_ty) then
             local found_boundary = false
             for i = 1, 8 do
-                local n = N8[i]
+                local n = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[i]
                 local ntx = tr.start_tx + n.dx
                 local nty = tr.start_ty + n.dy
-                if is_boundary_tile(surf, entity_name, ntx, nty) then
+                if tile_is_boundary_tile(surf, entity_name, ntx, nty) then
                     tr.start_tx = ntx
                     tr.start_ty = nty
                     found_boundary = true
@@ -363,7 +406,7 @@ local function trace_step(player, ps, state, visual, bot)
         tr.p1_ty = nil
 
         -- First edge move:
-        local nx, ny, nbx, nby = moore_next(surf, entity_name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
+        local nx, ny, nbx, nby = moore_trace_next_boundary_tile(surf, entity_name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
         if not nx then
             bot.task.survey_trace = nil
             return nil
@@ -384,7 +427,7 @@ local function trace_step(player, ps, state, visual, bot)
 
     if tr.phase == "edge" then
         -- Closed when we are back at start AND the next step would be p1.
-        local nx, ny, nbx, nby = moore_next(surf, entity_name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
+        local nx, ny, nbx, nby = moore_trace_next_boundary_tile(surf, entity_name, tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty)
         if not nx then
             bot.task.survey_trace = nil
             return nil
