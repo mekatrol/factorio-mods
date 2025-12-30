@@ -42,7 +42,8 @@ function mapper_bot.init_state(player, ps)
 
     bot.task.search_item = bot.task.search_item or {
         name = nil,
-        find_many = false
+        find_many = false,
+        remove_when_no_more_found = false
     }
 end
 
@@ -113,26 +114,32 @@ function mapper_bot.update(player, ps, state, visual, tick)
 
         bot.task.search_item = {
             name = nil,
-            find_many = false
+            find_many = false,
+            remove_when_no_more_found = false
         }
 
         local args = {
             -- set the list of items to search for and in the order we want to search
             ["search_list"] = {{
                 name = "crash-site",
-                find_many = true
+                find_many = true,
+                remove_when_no_more_found = true
             }, {
                 name = "coal",
-                find_many = true
+                find_many = true,
+                remove_when_no_more_found = false
             }, {
                 name = "iron-ore",
-                find_many = true
+                find_many = true,
+                remove_when_no_more_found = false
             }, {
                 name = "stone",
-                find_many = true
+                find_many = true,
+                remove_when_no_more_found = false
             }, {
                 name = "tree",
-                find_many = true
+                find_many = true,
+                remove_when_no_more_found = false
             }}
         }
 

@@ -80,7 +80,8 @@ local function rotate_search_item_to_back(bot)
     -- clear current so next pop gets a new one
     bot.task.search_item = {
         name = nil,
-        find_many = false
+        find_many = false,
+        remove_when_no_more_found = false
     }
 end
 
@@ -154,7 +155,8 @@ local function get_search_item(player, ps, bot)
     -- try an get next search name in list
     bot.task.search_item = util.dict_array_pop(bot.task.args, "search_list") or {
         name = nil,
-        find_many = false
+        find_many = false,
+        remove_when_no_more_found = false
     }
 
     return bot.task.search_item
@@ -181,7 +183,8 @@ function search.update(player, ps, state, bot)
             -- found one so move to next name
             bot.task.search_item = {
                 name = nil,
-                find_many = false
+                find_many = false,
+                remove_when_no_more_found = false
             }
 
             search_item = get_search_item(player, ps, bot)
@@ -215,7 +218,7 @@ function search.update(player, ps, state, bot)
             return
         else
             if bot.task.survey_found_entity then
-                if search_item.find_many == true then
+                if search_item.find_many == true and not search_item.remove_when_no_more_found then
                     -- rotate to back and try next type
                     rotate_search_item_to_back(bot)
                 end
@@ -223,7 +226,8 @@ function search.update(player, ps, state, bot)
                 -- clear current name (so the next name will be fetched)
                 bot.task.search_item = {
                     name = nil,
-                    find_many = false
+                    find_many = false,
+                    remove_when_no_more_found = false
                 }
 
                 -- update search name to next type
