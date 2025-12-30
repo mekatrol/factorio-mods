@@ -101,7 +101,29 @@ function search.pick_new_search_target_spiral(ps, bpos)
     }
 end
 
-local function find_entity(player, ps, bot, pos, surf, search_item)
+local function filter_entities(entities, filter_name)
+    local filtered_entities = {}
+    local write_index = 1
+
+    for i = 1, #entities do
+        local entity = entities[i]
+
+        if entity.name == filter_name then
+            filtered_entities[#filtered_entities + 1] = entity
+        else
+            entities[write_index] = entity
+            write_index = write_index + 1
+        end
+    end
+
+    -- shrink others_found to remove trailing leftovers
+    for i = write_index, #entities do
+        entities[i] = nil
+    end
+
+end
+
+local function find_entity(player, ps, bot, pos, surface, search_item)
     local entity_group = module.get_module("entity_group")
 
     bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
@@ -120,15 +142,15 @@ local function find_entity(player, ps, bot, pos, surf, search_item)
 
             if e and e.valid then
                 -- recheck this entity may have been added prior to boundary for this area created
-                if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
+                if not entity_group.is_in_any_entity_group(ps, surface.index, e) then
                     return e
                 end
             end
-        end
+        end        
     end
 
     local search_for_list = util.get_value(bot.task.args, "search_list")
-    local entities_found, others_found = util.find_entities(player, pos, BOT_CONF.search.detection_radius, surf,
+    local entities_found, others_found = util.find_entities(player, pos, BOT_CONF.search.detection_radius, surface,
         search_item.name, search_for_list, true, true)
 
     if #others_found > 0 then
@@ -145,7 +167,7 @@ local function find_entity(player, ps, bot, pos, surf, search_item)
     for _, e in ipairs(entities_found) do
         if not entity_group.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
-            if not entity_group.is_in_any_entity_group(ps, surf.index, e) then
+            if not entity_group.is_in_any_entity_group(ps, surface.index, e) then
                 if not next_found_entity then
                     next_found_entity = e
                 else
