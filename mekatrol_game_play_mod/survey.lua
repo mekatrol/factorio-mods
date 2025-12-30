@@ -480,9 +480,13 @@ local function advance_trace_one_step(player, player_state, visual, bot)
 
         -- Closure condition:
         --   We are back at the start tile AND the next step would be the first edge step tile.
-        if trace_state.has_started_edge_trace and trace_state.current_tile_x == trace_state.start_boundary_tile_x and
-            trace_state.current_tile_y == trace_state.start_boundary_tile_y and next_tile_x ==
-            trace_state.first_edge_step_tile_x and next_tile_y == trace_state.first_edge_step_tile_y then
+        local is_at_start_tile = trace_state.current_tile_x == trace_state.start_boundary_tile_x and
+                                     trace_state.current_tile_y == trace_state.start_boundary_tile_y
+
+        local next_step_is_first_edge_step = next_tile_x == trace_state.first_edge_step_tile_x and next_tile_y ==
+                                                 trace_state.first_edge_step_tile_y
+
+        if trace_state.has_started_edge_trace and is_at_start_tile and next_step_is_first_edge_step then
             local entity_group = module.get_module("entity_group")
 
             -- Completed loop: persist + render the boundary group.
