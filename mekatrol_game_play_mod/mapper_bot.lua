@@ -123,13 +123,13 @@ function mapper_bot.update(player, ps, state, visual, tick)
                 find_many = true
             }, {
                 name = "coal",
-                find_many = false
+                find_many = true
             }, {
                 name = "iron-ore",
-                find_many = false
+                find_many = true
             }, {
                 name = "stone",
-                find_many = false
+                find_many = true
             }, {
                 name = "tree",
                 find_many = true

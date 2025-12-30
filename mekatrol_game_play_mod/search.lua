@@ -60,6 +60,30 @@ local function spiral_advance(ps)
     end
 end
 
+local function rotate_search_item_to_back(bot)
+    local search_item = bot.task.search_item
+    if not search_item or not search_item.name then
+        return
+    end
+
+    local list = bot.task.args and bot.task.args.search_list
+    if not list then
+        return
+    end
+
+    -- push current item to back
+    list[#list + 1] = {
+        name = search_item.name,
+        find_many = search_item.find_many
+    }
+
+    -- clear current so next pop gets a new one
+    bot.task.search_item = {
+        name = nil,
+        find_many = false
+    }
+end
+
 function search.pick_new_search_target_spiral(ps, bpos)
     if not ps.search_spiral then
         init_spiral(ps, bpos)
@@ -191,21 +215,24 @@ function search.update(player, ps, state, bot)
             return
         else
             if bot.task.survey_found_entity then
-                if search_item.find_many == false then
-                    -- clear current name (so the next name will be fetched)
-                    bot.task.search_item = {
-                        name = nil,
-                        find_many = false
-                    }
-
-                    -- update search name to next type
-                    search_item = get_search_item(player, ps, bot)
-
-                    -- clear previous found entity
-                    bot.task.survey_entity = nil
-                    bot.task.search_item = search_item
-                    bot.task.survey_found_entity = false
+                if search_item.find_many == true then
+                    -- rotate to back and try next type
+                    rotate_search_item_to_back(bot)
                 end
+
+                -- clear current name (so the next name will be fetched)
+                bot.task.search_item = {
+                    name = nil,
+                    find_many = false
+                }
+
+                -- update search name to next type
+                search_item = get_search_item(player, ps, bot)
+
+                -- clear previous found entity
+                bot.task.survey_entity = nil
+                bot.task.search_item = search_item
+                bot.task.survey_found_entity = false
 
                 -- try finding the new entity from the current position, and if found just return
                 -- without changing tasks
