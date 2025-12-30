@@ -23,6 +23,8 @@ local util = require("util")
 
 local BOT_CONFIGURATION = config.bot
 
+local PERIMETER_UNCHANGED_COUNT_THRESHOLD = 10
+
 --------------------------------------------------------------------------------
 -- Tile / coordinate helpers
 --------------------------------------------------------------------------------
@@ -558,11 +560,13 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             if math.abs(perimeter - trace_state.perimeter) < 0.001 then
                 trace_state.permiter_unchanged_count = trace_state.permiter_unchanged_count + 1
 
-                util.print(player, "yellow", "[unchanged] p: %s", trace_state.permiter_unchanged_count )
-
-                if trace_state.permiter_unchanged_count >= 20 then
+                -- has the perimeter remain unchanged for the threshold count?
+                if trace_state.permiter_unchanged_count >= PERIMETER_UNCHANGED_COUNT_THRESHOLD then
                     util.print(player, "red", "[unchanged] p: %s", perimeter)
                 end
+            else
+                -- if permiter changes then reset count
+                trace_state.permiter_unchanged_count = 0
             end
 
             trace_state.area = area
