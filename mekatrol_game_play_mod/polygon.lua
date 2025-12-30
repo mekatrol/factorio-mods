@@ -340,6 +340,57 @@ function polygon.polygon_area(points)
     return math.abs(sum) * 0.5
 end
 
+function polygon.polygon_area_perimeter(points)
+    if not points or #points < 3 then
+        return 0, 0
+    end
+
+    -- Area: keep original order, only drop duplicated closing point
+    local n_area = #points
+    if n_area >= 2 and polygon.points_equal(points[1], points[n_area]) then
+        n_area = n_area - 1
+        if n_area < 3 then
+            return 0, 0
+        end
+    end
+
+    local sum = 0
+    for i = 1, n_area do
+        local a = points[i]
+        local b = points[(i % n_area) + 1]
+        sum = sum + (a.x * b.y - b.x * a.y)
+    end
+    local area = math.abs(sum) * 0.5
+
+    -- Perimeter: ignore ALL duplicates (order-preserving)
+    local seen = {}
+    local uniq = {}
+    for i = 1, #points do
+        local p = points[i]
+        local k = tostring(p.x) .. "," .. tostring(p.y)
+        if not seen[k] then
+            seen[k] = true
+            uniq[#uniq + 1] = p
+        end
+    end
+
+    local n = #uniq
+    if n < 2 then
+        return area, 0
+    end
+
+    local perim = 0
+    for i = 1, n do
+        local a = uniq[i]
+        local b = uniq[(i % n) + 1]
+        local dx = a.x - b.x
+        local dy = a.y - b.y
+        perim = perim + math.sqrt(dx * dx + dy * dy)
+    end
+
+    return area, perim
+end
+
 function polygon.merge_polygons(a, b, opts)
     opts = opts or {}
     local points = {}

@@ -262,8 +262,10 @@ function visual.append_survey_trace(player, ps, trace_id, points)
 
     -- Update / create live area label while tracing (treats the polyline as a polygon by closing last->first)
     local area = 0
+    local perimeter = 0
     if #points >= 3 then
-        area = polygon.polygon_area(points)
+        area, perimeter = polygon.polygon_area_perimeter(points)
+        util.print(player, "red", "p: %s", perimeter)
     end
 
     -- Label position: average of points, slightly below
@@ -518,8 +520,10 @@ function visual.draw_entity_group(player, ps, group_id, name, type, boundary, ce
         }
 
         local area = 0
+        local perimeter = 0
         if boundary and #boundary >= 3 then
-            area = polygon.polygon_area(boundary)
+            area, perimeter = polygon.polygon_area_perimeter(boundary)
+            util.print(player, "red", "p: %s", perimeter)
         end
 
         area_label = rendering.draw_text {
