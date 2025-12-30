@@ -139,6 +139,36 @@ local function find_nearest_tile_containing_entity(surface, entity_name, world_p
     return nil
 end
 
+-- De-duplicate points globally (order-preserving), but always keep:
+--   - the first point (start)
+--   - the last point (end)
+local function dedupe_boundary_preserve_ends(points)
+    if not points or #points == 0 then
+        return {}
+    end
+    if #points <= 2 then
+        return points
+    end
+
+    local out = {points[1]}
+    local seen = {}
+    seen[tostring(points[1].x) .. "," .. tostring(points[1].y)] = true
+
+    -- middle points: only first occurrence
+    for i = 2, #points - 1 do
+        local p = points[i]
+        local k = tostring(p.x) .. "," .. tostring(p.y)
+        if not seen[k] then
+            seen[k] = true
+            out[#out + 1] = p
+        end
+    end
+
+    -- always keep the final point even if duplicate
+    out[#out + 1] = points[#points]
+    return out
+end
+
 --------------------------------------------------------------------------------
 -- Moore-neighbourhood clockwise boundary tracing over tiles
 --
@@ -562,7 +592,21 @@ local function advance_trace_one_step(player, player_state, visual, bot)
 
                 -- has the perimeter remain unchanged for the threshold count?
                 if trace_state.permiter_unchanged_count >= PERIMETER_UNCHANGED_COUNT_THRESHOLD then
-                    util.print(player, "red", "[unchanged] p: %s", perimeter)
+                    local entity_group = module.get_module("entity_group")
+                    entity_group.ensure_entity_groups(player_state)
+
+                    local boundary_world_positions = dedupe_boundary_preserve_ends(
+                        trace_state.boundary_points_world_positions or {})
+
+                    if visual and visual.clear_survey_trace then
+                        visual.clear_survey_trace(player_state, bot.name)
+                    end
+
+                    entity_group.add_boundary(player, player_state, visual, boundary_world_positions, target_entity,
+                        surface.index)
+
+                    switch_bot_to_next_task(player, player_state, visual, bot)
+                    return nil
                 end
             else
                 -- if permiter changes then reset count
