@@ -1,7 +1,5 @@
 local module = {}
 
-local util = require("util")
-
 local key_for = {
     constructor = "constructor_bot",
     logistics = "logistics_bot",
@@ -13,13 +11,6 @@ local key_for = {
 }
 
 module.modules = {}
-
-local function print_modules()
-    util.print(game, "red", "modules:")
-    for key, value in pairs(module.modules) do
-        util.print(game, "red", "  %s = %s", key, tostring(value))
-    end
-end
 
 function module.init_module(modules)
     module.modules = modules or {}

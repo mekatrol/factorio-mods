@@ -1,5 +1,10 @@
 local util = {}
 
+local config = require("config")
+local module = require("module")
+
+local BOT_CONFIGURATION = config.bot
+
 ----------------------------------------------------------------------
 -- Print helpers
 ----------------------------------------------------------------------
@@ -17,6 +22,13 @@ function util.print(player_or_game, color, fmt, ...)
         game.print(text)
     elseif player_or_game and player_or_game.valid then
         player_or_game.print(text)
+    end
+end
+
+function util.print_modules()
+    util.print(game, "red", "modules:")
+    for key, value in pairs(module.modules) do
+        util.print(game, "red", "  %s = %s", key, tostring(value))
     end
 end
 
@@ -303,6 +315,64 @@ function util.find_entities(player, pos, radius, surf, find_name, find_others, f
     end
 
     return util.filter_player_and_bots(player, found), util.filter_player_and_bots(player, others)
+end
+
+function util.find_entity(player, ps, bot, pos, surface, search_item)
+    local entity_group = module.get_module("entity_group")
+
+    bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
+    bot.task.future_survey_entities = bot.task.future_survey_entities or {}
+
+    local next_entities = bot.task.queued_survey_entities
+    local future_entities = bot.task.future_survey_entities
+
+    if search_item.find_many then
+        -- re-sort table as different entities may now be closer to bot position
+        util.sort_entities_by_position(next_entities, pos)
+
+        -- if there are any queued then remove until a valid one is found
+        while #next_entities > 0 do
+            local e = table.remove(next_entities, 1)
+
+            if e and e.valid then
+                -- recheck this entity may have been added prior to boundary for this area created
+                if not entity_group.is_in_any_entity_group(ps, surface.index, e) then
+                    return e
+                end
+            end
+        end
+    end
+
+    local search_for_list = util.get_value(bot.task.args, "search_list")
+    local entities_found, others_found = util.find_entities(player, pos, BOT_CONFIGURATION.search.detection_radius, surface,
+        search_item.name, search_for_list, true, true)
+
+    if #others_found > 0 then
+        -- add to future entities
+        local start = #future_entities
+        for i = 1, #others_found do
+            future_entities[start + i] = others_found[i]
+        end
+    end
+
+    local char = player.character
+    local next_found_entity = nil
+
+    for _, e in ipairs(entities_found) do
+        if not entity_group.is_survey_ignore_target(e) then
+            -- Ignore entities already covered by an existing entity_group polygon
+            if not entity_group.is_in_any_entity_group(ps, surface.index, e) then
+                if not next_found_entity then
+                    next_found_entity = e
+                else
+                    -- Add it to next set to be found
+                    next_entities[#next_entities + 1] = e
+                end
+            end
+        end
+    end
+
+    return next_found_entity
 end
 
 return util
