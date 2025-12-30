@@ -133,6 +133,10 @@ function mapper_bot.update(player, ps, state, visual, tick)
                 find_many = true,
                 remove_when_no_more_found = false
             }, {
+                name = "copper-ore",
+                find_many = true,
+                remove_when_no_more_found = false
+            }, {
                 name = "stone",
                 find_many = true,
                 remove_when_no_more_found = false

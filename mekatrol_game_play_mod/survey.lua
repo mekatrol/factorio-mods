@@ -356,16 +356,36 @@ function survey.perform_survey_scan(player, player_state, bot, tick)
         return false
     end
 
-    -- Record the actual entity instance found (first match) as the target for tracing.
-    bot.task.survey_entity = entities_found[1]
+    local entity_group = module.get_module("entity_group")
 
-    -- Start tracing if not already tracing.
-    ensure_survey_trace_state(player_state, bot)
-    if not bot.task.survey_trace then
-        begin_trace_from_detected_resource(player_state, bot)
+    -- Try ALL found entities looking for one that is usable
+    for i = 1, #entities_found do
+        local found_entity = entities_found[i]
+
+        -- Skip entities already grouped
+        if not entity_group.is_in_any_entity_group(player_state, surface.index, found_entity) then
+            -- Select this entity
+            bot.task.survey_entity = found_entity
+
+            -- If already at the entity, begin tracing
+            if positioning.positions_are_close(bot.entity.position, found_entity.position,
+                BOT_CONFIGURATION.survey.arrival_threshold) then
+                ensure_survey_trace_state(player_state, bot)
+
+                if not bot.task.survey_trace then
+                    begin_trace_from_detected_resource(player_state, bot)
+                end
+            else
+                -- Otherwise move toward it
+                bot.task.target_position = found_entity.position
+            end
+
+            return true
+        end
     end
 
-    return true
+    -- All candidates were unusable
+    return false
 end
 
 --- Switch the bot to its next configured task and clear survey-specific state.
@@ -667,6 +687,8 @@ function survey.update(player, player_state, visual, bot, tick)
         -- Arrived; request the next trace target on the next update tick.
         bot.task.target_position = nil
         return
+    elseif bot.task.target_position ~= nil then
+        positioning.move_entity_towards(player, bot.entity, bot.task.target_position)
     end
 
     -- Not tracing: ensure we have a survey target entity configured.
