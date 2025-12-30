@@ -262,10 +262,12 @@ function util.sort_entities_by_position(entities, pos)
     end)
 end
 
-function util.find_entities(player, pos, radius, surf, find_name, find_starts_with, sort_by_pos)
+function util.find_entities(player, pos, radius, surf, find_name, find_others, find_starts_with, sort_by_pos)
     local found = {}
+    local others = {}
 
     if find_name == nil or not find_starts_with then
+
         -- find when name is not specified, or not looking for a name that starts with
         found = surf.find_entities_filtered {
             position = pos,
@@ -280,8 +282,18 @@ function util.find_entities(player, pos, radius, surf, find_name, find_starts_wi
             position = pos,
             radius = radius
         }) do
-            if ent.valid and string.sub(ent.name, 1, #prefix) == prefix then
-                found[#found + 1] = ent
+            if ent.valid then
+                if string.sub(ent.name, 1, #prefix) == prefix then
+                    found[#found + 1] = ent
+                else
+                    if find_others ~= nil then
+                        for k, v in pairs(find_others) do
+                            if v.name == ent.name then
+                                others[#others + 1] = ent
+                            end
+                        end
+                    end
+                end
             end
         end
     end
@@ -290,7 +302,7 @@ function util.find_entities(player, pos, radius, surf, find_name, find_starts_wi
         found = util.filter_player_and_bots(player, found)
     end
 
-    return util.filter_player_and_bots(player, found)
+    return util.filter_player_and_bots(player, found), util.filter_player_and_bots(player, others)
 end
 
 return util

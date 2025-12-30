@@ -125,12 +125,20 @@ local function find_entity(player, ps, bot, pos, surf, search_item)
         end
     end
 
-    local found = util.find_entities(player, pos, BOT_CONF.search.detection_radius, surf, search_item.name, true, true)
+    local search_for_list = util.get_value(bot.task.args, "search_list")
+    local entities_found, others_found = util.find_entities(player, pos, BOT_CONF.search.detection_radius, surf,
+        search_item.name, search_for_list, true, true)
+
+    if #others_found > 0 then
+        for i = 1, #others_found do
+            next_entities[#next_entities + 1] = others_found[i]
+        end
+    end
 
     local char = player.character
     local next_found_entity = nil
 
-    for _, e in ipairs(found) do
+    for _, e in ipairs(entities_found) do
         if not entity_group.is_survey_ignore_target(e) then
             -- Ignore entities already covered by an existing entity_group polygon
             if not entity_group.is_in_any_entity_group(ps, surf.index, e) then

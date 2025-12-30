@@ -349,8 +349,9 @@ function survey.perform_survey_scan(player, player_state, bot, tick)
 
     local survey_entity_name = bot.task.survey_entity.name
 
-    local entities_found = util.find_entities(player, bot_world_position, BOT_CONFIGURATION.search.detection_radius,
-        surface, survey_entity_name, true, true)
+    local search_for_list = util.get_value(bot.task.args, "search_list")
+    local entities_found, others_found = util.find_entities(player, bot_world_position,
+        BOT_CONFIGURATION.search.detection_radius, surface, survey_entity_name, search_for_list, true, true)
 
     if #entities_found == 0 then
         return false
