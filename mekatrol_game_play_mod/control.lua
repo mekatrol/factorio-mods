@@ -35,6 +35,50 @@ local function init_modules()
     })
 end
 
+-- control.lua (or a shared util)
+
+local function ensure_bot_map_tag(player, bot, icon_item_name, text)
+    if not (player and player.valid) then
+        return
+    end
+    if not (bot and bot.entity and bot.entity.valid) then
+        return
+    end
+
+    local force = player.force
+    local surface = bot.entity.surface
+    local pos = bot.entity.position
+
+    bot.visual = bot.visual or {}
+    local tag = bot.visual.map_tag
+
+    if tag and tag.valid then
+        -- update as the bot moves
+        tag.position = pos
+        tag.text = text
+        -- tag.icon is writable in Factorio 2; set if you want to change it dynamically
+        return
+    end
+
+    bot.visual.map_tag = force.add_chart_tag(surface, {
+        position = pos,
+        text = text,
+        icon = {
+            type = "item",
+            name = icon_item_name
+        } -- or type="entity"/"virtual"/"technology"
+    })
+end
+
+local function destroy_bot_map_tag(bot)
+    if bot and bot.visual and bot.visual.map_tag and bot.visual.map_tag.valid then
+        bot.visual.map_tag.destroy()
+    end
+    if bot and bot.visual then
+        bot.visual.map_tag = nil
+    end
+end
+
 ----------------------------------------------------------------------
 -- Hotkey handlers
 ----------------------------------------------------------------------
@@ -343,6 +387,17 @@ script.on_event(defines.events.on_tick, function(event)
     end
 
     update_bot_reveal(player, ps, event.tick)
+
+    if ps.bots then
+        local bot = ps.bots["constructor"]
+        ensure_bot_map_tag(player, bot, "construction-robot", "C")
+        local bot = ps.bots["logistics"]
+        ensure_bot_map_tag(player, bot, "construction-robot", "L")
+        local bot = ps.bots["mapper"]
+        ensure_bot_map_tag(player, bot, "construction-robot", "M")
+        local bot = ps.bots["repairer"]
+        ensure_bot_map_tag(player, bot, "construction-robot", "R")
+    end
 
     -------------------------------------------------------------------------------
     -- Render overlay
