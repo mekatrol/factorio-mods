@@ -12,71 +12,89 @@ local BOT_CONF = config.bot
 -- Tile helpers
 ----------------------------------------------------------------------
 
-local function tile_xy_from_pos(pos)
-    return math.floor(pos.x), math.floor(pos.y)
+--- Convert a world position (float) to a tile coordinate (int) by flooring.
+--- @param world_position table {x=number, y=number}
+--- @return integer tile_x
+--- @return integer tile_y
+local function tile_coordinates_from_world_position(world_position)
+    return math.floor(world_position.x), math.floor(world_position.y)
 end
 
-local function tile_center(tx, ty)
+--- Convert tile coordinates into the world position of the tile center.
+--- @param tile_x integer
+--- @param tile_y integer
+--- @return table world_position {x=number, y=number}
+local function world_position_at_tile_center(tile_x, tile_y)
     return {
-        x = tx + 0.5,
-        y = ty + 0.5
+        x = tile_x + 0.5,
+        y = tile_y + 0.5
     }
 end
 
-local function tile_key(tx, ty)
-    return tostring(tx) .. "," .. tostring(ty)
+--- Generate a stable string key for a tile coordinate.
+--- @param tile_x integer
+--- @param tile_y integer
+--- @return string key
+local function tile_key_from_coordinates(tile_x, tile_y)
+    return tostring(tile_x) .. "," .. tostring(tile_y)
 end
 
--- Checks whether the *tile* at (tx,ty) contains at least one entity with the tracked name.
--- Uses a 0.49 radius around tile center so it stays within the tile.
-local function tile_has_name(surface, entity_name, tx, ty)
+--- Returns whether the tile at (tile_x, tile_y) contains at least one entity with entity_name.
+--- Implementation detail:
+---   Uses a radius of 0.49 around the tile center to stay within the tile footprint.
+--- @param surface LuaSurface
+--- @param entity_name string|nil
+--- @param tile_x integer
+--- @param tile_y integer
+--- @return boolean
+local function tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y)
     if not entity_name then
         return false
     end
 
-    local c = tile_center(tx, ty)
-    local found = surface.find_entities_filtered {
-        position = c,
+    local tile_center_world_position = world_position_at_tile_center(tile_x, tile_y)
+    local entities_found = surface.find_entities_filtered {
+        position = tile_center_world_position,
         radius = 0.49,
         name = entity_name
     }
 
-    return #found > 0
+    return #entities_found > 0
 end
 
 -- A boundary tile is an "inside" tile with at least one 4-neighbor "outside" tile.
-local function is_boundary_tile(surface, entity_name, tx, ty)
-    if not tile_has_name(surface, entity_name, tx, ty) then
+local function is_boundary_tile(surface, entity_name, tile_x, tile_y)
+    if not tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y) then
         return false
     end
 
     -- 4-neighbors
-    if not tile_has_name(surface, entity_name, tx, ty - 1) then
+    if not tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y - 1) then
         return true
     end -- north
-    if not tile_has_name(surface, entity_name, tx + 1, ty) then
+    if not tile_contains_tracked_entity(surface, entity_name, tile_x + 1, tile_y) then
         return true
     end -- east
-    if not tile_has_name(surface, entity_name, tx, ty + 1) then
+    if not tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y + 1) then
         return true
     end -- south
-    if not tile_has_name(surface, entity_name, tx - 1, ty) then
+    if not tile_contains_tracked_entity(surface, entity_name, tile_x - 1, tile_y) then
         return true
     end -- west
 
     return false
 end
 
-local function find_nearby_resource_tile(surface, name, pos, max_r)
-    local cx, cy = tile_xy_from_pos(pos)
+local function find_nearest_tile_containing_entity(surface, entity_name, world_position, maximum_search_radius_tiles)
+    local center_tile_x, center_tile_y = tile_coordinates_from_world_position(world_position)
 
-    for r = 0, max_r do
-        for dx = -r, r do
-            for dy = -r, r do
-                local tx = cx + dx
-                local ty = cy + dy
-                if tile_has_name(surface, name, tx, ty) then
-                    return tx, ty
+    for radius_tiles = 0, maximum_search_radius_tiles do
+        for delta_x = -radius_tiles, radius_tiles do
+            for delta_y = -radius_tiles, radius_tiles do
+                local candidate_tile_x = center_tile_x + delta_x
+                local candidate_tile_y = center_tile_y + delta_y
+                if tile_contains_tracked_entity(surface, entity_name, candidate_tile_x, candidate_tile_y) then
+                    return candidate_tile_x, candidate_tile_y
                 end
             end
         end
@@ -179,12 +197,12 @@ local function ensure_trace(ps, bot)
 end
 
 local function start_trace_from_found(ps, bot)
-    local tx, ty = tile_xy_from_pos(bot.entity.position)
+    local tile_x, tile_y = tile_coordinates_from_world_position(bot.entity.position)
 
     bot.task.survey_trace = {
         phase = "north", -- "north" then "edge"
-        origin_tx = tx, -- where we first saw it (not strictly required)
-        origin_ty = ty,
+        origin_tx = tile_x, -- where we first saw it (not strictly required)
+        origin_ty = tile_y,
 
         -- will be set when north phase ends:
         start_tx = nil,
@@ -204,8 +222,8 @@ local function start_trace_from_found(ps, bot)
 
         -- unstick guard
         north_stuck_attempts = 0,
-        north_last_tx = tx,
-        north_last_ty = ty
+        north_last_tx = tile_x,
+        north_last_ty = tile_y
     }
 end
 
@@ -269,11 +287,11 @@ local function trace_step(player, ps, state, visual, bot)
 
     if tr.phase == "north" then
         -- Walk due north until the next tile does NOT contain the resource.
-        local tx, ty = tile_xy_from_pos(bot.entity.position)
+        local tile_x, tile_y = tile_coordinates_from_world_position(bot.entity.position)
 
         local MAX_NORTH_STUCK = 30 -- adjust (30 attempts is usually enough)
 
-        if tx == tr.north_last_tx and ty == tr.north_last_ty then
+        if tile_x == tr.north_last_tx and tile_y == tr.north_last_ty then
             tr.north_stuck_attempts = (tr.north_stuck_attempts or 0) + 1
             if tr.north_stuck_attempts >= MAX_NORTH_STUCK then
                 -- Abort trace; survey will restart when it finds the resource again
@@ -281,19 +299,19 @@ local function trace_step(player, ps, state, visual, bot)
                 return nil
             end
         else
-            tr.north_last_tx = tx
-            tr.north_last_ty = ty
+            tr.north_last_tx = tile_x
+            tr.north_last_ty = tile_y
             tr.north_stuck_attempts = 0
         end
 
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
-        if not tile_has_name(surf, entity_name, tx, ty) then
-            local found_tx, found_ty = find_nearby_resource_tile(surf, entity_name, bot.entity.position,
+        if not tile_contains_tracked_entity(surf, entity_name, tile_x, tile_y) then
+            local found_tx, found_ty = find_nearest_tile_containing_entity(surf, entity_name, bot.entity.position,
                 math.ceil(BOT_CONF.survey.radius) + 1)
             if found_tx then
                 tr.origin_tx = found_tx
                 tr.origin_ty = found_ty
-                return tile_center(found_tx, found_ty)
+                return world_position_at_tile_center(found_tx, found_ty)
             end
 
             -- No nearby resource tile; abort trace so scan can restart later
@@ -301,14 +319,14 @@ local function trace_step(player, ps, state, visual, bot)
             return nil
         end
 
-        local next_ty = ty - 1 -- due north in Factorio coords
-        if tile_has_name(surf, entity_name, tx, next_ty) then
-            return tile_center(tx, next_ty)
+        local next_ty = tile_y - 1 -- due north in Factorio coords
+        if tile_contains_tracked_entity(surf, entity_name, tile_x, next_ty) then
+            return world_position_at_tile_center(tile_x, next_ty)
         end
 
         -- Next tile north is outside: current tile is our "north edge" start.
-        tr.start_tx = tx
-        tr.start_ty = ty
+        tr.start_tx = tile_x
+        tr.start_ty = tile_y
 
         -- Ensure we start on a boundary tile; if not, search nearby for one (tight, local).
         if not is_boundary_tile(surf, entity_name, tr.start_tx, tr.start_ty) then
@@ -338,7 +356,7 @@ local function trace_step(player, ps, state, visual, bot)
         tr.p_ty = tr.start_ty
         tr.b_tx = tr.p_tx - 1 -- backtrack = west of start
         tr.b_ty = tr.p_ty
-        tr.boundary = {tile_center(tr.p_tx, tr.p_ty)}
+        tr.boundary = {world_position_at_tile_center(tr.p_tx, tr.p_ty)}
 
         tr.started_edge = false
         tr.p1_tx = nil
@@ -359,9 +377,9 @@ local function trace_step(player, ps, state, visual, bot)
         tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty = nx, ny, nbx, nby
 
         -- Record boundary point for rendering/storage
-        tr.boundary[#tr.boundary + 1] = tile_center(tr.p_tx, tr.p_ty)
+        tr.boundary[#tr.boundary + 1] = world_position_at_tile_center(tr.p_tx, tr.p_ty)
 
-        return tile_center(tr.p_tx, tr.p_ty)
+        return world_position_at_tile_center(tr.p_tx, tr.p_ty)
     end
 
     if tr.phase == "edge" then
@@ -391,9 +409,9 @@ local function trace_step(player, ps, state, visual, bot)
         tr.p_tx, tr.p_ty, tr.b_tx, tr.b_ty = nx, ny, nbx, nby
 
         -- Record boundary point for rendering/storage
-        tr.boundary[#tr.boundary + 1] = tile_center(tr.p_tx, tr.p_ty)
+        tr.boundary[#tr.boundary + 1] = world_position_at_tile_center(tr.p_tx, tr.p_ty)
 
-        return tile_center(tr.p_tx, tr.p_ty)
+        return world_position_at_tile_center(tr.p_tx, tr.p_ty)
     end
 
     return nil
