@@ -6,7 +6,7 @@ local polygon = require("polygon")
 local positioning = require("positioning")
 local util = require("util")
 
-local BOT_CONF = config.bot
+local BOT_CONFIGURATION = config.bot
 
 ----------------------------------------------------------------------
 -- Tile helpers
@@ -300,7 +300,7 @@ function survey.perform_survey_scan(player, player_state, bot, tick)
 
     local find_name = bot.task.survey_entity.name
 
-    local found = util.find_entities(player, bpos, BOT_CONF.search.detection_radius, surf, find_name, true, true)
+    local found = util.find_entities(player, bpos, BOT_CONFIGURATION.search.detection_radius, surf, find_name, true, true)
 
     if #found == 0 then
         return false
@@ -370,7 +370,7 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         -- If current tile doesn't actually have the resource, snap to origin tile center first.
         if not tile_contains_tracked_entity(surf, entity_name, tile_x, tile_y) then
             local found_tx, found_ty = find_nearest_tile_containing_entity(surf, entity_name, bot.entity.position,
-                math.ceil(BOT_CONF.survey.radius) + 1)
+                math.ceil(BOT_CONFIGURATION.survey.radius) + 1)
             if found_tx then
                 tr.origin_tx = found_tx
                 tr.origin_ty = found_ty
@@ -495,52 +495,56 @@ function survey.update(player, player_state, visual, bot, tick)
     ensure_survey_trace_state(player_state, bot)
 
     if bot.task.survey_trace then
-        local target_pos = bot.task.target_position
-        if not target_pos then
-            target_pos = advance_trace_one_step(player, player_state, visual, bot)
-            bot.task.target_position = target_pos
+        local current_target_world_position = bot.task.target_position
+
+        if not current_target_world_position then
+            current_target_world_position = advance_trace_one_step(player, player_state, visual, bot)
+            bot.task.target_position = current_target_world_position
         end
 
-        if not target_pos then
+        if not current_target_world_position then
             return
         end
 
-        positioning.move_entity_towards(player, bot.entity, target_pos)
+        positioning.move_entity_towards(player, bot.entity, current_target_world_position)
 
-        local bpos = bot.entity.position
+        local bot_world_position = bot.entity.position
+        local has_arrived_at_target = positioning.positions_are_close(current_target_world_position, bot_world_position,
+            BOT_CONFIGURATION.survey.arrival_threshold)
 
-        if not positioning.positions_are_close(target_pos, bpos, BOT_CONF.survey.arrival_threshold) then
+        if not has_arrived_at_target then
             return
         end
 
-        -- Arrived; request next trace target next update.
+        -- Arrived; request the next trace target on the next update tick.
         bot.task.target_position = nil
         return
     end
 
+    -- Not tracing: ensure we have a survey target entity configured.
     if not bot.task.survey_entity then
         return
     end
 
-    -- For single-tile survey targets (e.g. crude-oil), just add it as self contained polygon
+    -- For single-tile survey targets (e.g. crude-oil), add as a self-contained polygon/group.
     if entity_group.is_survey_single_target(bot.task.survey_entity) then
-        entity_group.add_single_tile_entity_group(player, player_state, visual, bot.entity.surface_index, bot.task.survey_entity)
+        entity_group.add_single_tile_entity_group(player, player_state, visual, bot.entity.surface_index,
+            bot.task.survey_entity)
 
-        -- Switch to next task
         switch_bot_to_next_task(player, player_state, bot)
-
         bot.task.survey_found_entity = true
-    else
-        -- Not tracing yet: just scan where we are; when we see the resource, tracing starts.
-        if not survey.perform_survey_scan(player, player_state, bot, tick) then
-            -- Switch to next task
-            switch_bot_to_next_task(player, player_state, bot)
-
-            bot.task.survey_found_entity = false
-        else
-            bot.task.survey_found_entity = true
-        end
+        return
     end
+
+    -- For multi-tile targets: scan for the resource; tracing begins once it is seen.
+    local did_find_target = survey.perform_survey_scan(player, player_state, bot, tick)
+    if not did_find_target then
+        switch_bot_to_next_task(player, player_state, bot)
+        bot.task.survey_found_entity = false
+        return
+    end
+
+    bot.task.survey_found_entity = true
 end
 
 return survey
