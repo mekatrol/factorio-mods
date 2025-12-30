@@ -1,9 +1,6 @@
 local util = {}
 
-local config = require("config")
 local module = require("module")
-
-local BOT_CONFIGURATION = config.bot
 
 ----------------------------------------------------------------------
 -- Print helpers
@@ -317,7 +314,7 @@ function util.find_entities(player, pos, radius, surf, find_name, find_others, f
     return util.filter_player_and_bots(player, found), util.filter_player_and_bots(player, others)
 end
 
-function util.find_entity(player, ps, bot, pos, surface, search_item)
+function util.find_entity(player, ps, bot, pos, surface, search_item, search_radius)
     local entity_group = module.get_module("entity_group")
 
     bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
@@ -344,7 +341,7 @@ function util.find_entity(player, ps, bot, pos, surface, search_item)
     end
 
     local search_for_list = util.get_value(bot.task.args, "search_list")
-    local entities_found, others_found = util.find_entities(player, pos, BOT_CONFIGURATION.search.detection_radius, surface,
+    local entities_found, others_found = util.find_entities(player, pos, search_radius, surface,
         search_item.name, search_for_list, true, true)
 
     if #others_found > 0 then

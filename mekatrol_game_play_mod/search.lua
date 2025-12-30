@@ -178,7 +178,7 @@ function search.update(player, ps, state, bot)
             return
         end
 
-        local entity = util.find_entity(player, ps, bot, bpos, surf, search_item)
+        local entity = util.find_entity(player, ps, bot, bpos, surf, search_item, BOT_CONFIGURATION.search.detection_radius)
 
         if entity then
             -- record what we found
