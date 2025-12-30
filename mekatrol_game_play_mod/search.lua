@@ -105,8 +105,10 @@ local function find_entity(player, ps, bot, pos, surf, search_item)
     local entity_group = module.get_module("entity_group")
 
     bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
+    bot.task.future_survey_entities = bot.task.future_survey_entities or {}
 
     local next_entities = bot.task.queued_survey_entities
+    local future_entities = bot.task.future_survey_entities
 
     if search_item.find_many then
         -- re-sort table as different entities may now be closer to bot position
@@ -130,8 +132,10 @@ local function find_entity(player, ps, bot, pos, surf, search_item)
         search_item.name, search_for_list, true, true)
 
     if #others_found > 0 then
+        -- add to future entities
+        local start = #future_entities
         for i = 1, #others_found do
-            next_entities[#next_entities + 1] = others_found[i]
+            future_entities[start + i] = others_found[i]
         end
     end
 

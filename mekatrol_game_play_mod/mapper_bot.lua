@@ -38,6 +38,7 @@ function mapper_bot.init_state(player, ps)
     bot.task.search_spiral = bot.task.search_spiral or nil
     bot.task.survey_entity = bot.task.survey_entity or nil
     bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
+    bot.task.future_survey_entities = bot.task.future_survey_entities or {}
     bot.task.survey_found_entity = bot.task.survey_found_entity or false
 
     bot.task.search_item = bot.task.search_item or {
@@ -73,6 +74,7 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
         bot.task.search_spiral = nil
         bot.task.survey_entity = nil
         bot.task.queued_survey_entities = {}
+        bot.task.future_survey_entities = {}
     end
 
     -- set new next_task
