@@ -31,7 +31,7 @@ local function full_task_name(task_name)
 end
 
 function logistics_bot.init_state(player, ps)
-    common_bot.init_state(player, ps, BOT_NAME, "collect")
+    common_bot.init_state(player, ps, BOT_NAME, "follow")
 
     local bot = ps.bots[BOT_NAME]
 

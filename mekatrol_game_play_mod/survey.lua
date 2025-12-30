@@ -555,7 +555,8 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             -- Completed loop: persist + render the boundary group.
             entity_group.ensure_entity_groups(player_state)
 
-            local boundary_world_positions = trace_state.boundary_points_world_positions or {}
+            local boundary_world_positions = dedupe_boundary_preserve_ends(
+                trace_state.boundary_points_world_positions or {})
 
             if visual and visual.clear_survey_trace then
                 visual.clear_survey_trace(player_state, bot.name)
