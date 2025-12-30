@@ -367,14 +367,14 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             trace_state.north_phase_stuck_attempts = 0
         end
 
-        -- If current tile doesn't actually have the resource, snap to origin tile center first.
+        -- If we are not currently on a resource tile, snap to a nearby resource tile first.
         if not tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, current_tile_y) then
-            local found_tx, found_ty = find_nearest_tile_containing_entity(surface, tracked_entity_name,
+            local found_tile_x, found_tile_y = find_nearest_tile_containing_entity(surface, tracked_entity_name,
                 bot.entity.position, math.ceil(BOT_CONFIGURATION.survey.radius) + 1)
-            if found_tx then
-                trace_state.origin_tx = found_tx
-                trace_state.origin_ty = found_ty
-                return world_position_at_tile_center(found_tx, found_ty)
+            if found_tile_x then
+                trace_state.origin_tile_x = found_tile_x
+                trace_state.origin_tile_y = found_tile_y
+                return world_position_at_tile_center(found_tile_x, found_tile_y)
             end
 
             -- No nearby resource tile; abort trace so scan can restart later
@@ -382,31 +382,31 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             return nil
         end
 
-        local next_ty = current_tile_y - 1 -- due north in Factorio coords
-        if tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, next_ty) then
-            return world_position_at_tile_center(current_tile_x, next_ty)
+        local north_neighbor_tile_y = current_tile_y - 1 -- due north in Factorio coords
+        if tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, north_neighbor_tile_y) then
+            return world_position_at_tile_center(current_tile_x, north_neighbor_tile_y)
         end
 
         -- Next tile north is outside: current tile is our "north edge" start.
-        trace_state.start_tx = current_tile_x
-        trace_state.start_ty = current_tile_y
+        trace_state.start_boundary_tile_x = current_tile_x
+        trace_state.start_boundary_tile_y = current_tile_y
 
         -- Ensure we start on a boundary tile; if not, search nearby for one (tight, local).
-        if not tile_is_boundary_tile(surface, tracked_entity_name, trace_state.start_tx, trace_state.start_ty) then
-            local found_boundary = false
+        if not tile_is_boundary_tile(surface, tracked_entity_name, trace_state.start_boundary_tile_x, trace_state.start_boundary_tile_y) then
+            local found_boundary_tile = false
             for i = 1, 8 do
                 local n = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[i]
-                local ntx = trace_state.start_tx + n.dx
-                local nty = trace_state.start_ty + n.dy
+                local ntx = trace_state.start_boundary_tile_x + n.dx
+                local nty = trace_state.start_boundary_tile_y + n.dy
                 if tile_is_boundary_tile(surface, tracked_entity_name, ntx, nty) then
-                    trace_state.start_tx = ntx
-                    trace_state.start_ty = nty
-                    found_boundary = true
+                    trace_state.start_boundary_tile_x = ntx
+                    trace_state.start_boundary_tile_y = nty
+                    found_boundary_tile = true
                     break
                 end
             end
 
-            if not found_boundary then
+            if not found_boundary_tile then
                 -- Can't find a boundary; abort.
                 bot.task.survey_trace = nil
                 return nil
@@ -415,8 +415,8 @@ local function advance_trace_one_step(player, player_state, visual, bot)
 
         -- Initialize Moore trace:
         trace_state.phase = "edge"
-        trace_state.p_tx = trace_state.start_tx
-        trace_state.p_ty = trace_state.start_ty
+        trace_state.p_tx = trace_state.start_boundary_tile_x
+        trace_state.p_ty = trace_state.start_boundary_tile_y
         trace_state.b_tx = trace_state.p_tx - 1 -- backtrack = west of start
         trace_state.b_ty = trace_state.p_ty
         trace_state.boundary = {world_position_at_tile_center(trace_state.p_tx, trace_state.p_ty)}
@@ -456,8 +456,8 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             return nil
         end
 
-        if trace_state.started_edge and trace_state.p_tx == trace_state.start_tx and trace_state.p_ty ==
-            trace_state.start_ty and nx == trace_state.p1_tx and ny == trace_state.p1_ty then
+        if trace_state.started_edge and trace_state.p_tx == trace_state.start_boundary_tile_x and trace_state.p_ty ==
+            trace_state.start_boundary_tile_y and nx == trace_state.p1_tx and ny == trace_state.p1_ty then
             local entity_group = module.get_module("entity_group")
 
             -- Completed loop: persist + render group.
