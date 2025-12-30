@@ -354,7 +354,8 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         -- Detect “stuck” (not changing tiles) to avoid infinite loops.
         local MAXIMUM_NORTH_PHASE_STUCK_ATTEMPTS = 30 -- adjust (30 attempts is usually enough)
 
-        if current_tile_x == trace_state.north_phase_last_tile_x and current_tile_y == trace_state.north_phase_last_tile_y then
+        if current_tile_x == trace_state.north_phase_last_tile_x and current_tile_y ==
+            trace_state.north_phase_last_tile_y then
             trace_state.north_phase_stuck_attempts = (trace_state.north_phase_stuck_attempts or 0) + 1
             if trace_state.north_phase_stuck_attempts >= MAXIMUM_NORTH_PHASE_STUCK_ATTEMPTS then
                 -- Abort trace; survey will restart when it finds the resource again
@@ -377,30 +378,34 @@ local function advance_trace_one_step(player, player_state, visual, bot)
                 return world_position_at_tile_center(found_tile_x, found_tile_y)
             end
 
-            -- No nearby resource tile; abort trace so scan can restart later
+            -- No nearby resource tile exists; abort trace so scanning can restart later.
             bot.task.survey_trace = nil
             return nil
         end
 
-        local north_neighbor_tile_y = current_tile_y - 1 -- due north in Factorio coords
+        -- Move due north (Factorio coordinates: decreasing y).
+        local north_neighbor_tile_y = current_tile_y - 1
         if tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, north_neighbor_tile_y) then
             return world_position_at_tile_center(current_tile_x, north_neighbor_tile_y)
         end
 
-        -- Next tile north is outside: current tile is our "north edge" start.
+        -- The tile north is outside: current tile is the “north edge” candidate boundary start.
         trace_state.start_boundary_tile_x = current_tile_x
         trace_state.start_boundary_tile_y = current_tile_y
 
-        -- Ensure we start on a boundary tile; if not, search nearby for one (tight, local).
-        if not tile_is_boundary_tile(surface, tracked_entity_name, trace_state.start_boundary_tile_x, trace_state.start_boundary_tile_y) then
+        -- Ensure we actually start on a boundary tile; if not, search the immediate 8 neighbors.
+        if not tile_is_boundary_tile(surface, tracked_entity_name, trace_state.start_boundary_tile_x,
+            trace_state.start_boundary_tile_y) then
             local found_boundary_tile = false
-            for i = 1, 8 do
-                local n = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[i]
-                local ntx = trace_state.start_boundary_tile_x + n.dx
-                local nty = trace_state.start_boundary_tile_y + n.dy
-                if tile_is_boundary_tile(surface, tracked_entity_name, ntx, nty) then
-                    trace_state.start_boundary_tile_x = ntx
-                    trace_state.start_boundary_tile_y = nty
+
+            for neighbor_index = 1, 8 do
+                local offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbor_index]
+                local neighbor_tile_x = trace_state.start_boundary_tile_x + offset.dx
+                local neighbor_tile_y = trace_state.start_boundary_tile_y + offset.dy
+
+                if tile_is_boundary_tile(surface, tracked_entity_name, neighbor_tile_x, neighbor_tile_y) then
+                    trace_state.start_boundary_tile_x = neighbor_tile_x
+                    trace_state.start_boundary_tile_y = neighbor_tile_y
                     found_boundary_tile = true
                     break
                 end
@@ -413,7 +418,9 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             end
         end
 
-        -- Initialize Moore trace:
+        ----------------------------------------------------------------
+        -- Initialize Moore boundary trace state and perform first step.
+        ----------------------------------------------------------------
         trace_state.phase = "edge"
         trace_state.p_tx = trace_state.start_boundary_tile_x
         trace_state.p_ty = trace_state.start_boundary_tile_y
