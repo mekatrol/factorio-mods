@@ -191,19 +191,21 @@ function search.update(player, ps, state, bot)
             return
         else
             if bot.task.survey_found_entity then
-                -- clear current name (so the next name will be fetched)
-                bot.task.search_item = {
-                    name = nil,
-                    find_many = false
-                }
+                if search_item.find_many == false then
+                    -- clear current name (so the next name will be fetched)
+                    bot.task.search_item = {
+                        name = nil,
+                        find_many = false
+                    }
 
-                -- update search name to next type
-                search_item = get_search_item(player, ps, bot)
+                    -- update search name to next type
+                    search_item = get_search_item(player, ps, bot)
 
-                -- clear previous found entity
-                bot.task.survey_entity = nil
-                bot.task.search_item = search_item
-                bot.task.survey_found_entity = false
+                    -- clear previous found entity
+                    bot.task.survey_entity = nil
+                    bot.task.search_item = search_item
+                    bot.task.survey_found_entity = false
+                end
 
                 -- try finding the new entity from the current position, and if found just return
                 -- without changing tasks

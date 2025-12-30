@@ -55,6 +55,10 @@ function common_bot.init_state(player, ps, bot_name, init_task)
             circle = nil,
             lines = nil,
             light = nil
+        },
+        reveal = {
+            next_tick = 0,
+            last_pos = nil
         }
     }
 end

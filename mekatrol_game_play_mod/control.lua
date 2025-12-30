@@ -136,6 +136,62 @@ local function register_commands()
     end
 end
 
+local function chart_area(force, surface, pos, radius)
+    local area = {{pos.x - radius, pos.y - radius}, {pos.x + radius, pos.y + radius}}
+    force.chart(surface, area)
+end
+
+local function update_bot_reveal(player, ps, tick)
+    if not (player and player.valid) then
+        return
+    end
+    if not (ps and ps.bots) then
+        return
+    end
+
+    local force = player.force
+    if not (force and force.valid) then
+        return
+    end
+
+    -- tune these
+    local radius = 48 -- tiles to reveal around each bot
+    local cooldown_ticks = 60 -- 1s
+    local min_move_sq = 8 * 8 -- only re-chart if moved >= 8 tiles
+
+    for _, bot_name in ipairs(BOT_NAMES) do
+        local bot = ps.bots[bot_name]
+        if bot and bot.entity and bot.entity.valid then
+            bot.reveal = bot.reveal or {
+                next_tick = 0,
+                last_pos = nil
+            }
+
+            if tick >= (bot.reveal.next_tick or 0) then
+                local pos = bot.entity.position
+                local last = bot.reveal.last_pos
+
+                local moved = true
+                if last then
+                    local dx = pos.x - last.x
+                    local dy = pos.y - last.y
+                    moved = (dx * dx + dy * dy) >= min_move_sq
+                end
+
+                if moved then
+                    chart_area(force, bot.entity.surface, pos, radius)
+                    bot.reveal.last_pos = {
+                        x = pos.x,
+                        y = pos.y
+                    }
+                end
+
+                bot.reveal.next_tick = tick + cooldown_ticks
+            end
+        end
+    end
+end
+
 ----------------------------------------------------------------------
 -- Event: Entity died
 ----------------------------------------------------------------------
@@ -285,6 +341,8 @@ script.on_event(defines.events.on_tick, function(event)
     for _, line in ipairs(lines) do
         overlay_lines[#overlay_lines + 1] = line
     end
+
+    update_bot_reveal(player, ps, event.tick)
 
     -------------------------------------------------------------------------------
     -- Render overlay

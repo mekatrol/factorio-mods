@@ -130,6 +130,9 @@ function mapper_bot.update(player, ps, state, visual, tick)
             }, {
                 name = "stone",
                 find_many = false
+            }, {
+                name = "tree",
+                find_many = true
             }}
         }
 
