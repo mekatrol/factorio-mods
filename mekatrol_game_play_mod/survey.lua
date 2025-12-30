@@ -231,42 +231,56 @@ local function moore_trace_next_boundary_tile(surface, entity_name, current_tile
     return nil
 end
 
-----------------------------------------------------------------------
--- Trace state
-----------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Trace state initialization
+--------------------------------------------------------------------------------
 
-local function ensure_trace(ps, bot)
+--- Ensure the trace field exists (or remains nil) on the bot task state.
+--- @param player_state table
+--- @param bot table
+local function ensure_survey_trace_state(player_state, bot)
     bot.task.survey_trace = bot.task.survey_trace or nil
 end
 
-local function start_trace_from_found(ps, bot)
-    local tile_x, tile_y = tile_coordinates_from_world_position(bot.entity.position)
+--- Initialize a new trace state when a survey target is found.
+--- Phases:
+---   - "north": walk due north until the tile north is outside the resource
+---   - "edge":  perform Moore boundary tracing until closure is detected
+--- @param player_state table
+--- @param bot table
+local function begin_trace_from_detected_resource(player_state, bot)
+    local starting_tile_x, starting_tile_y = tile_coordinates_from_world_position(bot.entity.position)
 
     bot.task.survey_trace = {
-        phase = "north", -- "north" then "edge"
-        origin_tx = tile_x, -- where we first saw it (not strictly required)
-        origin_ty = tile_y,
+        phase = "north",
 
-        -- will be set when north phase ends:
-        start_tx = nil,
-        start_ty = nil,
+        -- Initial sighting tile; used to recover if we’re momentarily off-resource.
+        origin_tile_x = starting_tile_x,
+        origin_tile_y = starting_tile_y,
 
-        -- moore state:
-        p_tx = nil,
-        p_ty = nil,
-        b_tx = nil,
-        b_ty = nil,
+        -- Boundary start tile (set when north phase ends)
+        start_boundary_tile_x = nil,
+        start_boundary_tile_y = nil,
 
-        -- closure:
-        p1_tx = nil,
-        p1_ty = nil,
-        started_edge = false,
-        boundary = {},
+        -- Current tile (p) and backtrack tile (b) for Moore tracing
+        current_tile_x = nil,
+        current_tile_y = nil,
+        backtrack_tile_x = nil,
+        backtrack_tile_y = nil,
 
-        -- unstick guard
-        north_stuck_attempts = 0,
-        north_last_tx = tile_x,
-        north_last_ty = tile_y
+        -- Closure detection:
+        --   first_edge_step_tile == p1 in the standard algorithm
+        first_edge_step_tile_x = nil,
+        first_edge_step_tile_y = nil,
+        has_started_edge_trace = false,
+
+        -- Collected boundary points (world positions of tile centers)
+        boundary_points_world_positions = {},
+
+        -- Unstick guard for the north-walk phase
+        north_phase_stuck_attempts = 0,
+        north_phase_last_tile_x = starting_tile_x,
+        north_phase_last_tile_y = starting_tile_y
     }
 end
 
@@ -294,9 +308,9 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     bot.task.survey_entity = found[1]
 
     -- If we're not already tracing, start.
-    ensure_trace(ps, bot)
+    ensure_survey_trace_state(ps, bot)
     if not bot.task.survey_trace then
-        start_trace_from_found(ps, bot)
+        begin_trace_from_detected_resource(ps, bot)
     end
 
     return true
@@ -468,7 +482,7 @@ function survey.update(player, ps, state, visual, bot, tick)
     local entity_group = module.get_module("entity_group")
 
     -- If we are tracing, drive movement purely from the trace state machine.
-    ensure_trace(ps, bot)
+    ensure_survey_trace_state(ps, bot)
 
     if bot.task.survey_trace then
         local target_pos = bot.task.target_position
