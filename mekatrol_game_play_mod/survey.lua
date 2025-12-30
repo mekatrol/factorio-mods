@@ -1,3 +1,18 @@
+-- survey.lua
+--
+-- Purpose:
+--   Trace the boundary of a resource/entity “blob” on a Factorio surface by walking tiles and
+--   performing a clockwise Moore-neighbourhood boundary trace. The traced boundary is then
+--   persisted/rendered via the entity_group module.
+--
+-- Notes on terminology used in this file:
+--   - “tile”: integer grid coordinate (tile_x, tile_y) derived from an entity’s world position.
+--   - “inside tile”: a tile that contains at least one entity matching the tracked entity name.
+--   - “boundary tile”: an inside tile that has at least one of its 4-neighbours outside.
+--   - “Moore neighbourhood”: the 8 neighbours around a tile (NW, N, NE, E, SE, S, SW, W).
+--
+-- This file is a verbose rewrite of the original logic with descriptive names and comments.
+-- Source: :contentReference[oaicite:0]{index=0}
 local survey = {}
 
 local config = require("config")
@@ -8,9 +23,9 @@ local util = require("util")
 
 local BOT_CONFIGURATION = config.bot
 
-----------------------------------------------------------------------
--- Tile helpers
-----------------------------------------------------------------------
+--------------------------------------------------------------------------------
+-- Tile / coordinate helpers
+--------------------------------------------------------------------------------
 
 --- Convert a world position (float) to a tile coordinate (int) by flooring.
 --- @param world_position table {x=number, y=number}
@@ -62,8 +77,8 @@ local function tile_contains_tracked_entity(surface, entity_name, tile_x, tile_y
     return #entities_found > 0
 end
 
---- A boundary tile is an “inside tile” with at least one 4-neighbor “outside tile”.
---- 4-neighbors: north, east, south, west.
+--- A boundary tile is an “inside tile” with at least one 4-neighbour “outside tile”.
+--- 4-neighbours: north, east, south, west.
 --- @param surface LuaSurface
 --- @param entity_name string|nil
 --- @param tile_x integer
@@ -122,17 +137,19 @@ local function find_nearest_tile_containing_entity(surface, entity_name, world_p
     return nil
 end
 
-----------------------------------------------------------------------
--- Moore-neighborhood clockwise boundary tracing over tiles
+--------------------------------------------------------------------------------
+-- Moore-neighbourhood clockwise boundary tracing over tiles
 --
 -- Standard approach:
---   p0 = start boundary tile
---   b0 = backtrack tile (initially west of p0)
---   At each step: search neighbors of p starting from neighbor after b in clockwise order,
---   pick first boundary tile found as next p, and set new b to the neighbor immediately
---   before that (counterclockwise) in the neighbor list.
--- Stop when we return to p0 and next == p1.
-----------------------------------------------------------------------
+--   start_tile = first boundary tile
+--   backtrack_tile = tile immediately “behind” us (initially west of start_tile)
+--   At each step:
+--     1) Determine the index of backtrack_tile in the neighbour list around current_tile.
+--     2) Scan neighbours starting from the next neighbour clockwise.
+--     3) Choose the first neighbour that is also a boundary tile as the next current tile.
+--     4) Update backtrack_tile to be the neighbour immediately counterclockwise of the chosen neighbour.
+--   Stop when we return to start_tile and the next step would be the first step tile (p1).
+--------------------------------------------------------------------------------
 
 -- Clockwise Moore-neighbourhood order:
 --   1: NW, 2: N, 3: NE, 4: E, 5: SE, 6: S, 7: SW, 8: W
@@ -170,27 +187,27 @@ local MOORE_NEIGHBOR_OFFSETS_CLOCKWISE = {{
 } -- W
 }
 
---- Find the 1..8 neighbor index for a tile-to-tile step.
+--- Find the 1..8 neighbour index for a tile-to-tile step.
 --- @param from_tile_x integer
 --- @param from_tile_y integer
 --- @param to_tile_x integer
 --- @param to_tile_y integer
---- @return integer|nil neighbor_index_1_to_8
-local function moore_neighbor_index(from_tile_x, from_tile_y, to_tile_x, to_tile_y)
+--- @return integer|nil neighbour_index_1_to_8
+local function moore_neighbour_index(from_tile_x, from_tile_y, to_tile_x, to_tile_y)
     local delta_x = to_tile_x - from_tile_x
     local delta_y = to_tile_y - from_tile_y
 
-    for neighbor_index = 1, 8 do
-        local neighbor_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbor_index]
-        if neighbor_offset.dx == delta_x and neighbor_offset.dy == delta_y then
-            return neighbor_index
+    for neighbour_index = 1, 8 do
+        local neighbour_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbour_index]
+        if neighbour_offset.dx == delta_x and neighbour_offset.dy == delta_y then
+            return neighbour_index
         end
     end
 
     return nil
 end
 
---- Compute the next boundary tile using Moore-neighborhood boundary tracing.
+--- Compute the next boundary tile using Moore-neighbourhood boundary tracing.
 --- @param surface LuaSurface
 --- @param entity_name string|nil
 --- @param current_tile_x integer
@@ -203,23 +220,23 @@ end
 --- @return integer|nil next_backtrack_tile_y
 local function moore_trace_next_boundary_tile(surface, entity_name, current_tile_x, current_tile_y, backtrack_tile_x,
     backtrack_tile_y)
-    -- Start scanning from the neighbor after the backtrack neighbor, clockwise.
-    local backtrack_neighbor_index = moore_neighbor_index(current_tile_x, current_tile_y, backtrack_tile_x,
+    -- Start scanning from the neighbour after the backtrack neighbour, clockwise.
+    local backtrack_neighbour_index = moore_neighbour_index(current_tile_x, current_tile_y, backtrack_tile_x,
         backtrack_tile_y) or 8 -- default to W if unknown
 
-    local first_scan_neighbor_index = (backtrack_neighbor_index % 8) + 1
+    local first_scan_neighbour_index = (backtrack_neighbour_index % 8) + 1
 
     for scan_step = 0, 7 do
-        local neighbor_index = ((first_scan_neighbor_index - 1 + scan_step) % 8) + 1
-        local neighbor_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbor_index]
+        local neighbour_index = ((first_scan_neighbour_index - 1 + scan_step) % 8) + 1
+        local neighbour_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbour_index]
 
-        local candidate_tile_x = current_tile_x + neighbor_offset.dx
-        local candidate_tile_y = current_tile_y + neighbor_offset.dy
+        local candidate_tile_x = current_tile_x + neighbour_offset.dx
+        local candidate_tile_y = current_tile_y + neighbour_offset.dy
 
         if tile_is_boundary_tile(surface, entity_name, candidate_tile_x, candidate_tile_y) then
-            -- Backtrack becomes the neighbor immediately before the chosen neighbor (counterclockwise).
-            local counterclockwise_neighbor_index = ((neighbor_index - 2) % 8) + 1
-            local counterclockwise_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[counterclockwise_neighbor_index]
+            -- Backtrack becomes the neighbour immediately before the chosen neighbour (counterclockwise).
+            local counterclockwise_neighbour_index = ((neighbour_index - 2) % 8) + 1
+            local counterclockwise_offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[counterclockwise_neighbour_index]
 
             local next_backtrack_x = current_tile_x + counterclockwise_offset.dx
             local next_backtrack_y = current_tile_y + counterclockwise_offset.dy
@@ -291,26 +308,26 @@ end
 --- Scan for the configured survey entity near the bot. If found, seed tracing state.
 --- @return boolean did_find_survey_target
 function survey.perform_survey_scan(player, player_state, bot, tick)
-    local surf = bot.entity.surface
-    local bpos = bot.entity.position
+    local surface = bot.entity.surface
+    local bot_world_position = bot.entity.position
 
     if not bot.task.survey_entity then
         return false
     end
 
-    local find_name = bot.task.survey_entity.name
+    local survey_entity_name = bot.task.survey_entity.name
 
-    local found = util.find_entities(player, bpos, BOT_CONFIGURATION.search.detection_radius, surf, find_name, true,
-        true)
+    local entities_found = util.find_entities(player, bot_world_position, BOT_CONFIGURATION.search.detection_radius,
+        surface, survey_entity_name, true, true)
 
-    if #found == 0 then
+    if #entities_found == 0 then
         return false
     end
 
-    -- set survey entity to first found type
-    bot.task.survey_entity = found[1]
+    -- Record the actual entity instance found (first match) as the target for tracing.
+    bot.task.survey_entity = entities_found[1]
 
-    -- If we're not already tracing, start.
+    -- Start tracing if not already tracing.
     ensure_survey_trace_state(player_state, bot)
     if not bot.task.survey_trace then
         begin_trace_from_detected_resource(player_state, bot)
@@ -348,12 +365,10 @@ local function advance_trace_one_step(player, player_state, visual, bot)
     -- Phase 1: walk north until the next tile north is outside
     --------------------------------------------------------------------
     if trace_state.phase == "north" then
-        -- Walk due north until the next tile does NOT contain the resource.
         local current_tile_x, current_tile_y = tile_coordinates_from_world_position(bot.entity.position)
 
         -- Detect “stuck” (not changing tiles) to avoid infinite loops.
-        local MAXIMUM_NORTH_PHASE_STUCK_ATTEMPTS = 30 -- adjust (30 attempts is usually enough)
-
+        local MAXIMUM_NORTH_PHASE_STUCK_ATTEMPTS = 30
         if current_tile_x == trace_state.north_phase_last_tile_x and current_tile_y ==
             trace_state.north_phase_last_tile_y then
             trace_state.north_phase_stuck_attempts = (trace_state.north_phase_stuck_attempts or 0) + 1
@@ -370,8 +385,10 @@ local function advance_trace_one_step(player, player_state, visual, bot)
 
         -- If we are not currently on a resource tile, snap to a nearby resource tile first.
         if not tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, current_tile_y) then
+            local maximum_snap_radius_tiles = math.ceil(BOT_CONFIGURATION.survey.radius) + 1
             local found_tile_x, found_tile_y = find_nearest_tile_containing_entity(surface, tracked_entity_name,
-                bot.entity.position, math.ceil(BOT_CONFIGURATION.survey.radius) + 1)
+                bot.entity.position, maximum_snap_radius_tiles)
+
             if found_tile_x then
                 trace_state.origin_tile_x = found_tile_x
                 trace_state.origin_tile_y = found_tile_y
@@ -384,28 +401,28 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         end
 
         -- Move due north (Factorio coordinates: decreasing y).
-        local north_neighbor_tile_y = current_tile_y - 1
-        if tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, north_neighbor_tile_y) then
-            return world_position_at_tile_center(current_tile_x, north_neighbor_tile_y)
+        local north_neighbour_tile_y = current_tile_y - 1
+        if tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, north_neighbour_tile_y) then
+            return world_position_at_tile_center(current_tile_x, north_neighbour_tile_y)
         end
 
         -- The tile north is outside: current tile is the “north edge” candidate boundary start.
         trace_state.start_boundary_tile_x = current_tile_x
         trace_state.start_boundary_tile_y = current_tile_y
 
-        -- Ensure we actually start on a boundary tile; if not, search the immediate 8 neighbors.
+        -- Ensure we actually start on a boundary tile; if not, search the immediate 8 neighbours.
         if not tile_is_boundary_tile(surface, tracked_entity_name, trace_state.start_boundary_tile_x,
             trace_state.start_boundary_tile_y) then
             local found_boundary_tile = false
 
-            for neighbor_index = 1, 8 do
-                local offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbor_index]
-                local neighbor_tile_x = trace_state.start_boundary_tile_x + offset.dx
-                local neighbor_tile_y = trace_state.start_boundary_tile_y + offset.dy
+            for neighbour_index = 1, 8 do
+                local offset = MOORE_NEIGHBOR_OFFSETS_CLOCKWISE[neighbour_index]
+                local neighbour_tile_x = trace_state.start_boundary_tile_x + offset.dx
+                local neighbour_tile_y = trace_state.start_boundary_tile_y + offset.dy
 
-                if tile_is_boundary_tile(surface, tracked_entity_name, neighbor_tile_x, neighbor_tile_y) then
-                    trace_state.start_boundary_tile_x = neighbor_tile_x
-                    trace_state.start_boundary_tile_y = neighbor_tile_y
+                if tile_is_boundary_tile(surface, tracked_entity_name, neighbour_tile_x, neighbour_tile_y) then
+                    trace_state.start_boundary_tile_x = neighbour_tile_x
+                    trace_state.start_boundary_tile_y = neighbour_tile_y
                     found_boundary_tile = true
                     break
                 end
@@ -427,7 +444,7 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         trace_state.current_tile_y = trace_state.start_boundary_tile_y
 
         -- Standard initialization: backtrack is west of the start tile.
-        trace_state.backtrack_tile_x = trace_state.current_tile_x - 1 -- backtrack = west of start
+        trace_state.backtrack_tile_x = trace_state.current_tile_x - 1
         trace_state.backtrack_tile_y = trace_state.current_tile_y
 
         trace_state.boundary_points_world_positions = {world_position_at_tile_center(trace_state.current_tile_x,
@@ -437,7 +454,6 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         trace_state.first_edge_step_tile_x = nil
         trace_state.first_edge_step_tile_y = nil
 
-        -- First edge move:
         local next_tile_x, next_tile_y, next_backtrack_x, next_backtrack_y =
             moore_trace_next_boundary_tile(surface, tracked_entity_name, trace_state.current_tile_x,
                 trace_state.current_tile_y, trace_state.backtrack_tile_x, trace_state.backtrack_tile_y)
@@ -468,7 +484,6 @@ local function advance_trace_one_step(player, player_state, visual, bot)
     -- Phase 2: Moore boundary trace until closure
     --------------------------------------------------------------------
     if trace_state.phase == "edge" then
-        -- Closed when we are back at start AND the next step would be p1.
         local next_tile_x, next_tile_y, next_backtrack_x, next_backtrack_y =
             moore_trace_next_boundary_tile(surface, tracked_entity_name, trace_state.current_tile_x,
                 trace_state.current_tile_y, trace_state.backtrack_tile_x, trace_state.backtrack_tile_y)
@@ -492,10 +507,11 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             -- Completed loop: persist + render the boundary group.
             entity_group.ensure_entity_groups(player_state)
 
-            local boundary = trace_state.boundary_points_world_positions or {}
+            local boundary_world_positions = trace_state.boundary_points_world_positions or {}
 
             -- add to boundary group
-            entity_group.add_boundary(player, player_state, visual, boundary, target_entity, surface.index)
+            entity_group.add_boundary(player, player_state, visual, boundary_world_positions, target_entity,
+                surface.index)
 
             -- Move on to the next task (typically to search for the next entity).
             switch_bot_to_next_task(player, player_state, bot)
@@ -503,8 +519,10 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         end
 
         -- Advance the Moore trace state.
-        trace_state.current_tile_x, trace_state.current_tile_y, trace_state.backtrack_tile_x, trace_state.backtrack_tile_y =
-            next_tile_x, next_tile_y, next_backtrack_x, next_backtrack_y
+        trace_state.current_tile_x = next_tile_x
+        trace_state.current_tile_y = next_tile_y
+        trace_state.backtrack_tile_x = next_backtrack_x
+        trace_state.backtrack_tile_y = next_backtrack_y
 
         -- Record boundary point for rendering/storage
         trace_state.boundary_points_world_positions[#trace_state.boundary_points_world_positions + 1] =
