@@ -454,6 +454,10 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         trace_state.boundary_points_world_positions = {world_position_at_tile_center(trace_state.current_tile_x,
             trace_state.current_tile_y)}
 
+        trace_state.area = 0
+        trace_state.perimeter = 0
+        trace_state.permiter_unchanged_count = 0
+
         if visual and visual.clear_survey_trace then
             visual.clear_survey_trace(player_state, bot.name)
         end
@@ -543,6 +547,27 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         -- Record boundary point for rendering/storage
         trace_state.boundary_points_world_positions[#trace_state.boundary_points_world_positions + 1] =
             world_position_at_tile_center(trace_state.current_tile_x, trace_state.current_tile_y)
+
+        local area = 0
+        local perimeter = 0
+        local boundary = trace_state.boundary_points_world_positions
+
+        if boundary and #boundary >= 3 then
+            area, perimeter = polygon.polygon_area_perimeter(boundary)
+
+            if math.abs(perimeter - trace_state.perimeter) < 0.001 then
+                trace_state.permiter_unchanged_count = trace_state.permiter_unchanged_count + 1
+
+                util.print(player, "yellow", "[unchanged] p: %s", trace_state.permiter_unchanged_count )
+
+                if trace_state.permiter_unchanged_count >= 20 then
+                    util.print(player, "red", "[unchanged] p: %s", perimeter)
+                end
+            end
+
+            trace_state.area = area
+            trace_state.perimeter = perimeter
+        end
 
         if visual and visual.append_survey_trace then
             visual.append_survey_trace(player, player_state, bot.name, trace_state.boundary_points_world_positions)
