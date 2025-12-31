@@ -104,6 +104,53 @@ function entity_index:take_by_name(name)
     return out
 end
 
+function entity_index:take_by_name_contains(name)
+    if not name then
+        return {}
+    end
+
+    local out = {}
+
+    -- Collect matching bucket names first (don’t mutate while iterating pairs)
+    local matching_names = {}
+
+    for bucket_name in pairs(self.by_name) do
+        if string.find(bucket_name, name, 1, true) ~= nil then
+            matching_names[#matching_names + 1] = bucket_name
+        end
+    end
+
+    if #matching_names == 0 then
+        return {}
+    end
+
+    -- Drain all matching buckets
+    for i = 1, #matching_names do
+        local bucket_name = matching_names[i]
+        local bucket = self.by_name[bucket_name]
+
+        if bucket then
+            for id in pairs(bucket) do
+                local ent = self.by_id[id]
+
+                -- remove from indexes regardless (either consumed or invalid)
+                self.by_id[id] = nil
+                self.name_by_id[id] = nil
+                bucket[id] = nil
+                self.count = self.count - 1
+
+                if ent and ent.valid then
+                    out[#out + 1] = ent
+                end
+            end
+
+            self.by_name[bucket_name] = nil
+        end
+    end
+
+    return out
+end
+
 -- Optional: cheap cleanup per tick to avoid invalids accumulating.
 function entity_index:compact(budget)
     budget = budget or 1000
