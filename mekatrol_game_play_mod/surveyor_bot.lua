@@ -1,4 +1,4 @@
-local mapper_bot = {}
+local surveyor_bot = {}
 
 local common_bot = require("common_bot")
 local config = require("config")
@@ -11,7 +11,7 @@ local survey = require("survey")
 local util = require("util")
 
 local BOT_CONF = config.bot
-local BOT_NAME = "mapper"
+local BOT_NAME = "surveyor"
 
 local BOT_TASKS = {
     list = {"follow", "search", "survey", "move_to"},
@@ -32,7 +32,7 @@ local function full_task_name(task_name)
     return task_name
 end
 
-function mapper_bot.init_state(player, ps)
+function surveyor_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME)
 
     local bot = ps.bots[BOT_NAME]
@@ -50,11 +50,11 @@ function mapper_bot.init_state(player, ps)
     }
 end
 
-function mapper_bot.destroy_state(player, ps)
+function surveyor_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
+function surveyor_bot.set_bot_task(player, ps, new_task, next_task, args)
     local bot = ps.bots[BOT_NAME]
 
     new_task = full_task_name(new_task)
@@ -86,7 +86,7 @@ function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
     bot.task.args = args or bot.task.args or {}
 end
 
-function mapper_bot.toggle_task(player, ps)
+function surveyor_bot.toggle_task(player, ps)
     local bot = ps.bots[BOT_NAME]
 
     -- default to search
@@ -97,14 +97,14 @@ function mapper_bot.toggle_task(player, ps)
         new_task = "follow"
     end
 
-    mapper_bot.set_bot_task(player, ps, new_task, nil, bot.task.args)
+    surveyor_bot.set_bot_task(player, ps, new_task, nil, bot.task.args)
 end
 
-function mapper_bot.get_queued_task(player, ps)
+function surveyor_bot.get_queued_task(player, ps)
     return nil, nil
 end
 
-function mapper_bot.update(player, ps, tick)
+function surveyor_bot.update(player, ps, tick)
     local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
 
@@ -160,7 +160,7 @@ function mapper_bot.update(player, ps, tick)
         }
 
         bot.task.target_position = nil
-        mapper_bot.set_bot_task(player, ps, "search", "survey", args)
+        surveyor_bot.set_bot_task(player, ps, "search", "survey", args)
     end
 
     -- perform updates common to all bots
@@ -188,4 +188,4 @@ function mapper_bot.update(player, ps, tick)
     visual.draw_bot_light(player, ps, BOT_NAME, bot)
 end
 
-return mapper_bot
+return surveyor_bot

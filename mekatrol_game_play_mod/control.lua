@@ -16,9 +16,9 @@ local visual = require("visual")
 local master_controller = require("master_controller")
 local constructor_bot = require("constructor_bot")
 local logistics_bot = require("logistics_bot")
-local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
 local searcher_bot = require("searcher_bot")
+local surveyor_bot = require("surveyor_bot")
 
 -- Config aliases.
 local BOT_CONF = config.bot
@@ -30,9 +30,9 @@ local function init_modules()
     module.init_module({
         logistics_bot = logistics_bot,
         constructor_bot = constructor_bot,
-        mapper_bot = mapper_bot,
         repairer_bot = repairer_bot,
         searcher_bot = searcher_bot,
+        surveyor_bot = surveyor_bot,
         entity_group = entity_group,
         visual = visual,
         inventory = inventory
@@ -80,12 +80,12 @@ local function full_bot_name(bot_name)
         bot_name = "constructor"
     elseif bot_name == "l" then
         bot_name = "logistics"
-    elseif bot_name == "m" then
-        bot_name = "mapper"
     elseif bot_name == "r" then
         bot_name = "repairer"
     elseif bot_name == "s" then
         bot_name = "searcher"
+    elseif bot_name == "v" then
+        bot_name = "surveyor"
     end
 
     return bot_name
@@ -133,12 +133,12 @@ end
 local function register_commands()
     -- a generic command: /bot <name> <task>
     if not commands.commands["bot"] then
-        commands.add_command("bot", "Usage: /bot <constructor|logistics|mapper|repairer> <task>", command)
+        commands.add_command("bot", "Usage: /bot <constructor|logistics|repairer|searcher|surveyor> <task>", command)
     end
 
     -- a generic command: /b <name> <task>
     if not commands.commands["b"] then
-        commands.add_command("b", "Usage: /b <c|l|m|r> <task>", command)
+        commands.add_command("b", "Usage: /b <c|l|r|s|v> <task>", command)
     end
 end
 
@@ -273,7 +273,7 @@ script.on_event(defines.events.on_tick, function(event)
     local overlay_lines = {"[game play mod]:", string.format("game phase: %s", ps.game_phase or "none")}
 
     if ps.bot_enabled and ps.bots then
-        local bot = ps.bots["mapper"]
+        local bot = ps.bots["surveyor"]
 
         local future_entities = bot.task.future_survey_entities
         if not (future_entities and future_entities.add_many and future_entities.take_by_name and
@@ -291,15 +291,15 @@ script.on_event(defines.events.on_tick, function(event)
         master_controller.update(player, ps, tick)
         constructor_bot.update(player, ps, tick)
         logistics_bot.update(player, ps, tick)
-        mapper_bot.update(player, ps, tick)
         repairer_bot.update(player, ps, tick)
         searcher_bot.update(player, ps, tick)
+        surveyor_bot.update(player, ps, tick)
 
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "constructor")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "logistics")
-        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "mapper")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "repairer")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "searcher")
+        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "surveyor")
     else
         overlay_lines[#overlay_lines + 1] = "bot is currently disabled"
     end

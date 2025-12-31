@@ -118,7 +118,7 @@ function common_bot.get_tasks(player, ps, bot_name)
 
     if bot_name == "logistics" and bot.task.pickup_name then
         other = string.format(" [%s: %s]", bot.task.pickup_name, bot.task.pickup_remaining)
-    elseif bot_name == "mapper" then
+    elseif bot_name == "surveyor" then
         local search_for_list = util.get_value(bot.task.args, "search_list")
         local search_next = "no search"
 

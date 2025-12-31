@@ -10,9 +10,9 @@ local util = require("util")
 
 local constructor_bot = require("constructor_bot")
 local logistics_bot = require("logistics_bot")
-local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
 local searcher_bot = require("searcher_bot")
+local surveyor_bot = require("surveyor_bot")
 
 local BOT_CONF = config.bot
 local BOT_NAMES = config.bot_names
@@ -58,9 +58,9 @@ function state.get_player_state(player_index)
 
     constructor_bot.init_state(player, ps)
     logistics_bot.init_state(player, ps)
-    mapper_bot.init_state(player, ps)
     repairer_bot.init_state(player, ps)
     searcher_bot.init_state(player, ps)
+    surveyor_bot.init_state(player, ps)
 
     ps.overlay_next_tick = ps.overlay_next_tick or 0
 
@@ -81,9 +81,9 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
     if ps.bots then
         constructor_bot.destroy_state(player, ps, state)
         logistics_bot.destroy_state(player, ps, state)
-        mapper_bot.destroy_state(player, ps, state)
         repairer_bot.destroy_state(player, ps, state)
         searcher_bot.destroy_state(player, ps, state)
+        surveyor_bot.destroy_state(player, ps, state)
     end
 
     -- Clear ALL render objects / visual.
@@ -140,10 +140,6 @@ function state.create_player_bot(player, visual, clear_entity_groups)
             x = -2,
             y = BOT_CONF.logistics.follow_offset_y
         },
-        ["mapper"] = {
-            x = -2,
-            y = BOT_CONF.mapper.follow_offset_y
-        },
         ["repairer"] = {
             x = -2,
             y = BOT_CONF.repairer.follow_offset_y
@@ -151,6 +147,10 @@ function state.create_player_bot(player, visual, clear_entity_groups)
         ["searcher"] = {
             x = -2,
             y = BOT_CONF.searcher.follow_offset_y
+        },
+        ["surveyor"] = {
+            x = -2,
+            y = BOT_CONF.surveyor.follow_offset_y
         }
     }
 
@@ -193,7 +193,7 @@ function state.create_player_bot(player, visual, clear_entity_groups)
     -- clear entity groups
     clear_entity_groups(ps)
 
-    util.print(player, "green", "created (constructor/logistics/mapper/repairer)")
+    util.print(player, "green", "created (constructor/logistics/repairer/searcher/surveyor)")
     return ps.bots
 end
 
