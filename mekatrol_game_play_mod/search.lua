@@ -143,6 +143,19 @@ local function find_entities(player, ps, bot, pos, surface, search_item, search_
     return entities_found, others_found
 end
 
+local function scan_entities(player, ps, bot, pos, surface, search_radius)
+    local search_for_list = util.get_value(bot.task.args, "search_list")
+
+    local entities_found = util.scan_entities(player, pos, search_radius, surface, search_for_list)
+
+    if #entities_found > 0 then
+        -- add to future entities
+        bot.task.future_survey_entities:add_many(ps, surface.index, entities_found)
+    end
+
+    return entities_found
+end
+
 local function find_entity(player, ps, bot, pos, surface, search_item, search_radius)
     local entity_group = module.get_module("entity_group")
 
@@ -330,8 +343,8 @@ function search.update(player, ps, state, bot)
     -- destination reached, so clear target position
     bot.task.target_position = nil
 
-    -- Do a quick scan for other entities
-    find_entities(player, ps, bot, bpos, surface, nil, BOT_CONFIGURATION.search.detection_radius, false, false)
+    -- Do a quick scan for and search list entities around current position
+    scan_entities(player, ps, bot, bpos, surface, BOT_CONFIGURATION.search.detection_radius)
 
     -- return if no current search name
     if bot.task.search_item.name == nil then

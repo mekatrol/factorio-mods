@@ -271,47 +271,109 @@ function util.sort_entities_by_position(entities, pos)
     end)
 end
 
-function util.find_entities(player, pos, radius, surf, find_name, find_others, find_starts_with, sort_by_pos)
+function util.find_entities(player, pos, search_radius, surface, find_name, find_others, find_starts_with, sort_by_pos)
     local found = {}
     local others = {}
 
-    if find_name == nil or not find_starts_with then
+    -- Build a set for "others" names for fast lookup
+    local others_set = nil
+    if find_others ~= nil then
+        others_set = {}
+        for i = 1, #find_others do
+            local item = find_others[i]
+            if item and item.name then
+                others_set[item.name] = true
+            end
+        end
+    end
 
-        -- find when name is not specified, or not looking for a name that starts with
-        found = surf.find_entities_filtered {
-            position = pos,
-            radius = radius,
-            name = find_name
-        }
-    else
-        -- find when name is specified and caller wants starts with
-        local prefix = find_name
+    local prefix = find_name
+    local want_name = find_name ~= nil
 
-        for _, ent in pairs(surf.find_entities_filtered {
-            position = pos,
-            radius = radius
-        }) do
-            if ent.valid then
-                if string.sub(ent.name, 1, #prefix) == prefix then
-                    found[#found + 1] = ent
-                else
-                    if find_others ~= nil then
-                        for k, v in pairs(find_others) do
-                            if v.name == ent.name then
-                                others[#others + 1] = ent
-                            end
-                        end
-                    end
+    -- If we're doing starts-with/contains, we can't pass name=... to the filter.
+    local filter = {
+        position = pos,
+        radius = search_radius
+    }
+
+    if find_name ~= nil and not find_starts_with then
+        filter.name = find_name
+    end
+
+    for _, ent in pairs(surface.find_entities_filtered(filter)) do
+        if ent.valid then
+            local is_match = false
+
+            if find_name == nil then
+                is_match = true
+            elseif not find_starts_with then
+                -- exact match (and filter.name already restricted it)
+                is_match = (ent.name == find_name)
+            else
+                -- contains
+                is_match = (string.find(ent.name, prefix, 1, true) ~= nil)
+            end
+
+            if is_match then
+                found[#found + 1] = ent
+            else
+                if others_set and others_set[ent.name] then
+                    others[#others + 1] = ent
                 end
             end
         end
     end
 
     if sort_by_pos then
-        found = util.filter_player_and_bots(player, found)
+        util.sort_entities_by_position(found, pos)
     end
 
     return util.filter_player_and_bots(player, found), util.filter_player_and_bots(player, others)
+end
+
+function util.scan_entities(player, pos, search_radius, surface, find_others)
+    local found = {}
+
+    -- Build a set of names to match against
+    local others_set = nil
+    if find_others ~= nil then
+        others_set = {}
+        for i = 1, #find_others do
+            local item = find_others[i]
+            if item and item.name then
+                others_set[item.name] = true
+            end
+        end
+    end
+
+    if not others_set then
+        return {}
+    end
+
+    local filter = {
+        position = pos,
+        radius = search_radius
+    }
+
+    for _, ent in pairs(surface.find_entities_filtered(filter)) do
+        if ent.valid then
+            local match = false
+
+            -- ent.name contains ANY of the others_set names
+            for name in pairs(others_set) do
+                if string.find(ent.name, name, 1, true) then
+                    match = true
+                    break
+                end
+            end
+
+            if match then
+                found[#found + 1] = ent
+            end
+        end
+    end
+
+    return util.filter_player_and_bots(player, found)
 end
 
 return util
