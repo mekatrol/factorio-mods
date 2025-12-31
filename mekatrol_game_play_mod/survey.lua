@@ -16,6 +16,7 @@
 local survey = {}
 
 local config = require("config")
+local entity_index = require("entity_index")
 local module = require("module")
 local polygon = require("polygon")
 local positioning = require("positioning")
@@ -352,6 +353,12 @@ function survey.perform_survey_scan(player, player_state, bot, tick)
     local search_for_list = util.get_value(bot.task.args, "search_list")
     local entities_found, others_found = util.find_entities(player, bot_world_position,
         BOT_CONFIGURATION.search.detection_radius, surface, survey_entity_name, search_for_list, true, true)
+
+    bot.task.future_survey_entities = bot.task.future_survey_entities or entity_index.new()
+
+    if #others_found > 0 then
+        bot.task.future_survey_entities:add_many(player_state, surface.index, others_found)
+    end
 
     if #entities_found == 0 then
         return false

@@ -1,6 +1,7 @@
 local search = {}
 
 local config = require("config")
+local entity_index = require("entity_index")
 local module = require("module")
 local polygon = require("polygon")
 local positioning = require("positioning")
@@ -108,11 +109,13 @@ local function filter_entities(entities, filter_name)
     for i = 1, #entities do
         local entity = entities[i]
 
-        if entity.name == filter_name then
-            filtered_entities[#filtered_entities + 1] = entity
-        else
-            entities[write_index] = entity
-            write_index = write_index + 1
+        if entity and entity.valid then
+            if entity.name == filter_name then
+                filtered_entities[#filtered_entities + 1] = entity
+            else
+                entities[write_index] = entity
+                write_index = write_index + 1
+            end
         end
     end
 
@@ -128,10 +131,10 @@ local function find_entity(player, ps, bot, pos, surface, search_item, search_ra
     local entity_group = module.get_module("entity_group")
 
     bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
-    bot.task.future_survey_entities = bot.task.future_survey_entities or {}
+    bot.task.future_survey_entities = bot.task.future_survey_entities or entity_index.new()
 
     local next_entities = bot.task.queued_survey_entities
-    local future_entities = bot.task.future_survey_entities
+    local entity_index = bot.task.future_survey_entities
 
     if search_item.find_many then
         -- re-sort table as different entities may now be closer to bot position
@@ -151,15 +154,12 @@ local function find_entity(player, ps, bot, pos, surface, search_item, search_ra
     end
 
     local search_for_list = util.get_value(bot.task.args, "search_list")
-    local entities_found, others_found = util.find_entities(player, pos, search_radius, surface,
-        search_item.name, search_for_list, true, true)
+    local entities_found, others_found = util.find_entities(player, pos, search_radius, surface, search_item.name,
+        search_for_list, true, true)
 
     if #others_found > 0 then
         -- add to future entities
-        local start = #future_entities
-        for i = 1, #others_found do
-            future_entities[start + i] = others_found[i]
-        end
+        bot.task.future_survey_entities:add_many(ps, surface.index, others_found)
     end
 
     local char = player.character
@@ -295,9 +295,7 @@ function search.update(player, ps, state, bot)
             if #bot.task.queued_survey_entities == 0 then
 
                 -- check future entities for the entity name we are searching for
-                local future_queued = filter_entities(bot.task.future_survey_entities, search_item.name)
-
-                util.print(player, "red", "future had: %s count of %s", search_item.name, #future_queued)
+                local future_queued = bot.task.future_survey_entities:take_by_name(search_item.name)
 
                 if future_queued and #future_queued > 0 then
                     bot.task.queued_survey_entities = future_queued
