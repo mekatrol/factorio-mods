@@ -22,7 +22,7 @@ local polygon = require("polygon")
 local positioning = require("positioning")
 local util = require("util")
 
-local BOT_CONFIGURATION = config.bot
+local BOT_CONFIG = config.bot
 
 local PERIMETER_UNCHANGED_COUNT_THRESHOLD = 10
 
@@ -352,7 +352,7 @@ function survey.perform_survey_scan(player, player_state, bot, tick)
 
     local search_for_list = util.get_value(bot.task.args, "search_list")
     local entities_found, others_found = util.find_entities(player, bot_world_position,
-        BOT_CONFIGURATION.search.detection_radius, surface, survey_entity_name, search_for_list, true, true)
+        BOT_CONFIG.search.detection_radius, surface, survey_entity_name, search_for_list, true, true)
 
     bot.task.future_survey_entities = bot.task.future_survey_entities or entity_index.new()
 
@@ -377,7 +377,7 @@ function survey.perform_survey_scan(player, player_state, bot, tick)
 
             -- If already at the entity, begin tracing
             if positioning.positions_are_close(bot.entity.position, found_entity.position,
-                BOT_CONFIGURATION.survey.arrival_threshold) then
+                BOT_CONFIG.survey.arrival_threshold) then
                 ensure_survey_trace_state(player_state, bot)
 
                 if not bot.task.survey_trace then
@@ -397,8 +397,9 @@ function survey.perform_survey_scan(player, player_state, bot, tick)
 end
 
 --- Switch the bot to its next configured task and clear survey-specific state.
-local function switch_bot_to_next_task(player, player_state, visual, bot)
+local function switch_bot_to_next_task(player, player_state, bot)
     local bot_module = module.get_module(bot.name)
+    local visual = module.get_module("visual")
     local next_task_name = bot.task.next_task or "search"
 
     if visual and visual.clear_survey_trace then
@@ -414,7 +415,8 @@ end
 --- Perform one step of the trace state machine.
 --- Returns the next world position the bot should move toward, or nil when idle/finished/aborted.
 --- @return table|nil next_target_world_position
-local function advance_trace_one_step(player, player_state, visual, bot)
+local function advance_trace_one_step(player, player_state, bot)
+    local visual = module.get_module("visual")
     local target_entity = bot.task.survey_entity
     local tracked_entity_name = target_entity and target_entity.name or nil
 
@@ -449,7 +451,7 @@ local function advance_trace_one_step(player, player_state, visual, bot)
 
         -- If we are not currently on a resource tile, snap to a nearby resource tile first.
         if not tile_contains_tracked_entity(surface, tracked_entity_name, current_tile_x, current_tile_y) then
-            local maximum_snap_radius_tiles = math.ceil(BOT_CONFIGURATION.survey.radius) + 1
+            local maximum_snap_radius_tiles = math.ceil(BOT_CONFIG.survey.radius) + 1
             local found_tile_x, found_tile_y = find_nearest_tile_containing_entity(surface, tracked_entity_name,
                 bot.entity.position, maximum_snap_radius_tiles)
 
@@ -518,13 +520,8 @@ local function advance_trace_one_step(player, player_state, visual, bot)
         trace_state.perimeter = 0
         trace_state.permiter_unchanged_count = 0
 
-        if visual and visual.clear_survey_trace then
-            visual.clear_survey_trace(player_state, bot.name)
-        end
-
-        if visual and visual.append_survey_trace then
-            visual.append_survey_trace(player, player_state, bot.name, trace_state.boundary_points_world_positions)
-        end
+        visual.clear_survey_trace(player_state, bot.name)
+        visual.append_survey_trace(player, player_state, bot.name, trace_state.boundary_points_world_positions)
 
         trace_state.has_started_edge_trace = false
         trace_state.first_edge_step_tile_x = nil
@@ -586,16 +583,13 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             local boundary_world_positions = dedupe_boundary_preserve_ends(
                 trace_state.boundary_points_world_positions or {})
 
-            if visual and visual.clear_survey_trace then
-                visual.clear_survey_trace(player_state, bot.name)
-            end
+            visual.clear_survey_trace(player_state, bot.name)
 
             -- add to boundary group
-            entity_group.add_boundary(player, player_state, visual, boundary_world_positions, target_entity,
-                surface.index)
+            entity_group.add_boundary(player, player_state, boundary_world_positions, target_entity, surface.index)
 
             -- Move on to the next task (typically to search for the next entity).
-            switch_bot_to_next_task(player, player_state, visual, bot)
+            switch_bot_to_next_task(player, player_state, bot)
             return nil
         end
 
@@ -627,14 +621,12 @@ local function advance_trace_one_step(player, player_state, visual, bot)
                     local boundary_world_positions = dedupe_boundary_preserve_ends(
                         trace_state.boundary_points_world_positions or {})
 
-                    if visual and visual.clear_survey_trace then
-                        visual.clear_survey_trace(player_state, bot.name)
-                    end
+                    visual.clear_survey_trace(player_state, bot.name)
 
-                    entity_group.add_boundary(player, player_state, visual, boundary_world_positions, target_entity,
+                    entity_group.add_boundary(player, player_state, boundary_world_positions, target_entity,
                         surface.index)
 
-                    switch_bot_to_next_task(player, player_state, visual, bot)
+                    switch_bot_to_next_task(player, player_state, bot)
                     return nil
                 end
             else
@@ -646,9 +638,7 @@ local function advance_trace_one_step(player, player_state, visual, bot)
             trace_state.perimeter = perimeter
         end
 
-        if visual and visual.append_survey_trace then
-            visual.append_survey_trace(player, player_state, bot.name, trace_state.boundary_points_world_positions)
-        end
+        visual.append_survey_trace(player, player_state, bot.name, trace_state.boundary_points_world_positions)
 
         return world_position_at_tile_center(trace_state.current_tile_x, trace_state.current_tile_y)
     end
@@ -660,7 +650,7 @@ end
 -- Update loop
 --------------------------------------------------------------------------------
 
-function survey.update(player, player_state, visual, bot, tick)
+function survey.update(player, player_state, bot, tick)
     if not (player and player.valid and bot and bot.entity.valid) then
         return
     end
@@ -675,7 +665,7 @@ function survey.update(player, player_state, visual, bot, tick)
 
     if bot.task.survey_trace then
         if not current_target_world_position then
-            current_target_world_position = advance_trace_one_step(player, player_state, visual, bot)
+            current_target_world_position = advance_trace_one_step(player, player_state, bot)
             bot.task.target_position = current_target_world_position
         end
 
@@ -683,12 +673,12 @@ function survey.update(player, player_state, visual, bot, tick)
             return
         end
     end
-    
+
     if bot.task.target_position ~= nil then
         positioning.move_entity_towards(player, bot.entity, current_target_world_position)
 
         local has_arrived_at_target = positioning.positions_are_close(current_target_world_position, bot_world_position,
-            BOT_CONFIGURATION.survey.arrival_threshold)
+            BOT_CONFIG.survey.arrival_threshold)
 
         if not has_arrived_at_target then
             return
@@ -706,10 +696,9 @@ function survey.update(player, player_state, visual, bot, tick)
 
     -- For single-tile survey targets (e.g. crude-oil), add as a self-contained polygon/group.
     if entity_group.is_survey_single_target(bot.task.survey_entity) then
-        entity_group.add_single_tile_entity_group(player, player_state, visual, bot.entity.surface_index,
-            bot.task.survey_entity)
+        entity_group.add_single_tile_entity_group(player, player_state, bot.entity.surface_index, bot.task.survey_entity)
 
-        switch_bot_to_next_task(player, player_state, visual, bot)
+        switch_bot_to_next_task(player, player_state, bot)
         bot.task.survey_found_entity = true
         return
     end
@@ -717,7 +706,7 @@ function survey.update(player, player_state, visual, bot, tick)
     -- For multi-tile targets: scan for the resource; tracing begins once it is seen.
     local did_find_target = survey.perform_survey_scan(player, player_state, bot, tick)
     if not did_find_target then
-        switch_bot_to_next_task(player, player_state, visual, bot)
+        switch_bot_to_next_task(player, player_state, bot)
         bot.task.survey_found_entity = false
         return
     end

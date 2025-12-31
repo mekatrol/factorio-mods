@@ -74,7 +74,7 @@ function logistics_bot.get_queued_task(player, ps)
     return nil, nil
 end
 
-function logistics_bot.update(player, ps, state, visual, tick)
+function logistics_bot.update(player, ps, tick)
     local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
 
@@ -87,7 +87,7 @@ function logistics_bot.update(player, ps, state, visual, tick)
 
     -- Task behavior step
     if bot.task.current_task == "follow" then
-        follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
+        follow.update(player, ps, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
     elseif bot.task.current_task == "collect" or bot.task.current_task == "pickup" then
@@ -101,6 +101,7 @@ function logistics_bot.update(player, ps, state, visual, tick)
         return
     end
 
+    local visual = module.get + module("visual")
     visual.draw_bot_light(player, ps, BOT_NAME, bot)
 end
 

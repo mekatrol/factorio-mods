@@ -4,6 +4,7 @@ local common_bot = require("common_bot")
 local config = require("config")
 local entity_index = require("entity_index")
 local follow = require("follow")
+local module = require("module")
 local move_to = require("move_to")
 local search = require("search")
 local survey = require("survey")
@@ -103,7 +104,7 @@ function mapper_bot.get_queued_task(player, ps)
     return nil, nil
 end
 
-function mapper_bot.update(player, ps, state, visual, tick)
+function mapper_bot.update(player, ps, tick)
     local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
 
@@ -167,13 +168,13 @@ function mapper_bot.update(player, ps, state, visual, tick)
 
     -- Task behavior step
     if bot.task.current_task == "follow" then
-        follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
+        follow.update(player, ps, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
     elseif bot.task.current_task == "search" then
-        search.update(player, ps, state, bot)
+        search.update(player, ps, bot)
     elseif bot.task.current_task == "survey" then
-        survey.update(player, ps, visual, bot, tick)
+        survey.update(player, ps, bot, tick)
     end
 
     -- Throttle overlay updates
@@ -183,6 +184,7 @@ function mapper_bot.update(player, ps, state, visual, tick)
         return
     end
 
+    local visual = module.get_module("visual")
     visual.draw_bot_light(player, ps, BOT_NAME, bot)
 end
 

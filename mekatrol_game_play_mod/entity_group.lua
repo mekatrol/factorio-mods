@@ -170,7 +170,7 @@ function entity_group.remove_group(player, ps, group_or_id)
     return true
 end
 
-function entity_group.add_boundary(player, ps, visual, boundary, entity, surface_index)
+function entity_group.add_boundary(player, ps, boundary, entity, surface_index)
     -- must be at least 3 points in boundary
     if #boundary < 3 then
         return
@@ -204,13 +204,15 @@ function entity_group.add_boundary(player, ps, visual, boundary, entity, surface
         center = center
     }
 
+    local visual = module.get_module("visual")
+
     -- Draw polygon + labels (clears any prior render for this group_id)
     visual.draw_entity_group(player, ps, group_id, entity_name, entity_type, boundary, center)
 
     -- entity_group.merge_overlapping_groups(player, ps, visual)
 end
 
-function entity_group.add_single_tile_entity_group(player, ps, visual, surface_index, entity)
+function entity_group.add_single_tile_entity_group(player, ps, surface_index, entity)
     entity_group.ensure_entity_groups(ps)
 
     if not (entity and entity.valid) then
@@ -240,7 +242,7 @@ function entity_group.add_single_tile_entity_group(player, ps, visual, surface_i
             y = pos.y + size
         }}
 
-        entity_group.add_boundary(player, ps, visual, boundary, entity, surface_index)
+        entity_group.add_boundary(player, ps, boundary, entity, surface_index)
 
         return
     end
@@ -267,10 +269,10 @@ function entity_group.add_single_tile_entity_group(player, ps, visual, surface_i
         y = pos.y + height
     }}
 
-    entity_group.add_boundary(player, ps, visual, boundary, entity, surface_index)
+    entity_group.add_boundary(player, ps, boundary, entity, surface_index)
 end
 
-function entity_group.merge_overlapping_groups(player, ps, visual)
+function entity_group.merge_overlapping_groups(player, ps)
     entity_group.ensure_entity_groups(ps)
 
     local groups = ps.entity_groups
@@ -302,6 +304,8 @@ function entity_group.merge_overlapping_groups(player, ps, visual)
             end
         end
     end
+
+    local visual = module.get_module("visual")
 
     -- Remove merged groups
     for k in pairs(removed) do

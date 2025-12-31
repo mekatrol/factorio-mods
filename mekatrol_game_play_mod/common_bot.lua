@@ -107,8 +107,8 @@ end
 -- This module contains code common to all bots in this mod
 -------------------------------------------------------------------------------------------------------
 
-function common_bot.get_tasks(player, ps, state, visual, bot_name)
-    local bot = state.get_bot_by_name(player, ps, bot_name)
+function common_bot.get_tasks(player, ps, bot_name)
+    local bot = ps.bots[bot_name]
 
     if not (bot and bot.task) then
         return nil, nil

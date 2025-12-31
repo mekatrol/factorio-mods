@@ -3,6 +3,7 @@ local searcher_bot = {}
 local common_bot = require("common_bot")
 local config = require("config")
 local follow = require("follow")
+local module = require("module")
 local move_to = require("move_to")
 local util = require("util")
 
@@ -66,8 +67,8 @@ function searcher_bot.get_queued_task(player, ps)
     return nil, nil
 end
 
-function searcher_bot.update(player, ps, state, visual, tick)
-    local bot = state.get_bot_by_name(player, ps, BOT_NAME)
+function searcher_bot.update(player, ps, tick)
+    local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
 
     if not (bot and bot.entity and bot.entity.valid) then
@@ -79,7 +80,7 @@ function searcher_bot.update(player, ps, state, visual, tick)
 
     -- Task behavior step
     if bot.task.current_task == "follow" then
-        follow.update(player, ps, state, bot, bot_conf.follow_offset_y)
+        follow.update(player, ps, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
     end
@@ -91,6 +92,7 @@ function searcher_bot.update(player, ps, state, visual, tick)
         return
     end
 
+    local visual = module.get_module("visual")
     visual.draw_bot_light(player, ps, BOT_NAME, bot)
 end
 

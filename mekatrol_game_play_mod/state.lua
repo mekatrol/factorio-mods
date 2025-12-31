@@ -25,27 +25,6 @@ function state.ensure_storage_tables()
     storage.mekatrol_game_play_bot = storage.mekatrol_game_play_bot or {}
 end
 
-function state.get_bot_by_name(player, ps, bot_name)
-    if not ps then
-        return nil
-    end
-
-    local bots = ps.bots
-
-    if not bots then
-        util.print(player, "red", "Failed to get bot with name: '%s'", bot_name)
-        return nil
-    end
-
-    local bot = bots[bot_name]
-
-    if bot and bot.entity and bot.entity.valid then
-        return bot
-    end
-
-    return nil
-end
-
 function state.get_player_state(player_index)
     state.ensure_storage_tables()
 

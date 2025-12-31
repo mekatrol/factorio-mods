@@ -7,8 +7,8 @@ local polygon = require("polygon")
 local positioning = require("positioning")
 local util = require("util")
 
-local BOT_CONFIGURATION = config.bot
-local DETECTION_RADIUS = BOT_CONFIGURATION.search.detection_radius / 3
+local BOT_CONFIG = config.bot
+local DETECTION_RADIUS = BOT_CONFIG.search.detection_radius / 3
 
 ----------------------------------------------------------------------
 -- Search task
@@ -94,7 +94,7 @@ function search.pick_new_search_target_spiral(ps, bpos)
     spiral_advance(ps)
 
     local s = ps.search_spiral
-    local step = BOT_CONFIGURATION.search.step_distance
+    local step = BOT_CONFIG.search.step_distance
 
     return {
         x = s.origin.x + s.offset_x * step,
@@ -220,7 +220,7 @@ local function get_search_item(player, ps, bot)
     return bot.task.search_item
 end
 
-function search.update(player, ps, state, bot)
+function search.update(player, ps, bot)
     if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
     end
@@ -258,7 +258,7 @@ function search.update(player, ps, state, bot)
         end
 
         local entity = find_entity(player, ps, bot, bpos, surface, search_item,
-            BOT_CONFIGURATION.search.detection_radius)
+            BOT_CONFIG.search.detection_radius)
 
         if entity then
             -- record what we found
@@ -344,7 +344,7 @@ function search.update(player, ps, state, bot)
     bot.task.target_position = nil
 
     -- Do a quick scan for and search list entities around current position
-    scan_entities(player, ps, bot, bpos, surface, BOT_CONFIGURATION.search.detection_radius)
+    scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius)
 
     -- return if no current search name
     if bot.task.search_item.name == nil then

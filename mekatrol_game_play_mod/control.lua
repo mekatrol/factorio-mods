@@ -244,7 +244,7 @@ script.on_event(defines.events.on_player_removed, on_player_removed)
 ----------------------------------------------------------------------
 
 local function get_tasks(player, ps, bot_name)
-    local current_task, next_task, other = common_bot.get_tasks(player, ps, state, visual, bot_name)
+    local current_task, next_task, other = common_bot.get_tasks(player, ps, bot_name)
     local line = string.format("%s: %s→%s%s", bot_name, current_task or "nil", next_task or "nil", other or "")
     return line
 end
@@ -289,11 +289,11 @@ script.on_event(defines.events.on_tick, function(event)
 
         local tick = event.tick
         master_controller.update(player, ps, tick)
-        constructor_bot.update(player, ps, state, visual, tick)
-        logistics_bot.update(player, ps, state, visual, tick)
-        mapper_bot.update(player, ps, state, visual, tick)
-        repairer_bot.update(player, ps, state, visual, tick)
-        searcher_bot.update(player, ps, state, visual, tick)
+        constructor_bot.update(player, ps, tick)
+        logistics_bot.update(player, ps, tick)
+        mapper_bot.update(player, ps, tick)
+        repairer_bot.update(player, ps, tick)
+        searcher_bot.update(player, ps, tick)
 
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "constructor")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "logistics")
