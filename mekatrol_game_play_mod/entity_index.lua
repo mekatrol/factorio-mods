@@ -131,4 +131,22 @@ function entity_index:compact(budget)
     end
 end
 
+function entity_index:get_name_counts()
+    local result = {}
+
+    for name, bucket in pairs(self.by_name) do
+        local c = 0
+        for _ in pairs(bucket) do
+            c = c + 1
+        end
+
+        -- only include non-empty buckets (should always be true)
+        if c > 0 then
+            result[name] = c
+        end
+    end
+
+    return result
+end
+
 return entity_index

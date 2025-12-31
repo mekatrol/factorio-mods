@@ -268,8 +268,12 @@ script.on_event(defines.events.on_tick, function(event)
 
     if ps.bot_enabled and ps.bots then
         local bot = ps.bots["mapper"]
-        overlay_lines[#overlay_lines + 1] = string.format("q: %s, f: %s", #bot.task.queued_survey_entities,
-            #bot.task.future_survey_entities)
+
+        local counts = bot.task.future_survey_entities:get_name_counts()
+        overlay_lines[#overlay_lines + 1] = string.format("queued:")
+        for name, count in pairs(counts) do
+            overlay_lines[#overlay_lines + 1] = string.format("    '%s' = %s", name, count)
+        end
 
         local tick = event.tick
         constructor_bot.update(player, ps, state, visual, tick)
