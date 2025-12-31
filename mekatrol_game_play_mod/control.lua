@@ -13,6 +13,7 @@ local survey = require("survey")
 local util = require("util")
 local visual = require("visual")
 
+local master_controller = require("master_controller")
 local constructor_bot = require("constructor_bot")
 local logistics_bot = require("logistics_bot")
 local mapper_bot = require("mapper_bot")
@@ -287,6 +288,7 @@ script.on_event(defines.events.on_tick, function(event)
         end
 
         local tick = event.tick
+        master_controller.update(player, ps, tick)
         constructor_bot.update(player, ps, state, visual, tick)
         logistics_bot.update(player, ps, state, visual, tick)
         mapper_bot.update(player, ps, state, visual, tick)
