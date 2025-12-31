@@ -670,9 +670,10 @@ function survey.update(player, player_state, visual, bot, tick)
     -- If we are tracing, drive movement purely from the trace state machine.
     ensure_survey_trace_state(player_state, bot)
 
-    if bot.task.survey_trace then
-        local current_target_world_position = bot.task.target_position
+    local current_target_world_position = bot.task.target_position
+    local bot_world_position = bot.entity.position
 
+    if bot.task.survey_trace then
         if not current_target_world_position then
             current_target_world_position = advance_trace_one_step(player, player_state, visual, bot)
             bot.task.target_position = current_target_world_position
@@ -681,10 +682,11 @@ function survey.update(player, player_state, visual, bot, tick)
         if not current_target_world_position then
             return
         end
-
+    end
+    
+    if bot.task.target_position ~= nil then
         positioning.move_entity_towards(player, bot.entity, current_target_world_position)
 
-        local bot_world_position = bot.entity.position
         local has_arrived_at_target = positioning.positions_are_close(current_target_world_position, bot_world_position,
             BOT_CONFIGURATION.survey.arrival_threshold)
 
@@ -695,8 +697,6 @@ function survey.update(player, player_state, visual, bot, tick)
         -- Arrived; request the next trace target on the next update tick.
         bot.task.target_position = nil
         return
-    elseif bot.task.target_position ~= nil then
-        positioning.move_entity_towards(player, bot.entity, bot.task.target_position)
     end
 
     -- Not tracing: ensure we have a survey target entity configured.
