@@ -1,6 +1,7 @@
 local common_bot = require("common_bot")
 local config = require("config")
 local entity_group = require("entity_group")
+local entity_index = require("entity_index")
 local follow = require("follow")
 local inventory = require("inventory")
 local module = require("module")
@@ -268,6 +269,12 @@ script.on_event(defines.events.on_tick, function(event)
 
     if ps.bot_enabled and ps.bots then
         local bot = ps.bots["mapper"]
+
+        local future_entities = bot.task.future_survey_entities
+        if not (future_entities and future_entities.add_many and future_entities.take_by_name and
+            future_entities.get_name_counts) then
+            bot.task.future_survey_entities = entity_index.new()
+        end
 
         local counts = bot.task.future_survey_entities:get_name_counts()
         overlay_lines[#overlay_lines + 1] = string.format("queued:")
