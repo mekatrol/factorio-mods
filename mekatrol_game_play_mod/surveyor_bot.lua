@@ -86,20 +86,6 @@ function surveyor_bot.set_bot_task(player, ps, new_task, next_task, args)
     bot.task.args = args or bot.task.args or {}
 end
 
-function surveyor_bot.toggle_task(player, ps)
-    local bot = ps.bots[BOT_NAME]
-
-    -- default to search
-    local new_task = "search"
-
-    -- if not in follow task then set to follow task
-    if not (bot.task.current_task == "follow") then
-        new_task = "follow"
-    end
-
-    surveyor_bot.set_bot_task(player, ps, new_task, nil, bot.task.args)
-end
-
 function surveyor_bot.get_queued_task(player, ps)
     return nil, nil
 end

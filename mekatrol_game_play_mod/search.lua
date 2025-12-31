@@ -67,13 +67,14 @@ local function rotate_search_item_to_back(bot)
         return
     end
 
-    local list = bot.task.args and bot.task.args.search_list
-    if not list then
+    local search_list = bot.task.search_list
+    
+    if not search_list then
         return
     end
 
     -- push current item to back
-    list[#list + 1] = {
+    search_list[#search_list + 1] = {
         name = search_item.name,
         find_many = search_item.find_many
     }
@@ -128,12 +129,12 @@ local function filter_entities(entities, filter_name)
 end
 
 local function find_entities(player, ps, bot, pos, surface, search_item, search_radius, find_starts_with, sort_by_pos)
-    local search_for_list = util.get_value(bot.task.args, "search_list")
+    local search_list = bot.task.search_list
 
     local search_item_name = search_item and search_item.name
 
     local entities_found, others_found = util.find_entities(player, pos, search_radius, surface, search_item_name,
-        search_for_list, find_starts_with, sort_by_pos)
+        search_list, find_starts_with, sort_by_pos)
 
     if #others_found > 0 then
         -- add to future entities
@@ -144,9 +145,9 @@ local function find_entities(player, ps, bot, pos, surface, search_item, search_
 end
 
 local function scan_entities(player, ps, bot, pos, surface, search_radius)
-    local search_for_list = util.get_value(bot.task.args, "search_list")
+    local search_list = bot.task.search_list
 
-    local entities_found = util.scan_entities(player, pos, search_radius, surface, search_for_list)
+    local entities_found = util.scan_entities(player, pos, search_radius, surface, search_list)
 
     if #entities_found > 0 then
         -- add to future entities
@@ -211,7 +212,7 @@ local function get_search_item(player, ps, bot)
     end
 
     -- try an get next search name in list
-    bot.task.search_item = util.dict_array_pop(bot.task.args, "search_list") or {
+    bot.task.search_item = util.array_pop(bot.task.search_list) or {
         name = nil,
         find_many = false,
         remove_when_no_more_found = false
@@ -250,10 +251,10 @@ function search.update(player, ps, bot)
 
         if search_item.name == nil then
             -- no more search list
-            bot.task.args["search_list"] = nil
+            bot.task.search_list = {}
 
             -- return to follow mode
-            bot_module.set_bot_task(player, ps, "follow", nil, bot.task.args)
+            bot_module.set_bot_task(player, ps, "follow")
             return
         end
 
@@ -309,10 +310,10 @@ function search.update(player, ps, bot)
 
             if not search_item.name then
                 -- no more search list
-                bot.task.args["search_list"] = nil
+                bot.task.search_list = {}
 
                 -- return to follow mode
-                bot_module.set_bot_task(player, ps, "follow", nil, bot.task.args)
+                bot_module.set_bot_task(player, ps, "follow")
                 return
             end
 
@@ -356,9 +357,6 @@ function search.update(player, ps, bot)
     }
 
     bot.task.survey_found_entity = false
-
-    -- switch to survey task once destination reached so that we can survey the location
-    bot_module.set_bot_task(player, ps, "survey", "search", bot.task.args)
 end
 
 return search

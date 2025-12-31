@@ -53,7 +53,7 @@ function entity_index:add(entity)
     return true
 end
 
-function entity_index:add_many(player_state, surface_index, entities)
+function entity_index:add_many(ps, surface_index, entities)
     if not entities or #entities == 0 then
         return 0
     end
@@ -65,7 +65,7 @@ function entity_index:add_many(player_state, surface_index, entities)
         local e = entities[i]
         if e and e.valid then
             -- preserve your existing “don’t track if already grouped” rule
-            if not entity_group.is_in_any_entity_group(player_state, surface_index, e) then
+            if not entity_group.is_in_any_entity_group(ps, surface_index, e) then
                 if self:add(e) then
                     added = added + 1
                 end

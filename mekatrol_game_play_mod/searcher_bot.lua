@@ -5,6 +5,7 @@ local config = require("config")
 local follow = require("follow")
 local module = require("module")
 local move_to = require("move_to")
+local search = require("search")
 local util = require("util")
 
 local BOT_CONF = config.bot
@@ -31,6 +32,19 @@ end
 
 function searcher_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME)
+
+    local bot = ps.bots[BOT_NAME]
+
+    bot.task.search_spiral = bot.task.search_spiral or nil
+    bot.task.search_item = bot.task.search_item or {
+        name = nil,
+        find_many = false,
+        remove_when_no_more_found = false
+    }
+
+    bot.task.search_list = bot.task.search_list or {
+        ["search_list"] = {}
+    }
 end
 
 function searcher_bot.destroy_state(player, ps)
@@ -83,6 +97,8 @@ function searcher_bot.update(player, ps, tick)
         follow.update(player, ps, bot, bot_conf.follow_offset_y)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
+    elseif bot.task.current_task == "search" then
+        search.update(player, ps, bot)
     end
 
     -- Throttle overlay updates

@@ -136,20 +136,16 @@ function common_bot.get_tasks(player, ps, bot_name)
     return bot.task.current_task, bot.task.next_task, other
 end
 
-function common_bot.init_state(player, ps, bot_name, init_task)
-    if not init_task then
-        init_task = "follow"
-    end
-
+function common_bot.init_state(player, ps, bot_name, init_task, init_args)
     ps.bots[bot_name] = ps.bots[bot_name] or {
         name = bot_name,
         entity = nil,
         task = {
             busy = false,
             target_position = nil,
-            current_task = init_task,
+            current_task = init_task or "follow",
             next_task = nil,
-            args = {}
+            args = init_args or {}
         },
         visual = {
             highlight = nil,

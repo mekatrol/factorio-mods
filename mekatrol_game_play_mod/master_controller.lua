@@ -3,54 +3,34 @@ local master_controller = {}
 local module = require("module")
 
 local function init_game(player, ps, tick)
-    local surveyor_module = module.get_module("surveyor")
-    local bot = ps.bots["surveyor"]
+    local logistics_module = module.get_module("logistics")
+    local logistics_bot = ps.bots["surveyor"]
+    local searcher_module = module.get_module("searcher")
+    local searcher_bot = ps.bots["searcher"]
 
-    bot.task.search_item = {
+    searcher_bot.task.search_item = {
         name = nil,
         find_many = false,
         remove_when_no_more_found = false
     }
 
-    local args = {
-        -- set the list of items to search for and in the order we want to search
-        ["search_list"] = {{
-            name = "crash-site",
-            find_many = true,
-            remove_when_no_more_found = true
-        }, {
-            name = "coal",
-            find_many = true,
-            remove_when_no_more_found = false
-        }, {
-            name = "iron-ore",
-            find_many = true,
-            remove_when_no_more_found = false
-        }, {
-            name = "copper-ore",
-            find_many = true,
-            remove_when_no_more_found = false
-        }, {
-            name = "stone",
-            find_many = true,
-            remove_when_no_more_found = false
-        }, {
-            name = "tree",
-            find_many = true,
-            remove_when_no_more_found = false
-        }, {
-            name = "uranium-ore",
-            find_many = true,
-            remove_when_no_more_found = false
-        }, {
-            name = "oil",
-            find_many = true,
-            remove_when_no_more_found = false
+    searcher_bot.task.target_position = nil
+    searcher_bot.task.search_list = {{
+        name = "crash-site",
+        find_many = true,
+        remove_when_no_more_found = true
+    }}
+    searcher_module.set_bot_task(player, ps, "search")
+
+    local logistics_args = {
+        -- set the list of items to collect
+        ["collect_list"] = {{
+            name = "crash-site"
         }}
     }
 
-    bot.task.target_position = nil
-    surveyor_module.set_bot_task(player, ps, "search", "survey", args)
+    logistics_bot.task.target_position = nil
+    logistics_module.set_bot_task(player, ps, "collect", nil, searcher_args)
 end
 
 function master_controller.update(player, ps, tick)

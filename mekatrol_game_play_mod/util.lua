@@ -102,8 +102,66 @@ function util.get_value(t, key)
     return t[key]
 end
 
-function util.print_table(player_or_game, t)
+function util.print_table(player_or_game, t, opts)
     local color = "yellow"
+
+    opts = opts or {}
+    local indent_step = opts.indent_step or 2
+    local max_depth = opts.max_depth or 10
+
+    local visited = {}
+
+    local function indent(level)
+        return string.rep(" ", level * indent_step)
+    end
+
+    local function is_array(tbl)
+        local n = #tbl
+        if n == 0 then
+            return next(tbl) == nil
+        end
+
+        for k in pairs(tbl) do
+            if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then
+                return false
+            end
+        end
+        return true
+    end
+
+    local function print_value(key, value, level)
+        local prefix = indent(level)
+
+        if type(value) ~= "table" then
+            util.print(player_or_game, color, "%s[%s] = %s", prefix, tostring(key), tostring(value))
+            return
+        end
+
+        if visited[value] then
+            util.print(player_or_game, color, "%s[%s] = <cycle>", prefix, tostring(key))
+            return
+        end
+
+        if level >= max_depth then
+            util.print(player_or_game, color, "%s[%s] = <max depth>", prefix, tostring(key))
+            return
+        end
+
+        visited[value] = true
+
+        local array = is_array(value)
+        util.print(player_or_game, color, "%s[%s] = %s:", prefix, tostring(key), array and "array" or "dict")
+
+        if array then
+            for i = 1, #value do
+                print_value(i, value[i], level + 1)
+            end
+        else
+            for k, v in pairs(value) do
+                print_value(k, v, level + 1)
+            end
+        end
+    end
 
     if t == nil then
         util.print(player_or_game, color, "table is nil")
@@ -115,31 +173,18 @@ function util.print_table(player_or_game, t)
         return
     end
 
-    -- Detect array (contiguous 1..n)
-    local n = #t
-    local is_array = true
+    visited[t] = true
 
-    for k in pairs(t) do
-        if type(k) ~= "number" or k < 1 or k > n or k % 1 ~= 0 then
-            is_array = false
-            break
-        end
-    end
+    local array = is_array(t)
+    util.print(player_or_game, color, "%s:", array and "array" or "dict")
 
-    if next(t) == nil then
-        util.print(player_or_game, color, "<empty table>")
-        return
-    end
-
-    util.print(player_or_game, color, "%s:", is_array and "array" or "dict")
-
-    if is_array then
-        for i = 1, n do
-            util.print(player_or_game, color, "  [%d] = %s", i, tostring(t[i]))
+    if array then
+        for i = 1, #t do
+            print_value(i, t[i], 1)
         end
     else
         for k, v in pairs(t) do
-            util.print(player_or_game, color, "  [%s] = %s", tostring(k), tostring(v))
+            print_value(k, v, 1)
         end
     end
 end
