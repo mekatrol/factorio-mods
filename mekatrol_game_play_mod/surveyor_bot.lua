@@ -112,57 +112,6 @@ function surveyor_bot.update(player, ps, tick)
         return
     end
 
-    -- are we in init phase of game, and not searching for specified list?
-    if ps.game_phase == "init" then
-        ps.game_phase = "done"
-
-        bot.task.search_item = {
-            name = nil,
-            find_many = false,
-            remove_when_no_more_found = false
-        }
-
-        local args = {
-            -- set the list of items to search for and in the order we want to search
-            ["search_list"] = {{
-                name = "crash-site",
-                find_many = true,
-                remove_when_no_more_found = true
-            }, {
-                name = "coal",
-                find_many = true,
-                remove_when_no_more_found = false
-            }, {
-                name = "iron-ore",
-                find_many = true,
-                remove_when_no_more_found = false
-            }, {
-                name = "copper-ore",
-                find_many = true,
-                remove_when_no_more_found = false
-            }, {
-                name = "stone",
-                find_many = true,
-                remove_when_no_more_found = false
-            }, {
-                name = "tree",
-                find_many = true,
-                remove_when_no_more_found = false
-            }, {
-                name = "uranium-ore",
-                find_many = true,
-                remove_when_no_more_found = false
-            }, {
-                name = "oil",
-                find_many = true,
-                remove_when_no_more_found = false
-            }}
-        }
-
-        bot.task.target_position = nil
-        surveyor_bot.set_bot_task(player, ps, "search", "survey", args)
-    end
-
     -- perform updates common to all bots
     common_bot.update(player, bot, bot_conf, tick)
 

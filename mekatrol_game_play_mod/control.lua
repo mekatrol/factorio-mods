@@ -289,11 +289,6 @@ script.on_event(defines.events.on_tick, function(event)
 
         local tick = event.tick
         master_controller.update(player, ps, tick)
-        constructor_bot.update(player, ps, tick)
-        logistics_bot.update(player, ps, tick)
-        repairer_bot.update(player, ps, tick)
-        searcher_bot.update(player, ps, tick)
-        surveyor_bot.update(player, ps, tick)
 
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "constructor")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "logistics")

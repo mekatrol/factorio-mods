@@ -79,7 +79,5 @@ function config.get_bot_config(bot_name)
     return config.bot[bot_name]
 end
 
-config.game_phases = {"init"}
-
 return config
 

@@ -145,6 +145,7 @@ function common_bot.init_state(player, ps, bot_name, init_task)
         name = bot_name,
         entity = nil,
         task = {
+            busy = false,
             target_position = nil,
             current_task = init_task,
             next_task = nil,
