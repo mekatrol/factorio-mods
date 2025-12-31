@@ -147,6 +147,14 @@ function mapper_bot.update(player, ps, state, visual, tick)
                 name = "tree",
                 find_many = true,
                 remove_when_no_more_found = false
+            }, {
+                name = "uranium-ore",
+                find_many = true,
+                remove_when_no_more_found = false
+            }, {
+                name = "oil",
+                find_many = true,
+                remove_when_no_more_found = false
             }}
         }
 
