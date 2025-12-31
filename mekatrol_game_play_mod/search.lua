@@ -319,7 +319,7 @@ function search.update(player, ps, state, bot)
             if #bot.task.queued_survey_entities == 0 then
 
                 -- check future entities for the entity name we are searching for
-                local future_queued = bot.task.future_survey_entities:take_by_name_contains(search_item.name)
+                local future_queued = bot.task.future_survey_entities:take_by_name_contains_with_limit(search_item.name, 1)
 
                 if future_queued and #future_queued > 0 then
                     bot.task.queued_survey_entities = future_queued

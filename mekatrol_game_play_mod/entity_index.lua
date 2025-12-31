@@ -151,6 +151,45 @@ function entity_index:take_by_name_contains(name)
     return out
 end
 
+function entity_index:take_by_name_contains_with_limit(name, limit)
+    if not name or limit <= 0 then
+        return {}
+    end
+
+    local out = {}
+    local taken = 0
+
+    -- iterate bucket names that contain substr
+    for bucket_name, bucket in pairs(self.by_name) do
+        if string.find(bucket_name, name, 1, true) then
+            for id in pairs(bucket) do
+                local ent = self.by_id[id]
+
+                -- remove one
+                self.by_id[id] = nil
+                self.name_by_id[id] = nil
+                bucket[id] = nil
+                self.count = self.count - 1
+
+                if ent and ent.valid then
+                    out[#out + 1] = ent
+                end
+
+                taken = taken + 1
+                if taken >= limit then
+                    return out
+                end
+            end
+
+            if next(bucket) == nil then
+                self.by_name[bucket_name] = nil
+            end
+        end
+    end
+
+    return out
+end
+
 -- Optional: cheap cleanup per tick to avoid invalids accumulating.
 function entity_index:compact(budget)
     budget = budget or 1000
