@@ -12,6 +12,7 @@ local constructor_bot = require("constructor_bot")
 local logistics_bot = require("logistics_bot")
 local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
+local searcher_bot = require("searcher_bot")
 
 local BOT_CONF = config.bot
 local BOT_NAMES = config.bot_names
@@ -80,6 +81,7 @@ function state.get_player_state(player_index)
     logistics_bot.init_state(player, ps)
     mapper_bot.init_state(player, ps)
     repairer_bot.init_state(player, ps)
+    searcher_bot.init_state(player, ps)
 
     ps.overlay_next_tick = ps.overlay_next_tick or 0
 
@@ -102,6 +104,7 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
         logistics_bot.destroy_state(player, ps, state)
         mapper_bot.destroy_state(player, ps, state)
         repairer_bot.destroy_state(player, ps, state)
+        searcher_bot.destroy_state(player, ps, state)
     end
 
     -- Clear ALL render objects / visual.
@@ -150,6 +153,14 @@ function state.create_player_bot(player, visual, clear_entity_groups)
 
     local pos = player.position
     local offsets = {
+        ["constructor"] = {
+            x = -2,
+            y = BOT_CONF.constructor.follow_offset_y
+        },
+        ["logistics"] = {
+            x = -2,
+            y = BOT_CONF.logistics.follow_offset_y
+        },
         ["mapper"] = {
             x = -2,
             y = BOT_CONF.mapper.follow_offset_y
@@ -158,13 +169,9 @@ function state.create_player_bot(player, visual, clear_entity_groups)
             x = -2,
             y = BOT_CONF.repairer.follow_offset_y
         },
-        ["constructor"] = {
+        ["searcher"] = {
             x = -2,
-            y = BOT_CONF.constructor.follow_offset_y
-        },
-        ["logistics"] = {
-            x = -2,
-            y = BOT_CONF.logistics.follow_offset_y
+            y = BOT_CONF.searcher.follow_offset_y
         }
     }
 

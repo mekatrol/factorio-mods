@@ -5,6 +5,7 @@ local key_for = {
     logistics = "logistics_bot",
     mapper = "mapper_bot",
     repairer = "repairer_bot",
+    searcher = "searcher_bot",
     entity_group = "entity_group",
     inventory = "inventory",
     visual = "visual"

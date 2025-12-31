@@ -17,6 +17,7 @@ local constructor_bot = require("constructor_bot")
 local logistics_bot = require("logistics_bot")
 local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
+local searcher_bot = require("searcher_bot")
 
 -- Config aliases.
 local BOT_CONF = config.bot
@@ -30,6 +31,7 @@ local function init_modules()
         constructor_bot = constructor_bot,
         mapper_bot = mapper_bot,
         repairer_bot = repairer_bot,
+        searcher_bot = searcher_bot,
         entity_group = entity_group,
         visual = visual,
         inventory = inventory
@@ -81,6 +83,8 @@ local function full_bot_name(bot_name)
         bot_name = "mapper"
     elseif bot_name == "r" then
         bot_name = "repairer"
+    elseif bot_name == "s" then
+        bot_name = "searcher"
     end
 
     return bot_name
@@ -287,11 +291,13 @@ script.on_event(defines.events.on_tick, function(event)
         logistics_bot.update(player, ps, state, visual, tick)
         mapper_bot.update(player, ps, state, visual, tick)
         repairer_bot.update(player, ps, state, visual, tick)
+        searcher_bot.update(player, ps, state, visual, tick)
 
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "constructor")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "logistics")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "mapper")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "repairer")
+        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "searcher")
     else
         overlay_lines[#overlay_lines + 1] = "bot is currently disabled"
     end

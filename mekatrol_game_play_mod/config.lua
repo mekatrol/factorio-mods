@@ -60,10 +60,20 @@ config.bot = {
             b = 0.0,
             a = 0.3
         }
+    },
+
+    ["searcher"] = {
+        follow_offset_y = -3.333,
+        highlight_color = {
+            r = 0.5,
+            g = 1.0,
+            b = 0.0,
+            a = 0.3
+        }
     }
 }
 
-config.bot_names = {"constructor", "logistics", "mapper", "repairer"}
+config.bot_names = {"constructor", "logistics", "mapper", "repairer", "searcher"}
 
 function config.get_bot_config(bot_name)
     return config.bot[bot_name]
