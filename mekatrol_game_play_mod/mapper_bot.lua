@@ -1,4 +1,4 @@
-local searcher_bot = {}
+local mapper_bot = {}
 
 local common_bot = require("common_bot")
 local config = require("config")
@@ -9,7 +9,7 @@ local search = require("search")
 local util = require("util")
 
 local BOT_CONF = config.bot
-local BOT_NAME = "searcher"
+local BOT_NAME = "mapper"
 
 local BOT_TASKS = {
     list = {"follow", "search", "move_to"},
@@ -30,7 +30,7 @@ local function full_task_name(task_name)
     return task_name
 end
 
-function searcher_bot.init_state(player, ps)
+function mapper_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME)
 
     local bot = ps.bots[BOT_NAME]
@@ -41,11 +41,11 @@ function searcher_bot.init_state(player, ps)
     }
 end
 
-function searcher_bot.destroy_state(player, ps)
+function mapper_bot.destroy_state(player, ps)
     common_bot.destroy_state(player, ps, BOT_NAME)
 end
 
-function searcher_bot.set_bot_task(player, ps, new_task, next_task, args)
+function mapper_bot.set_bot_task(player, ps, new_task, next_task, args)
     local bot = ps.bots[BOT_NAME]
 
     new_task = full_task_name(new_task)
@@ -71,11 +71,11 @@ function searcher_bot.set_bot_task(player, ps, new_task, next_task, args)
     bot.task.args = args or bot.task.args or {}
 end
 
-function searcher_bot.get_queued_task(player, ps)
+function mapper_bot.get_queued_task(player, ps)
     return nil, nil
 end
 
-function searcher_bot.update(player, ps, tick)
+function mapper_bot.update(player, ps, tick)
     local bot = ps.bots[BOT_NAME]
     local bot_conf = BOT_CONF[BOT_NAME]
 
@@ -106,4 +106,4 @@ function searcher_bot.update(player, ps, tick)
     visual.draw_bot_light(player, ps, BOT_NAME, bot)
 end
 
-return searcher_bot
+return mapper_bot

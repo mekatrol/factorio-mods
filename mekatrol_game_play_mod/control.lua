@@ -16,8 +16,8 @@ local visual = require("visual")
 local master_controller = require("master_controller")
 local constructor_bot = require("constructor_bot")
 local logistics_bot = require("logistics_bot")
+local mapper_bot = require("mapper_bot")
 local repairer_bot = require("repairer_bot")
-local searcher_bot = require("searcher_bot")
 local surveyor_bot = require("surveyor_bot")
 
 -- Config aliases.
@@ -31,7 +31,7 @@ local function init_modules()
         logistics_bot = logistics_bot,
         constructor_bot = constructor_bot,
         repairer_bot = repairer_bot,
-        searcher_bot = searcher_bot,
+        mapper_bot = mapper_bot,
         surveyor_bot = surveyor_bot,
         entity_group = entity_group,
         visual = visual,
@@ -80,10 +80,10 @@ local function full_bot_name(bot_name)
         bot_name = "constructor"
     elseif bot_name == "l" then
         bot_name = "logistics"
+    elseif bot_name == "m" then
+        bot_name = "mapper"
     elseif bot_name == "r" then
         bot_name = "repairer"
-    elseif bot_name == "s" then
-        bot_name = "searcher"
     elseif bot_name == "v" then
         bot_name = "surveyor"
     end
@@ -133,12 +133,12 @@ end
 local function register_commands()
     -- a generic command: /bot <name> <task>
     if not commands.commands["bot"] then
-        commands.add_command("bot", "Usage: /bot <constructor|logistics|repairer|searcher|surveyor> <task>", command)
+        commands.add_command("bot", "Usage: /bot <constructor|logistics|mapper|repairer|surveyor> <task>", command)
     end
 
     -- a generic command: /b <name> <task>
     if not commands.commands["b"] then
-        commands.add_command("b", "Usage: /b <c|l|r|s|v> <task>", command)
+        commands.add_command("b", "Usage: /b <c|l|m|r|s> <task>", command)
     end
 end
 
@@ -292,8 +292,8 @@ script.on_event(defines.events.on_tick, function(event)
 
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "constructor")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "logistics")
+        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "mapper")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "repairer")
-        overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "searcher")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "surveyor")
     else
         overlay_lines[#overlay_lines + 1] = "bot is currently disabled"

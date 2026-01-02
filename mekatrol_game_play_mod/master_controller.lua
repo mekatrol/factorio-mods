@@ -13,7 +13,7 @@ end
 
 local function init_game(player, ps, tick)
     local logistics_module, logistics_bot = get_bot(ps, "logistics")
-    local searcher_module, searcher_bot = get_bot(ps, "searcher")
+    local searcher_module, mapper_bot = get_bot(ps, "mapper")
     local surveyor_module, surveyor_bot = get_bot(ps, "surveyor")
 
     logistics_bot.collect_list = {
@@ -25,7 +25,7 @@ local function init_game(player, ps, tick)
     logistics_bot.task.target_position = nil
     logistics_module.set_bot_task(player, ps, "collect")
 
-    searcher_bot.task.search_list = {{
+    mapper_bot.task.search_list = {{
         name = "crash-site",
         find_many = true,
         remove_when_no_more_found = true
@@ -58,7 +58,7 @@ local function init_game(player, ps, tick)
         find_many = true,
         remove_when_no_more_found = false
     }}
-    searcher_bot.task.target_position = nil
+    mapper_bot.task.target_position = nil
     searcher_module.set_bot_task(player, ps, "search")
 
     surveyor_bot.task.target_position = nil
@@ -104,8 +104,8 @@ end
 function master_controller.update(player, ps, tick)
     local constructor_module, constructor_bot = get_bot(ps, "constructor")
     local logistics_module, logistics_bot = get_bot(ps, "logistics")
+    local searcher_module, mapper_bot = get_bot(ps, "mapper")
     local repairer_module, repairer_bot = get_bot(ps, "repairer")
-    local searcher_module, searcher_bot = get_bot(ps, "searcher")
     local surveyor_module, surveyor_bot = get_bot(ps, "surveyor")
 
     ps.discovered_entities = ps.discovered_entities or entity_index.new()

@@ -42,6 +42,16 @@ config.bot = {
             a = 0.3
         }
     },
+    
+    ["mapper"] = {
+        follow_offset_y = -3.333,
+        highlight_color = {
+            r = 0.5,
+            g = 1.0,
+            b = 0.0,
+            a = 0.3
+        }
+    },
 
     ["repairer"] = {
         follow_offset_y = -0.666,
@@ -52,16 +62,7 @@ config.bot = {
             a = 0.3
         }
     },
-
-    ["searcher"] = {
-        follow_offset_y = -3.333,
-        highlight_color = {
-            r = 0.5,
-            g = 1.0,
-            b = 0.0,
-            a = 0.3
-        }
-    },
+    
     ["surveyor"] = {
         follow_offset_y = -2,
         highlight_color = {
@@ -73,7 +74,7 @@ config.bot = {
     }
 }
 
-config.bot_names = {"constructor", "logistics", "repairer", "searcher", "surveyor"}
+config.bot_names = {"constructor", "logistics", "mapper", "repairer", "surveyor"}
 
 function config.get_bot_config(bot_name)
     return config.bot[bot_name]
