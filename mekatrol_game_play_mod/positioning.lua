@@ -84,7 +84,7 @@ function positioning.move_entity_towards(player, entity, target)
 
     local pos, err = positioning.resolve_target_position(target)
     if not pos then
-        util.print(player, "red", "invalid target: %s", err or "?")
+        util.print_player_or_game(player, "red", "invalid target: %s", err or "?")
         return
     end
 

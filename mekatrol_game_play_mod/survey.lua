@@ -354,10 +354,8 @@ function survey.perform_survey_scan(player, ps, bot, tick)
     local entities_found, others_found = util.find_entities(player, bot_world_position,
         BOT_CONFIG.search.detection_radius, surface, survey_entity_name, search_for_list, true, true)
 
-    bot.task.future_survey_entities = bot.task.future_survey_entities or entity_index.new()
-
     if #others_found > 0 then
-        bot.task.future_survey_entities:add_many(ps, surface.index, others_found)
+        ps.discovered_entities:add_many(ps, surface.index, others_found)
     end
 
     if #entities_found == 0 then
@@ -623,8 +621,7 @@ local function advance_trace_one_step(player, ps, bot)
 
                     visual.clear_survey_trace(ps, bot.name)
 
-                    entity_group.add_boundary(player, ps, boundary_world_positions, target_entity,
-                        surface.index)
+                    entity_group.add_boundary(player, ps, boundary_world_positions, target_entity, surface.index)
 
                     switch_bot_to_next_task(player, ps, bot)
                     return nil
@@ -655,6 +652,11 @@ function survey.update(player, ps, bot, tick)
         return
     end
 
+    if not (bot.task.survey_list or bot.task.target_position) then
+        -- nothing to do
+        return
+    end
+
     local entity_group = module.get_module("entity_group")
 
     -- If we are tracing, drive movement purely from the trace state machine.
@@ -674,7 +676,23 @@ function survey.update(player, ps, bot, tick)
         end
     end
 
-    if bot.task.target_position ~= nil then
+    if bot.task.survey_list and bot.task.target_position == nil then
+        local entity = util.array_pop(bot.task.survey_list)
+
+        if entity then
+            bot.task.survey_entity = entity
+            current_target_world_position = entity.position
+            bot.task.target_position = entity.position
+        else
+            -- done with this survey list
+            bot.task.survey_list = nil
+
+            -- nothing to survey
+            return
+        end
+    end
+
+    if current_target_world_position ~= nil then
         positioning.move_entity_towards(player, bot.entity, current_target_world_position)
 
         local has_arrived_at_target = positioning.positions_are_close(current_target_world_position, bot_world_position,

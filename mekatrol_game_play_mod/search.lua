@@ -1,9 +1,7 @@
 local search = {}
 
 local config = require("config")
-local entity_index = require("entity_index")
 local module = require("module")
-local polygon = require("polygon")
 local positioning = require("positioning")
 local util = require("util")
 
@@ -61,32 +59,6 @@ local function spiral_advance(ps)
     end
 end
 
-local function rotate_search_item_to_back(bot)
-    local search_item = bot.task.search_item
-    if not search_item or not search_item.name then
-        return
-    end
-
-    local search_list = bot.task.search_list
-    
-    if not search_list then
-        return
-    end
-
-    -- push current item to back
-    search_list[#search_list + 1] = {
-        name = search_item.name,
-        find_many = search_item.find_many
-    }
-
-    -- clear current so next pop gets a new one
-    bot.task.search_item = {
-        name = nil,
-        find_many = false,
-        remove_when_no_more_found = false
-    }
-end
-
 function search.pick_new_search_target_spiral(ps, bpos)
     if not ps.search_spiral then
         init_spiral(ps, bpos)
@@ -103,122 +75,17 @@ function search.pick_new_search_target_spiral(ps, bpos)
     }
 end
 
-local function filter_entities(entities, filter_name)
-    local filtered_entities = {}
-    local write_index = 1
-
-    for i = 1, #entities do
-        local entity = entities[i]
-
-        if entity and entity.valid then
-            if entity.name == filter_name then
-                filtered_entities[#filtered_entities + 1] = entity
-            else
-                entities[write_index] = entity
-                write_index = write_index + 1
-            end
-        end
-    end
-
-    -- shrink others_found to remove trailing leftovers
-    for i = write_index, #entities do
-        entities[i] = nil
-    end
-
-    return filtered_entities
-end
-
-local function find_entities(player, ps, bot, pos, surface, search_item, search_radius, find_starts_with, sort_by_pos)
-    local search_list = bot.task.search_list
-
-    local search_item_name = search_item and search_item.name
-
-    local entities_found, others_found = util.find_entities(player, pos, search_radius, surface, search_item_name,
-        search_list, find_starts_with, sort_by_pos)
-
-    if #others_found > 0 then
-        -- add to future entities
-        bot.task.future_survey_entities:add_many(ps, surface.index, others_found)
-    end
-
-    return entities_found, others_found
-end
-
 local function scan_entities(player, ps, bot, pos, surface, search_radius)
     local search_list = bot.task.search_list
 
     local entities_found = util.scan_entities(player, pos, search_radius, surface, search_list)
 
     if #entities_found > 0 then
-        -- add to future entities
-        bot.task.future_survey_entities:add_many(ps, surface.index, entities_found)
+        -- add to discovered entities
+        ps.discovered_entities:add_many(ps, surface.index, entities_found)
     end
 
     return entities_found
-end
-
-local function find_entity(player, ps, bot, pos, surface, search_item, search_radius)
-    local entity_group = module.get_module("entity_group")
-
-    bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
-    bot.task.future_survey_entities = bot.task.future_survey_entities or entity_index.new()
-
-    local next_entities = bot.task.queued_survey_entities
-    local entity_index = bot.task.future_survey_entities
-
-    if search_item.find_many then
-        -- re-sort table as different entities may now be closer to bot position
-        util.sort_entities_by_position(next_entities, pos)
-
-        -- if there are any queued then remove until a valid one is found
-        while #next_entities > 0 do
-            local e = table.remove(next_entities, 1)
-
-            if e and e.valid then
-                -- recheck this entity may have been added prior to boundary for this area created
-                if not entity_group.is_in_any_entity_group(ps, surface.index, e) then
-                    return e
-                end
-            end
-        end
-    end
-
-    local entities_found, others_found = find_entities(player, ps, bot, pos, surface, search_item, search_radius, true,
-        true)
-
-    local char = player.character
-    local next_found_entity = nil
-
-    for _, e in ipairs(entities_found) do
-        if not entity_group.is_survey_ignore_target(e) then
-            -- Ignore entities already covered by an existing entity_group polygon
-            if not entity_group.is_in_any_entity_group(ps, surface.index, e) then
-                if not next_found_entity then
-                    next_found_entity = e
-                else
-                    -- Add it to next set to be found
-                    next_entities[#next_entities + 1] = e
-                end
-            end
-        end
-    end
-
-    return next_found_entity
-end
-
-local function get_search_item(player, ps, bot)
-    if bot.task.search_item.name then
-        return bot.task.search_item
-    end
-
-    -- try an get next search name in list
-    bot.task.search_item = util.array_pop(bot.task.search_list) or {
-        name = nil,
-        find_many = false,
-        remove_when_no_more_found = false
-    }
-
-    return bot.task.search_item
 end
 
 function search.update(player, ps, bot)
@@ -233,106 +100,11 @@ function search.update(player, ps, bot)
     local bpos = bot.entity.position
 
     if not target_pos then
-        local search_item = get_search_item(player, ps, bot)
-
-        -- did survey find one and we are only looking for one?
-        if bot.task.survey_found_entity and search_item.find_many == false then
-            bot.task.survey_found_entity = false
-
-            -- found one so move to next name
-            bot.task.search_item = {
-                name = nil,
-                find_many = false,
-                remove_when_no_more_found = false
-            }
-
-            search_item = get_search_item(player, ps, bot)
-        end
-
-        if search_item.name == nil then
-            -- no more search list
-            bot.task.search_list = {}
-
-            -- return to follow mode
-            bot_module.set_bot_task(player, ps, "follow")
-            return
-        end
-
-        local entity = find_entity(player, ps, bot, bpos, surface, search_item,
-            BOT_CONFIG.search.detection_radius)
-
-        if entity then
-            -- record what we found
-            bot.task.survey_entity = entity
-
-            -- move to the entity and then switch to survey task
-            -- to survey the entity group
-            bot.task.target_position = {
-                x = entity.position.x,
-                y = entity.position.y
-            }
-
-            -- reset search spiral so searching restarts cleanly after
-            bot.task.search_spiral = nil
-
-            return
-        else
-            if bot.task.survey_found_entity then
-                if search_item.find_many == true and not search_item.remove_when_no_more_found then
-                    -- rotate to back and try next type
-                    rotate_search_item_to_back(bot)
-                end
-
-                -- clear current name (so the next name will be fetched)
-                bot.task.search_item = {
-                    name = nil,
-                    find_many = false,
-                    remove_when_no_more_found = false
-                }
-
-                -- update search name to next type
-                search_item = get_search_item(player, ps, bot)
-
-                -- clear previous found entity
-                bot.task.survey_entity = nil
-                bot.task.search_item = search_item
-                bot.task.survey_found_entity = false
-
-                -- try finding the new entity from the current position, and if found just return
-                -- without changing tasks
-                entity = find_entity(player, ps, bot, bpos, surface, search_item)
-
-                if entity then
-                    bot.task.target_position = nil
-                    return
-                end
-            end
-
-            if not search_item.name then
-                -- no more search list
-                bot.task.search_list = {}
-
-                -- return to follow mode
-                bot_module.set_bot_task(player, ps, "follow")
-                return
-            end
-
-            if #bot.task.queued_survey_entities == 0 then
-
-                -- check future entities for the entity name we are searching for
-                local future_queued = bot.task.future_survey_entities:take_by_name_contains_with_limit(search_item.name, 1)
-
-                if future_queued and #future_queued > 0 then
-                    bot.task.queued_survey_entities = future_queued
-                    return
-                end
-            end
-        end
-
         target_pos = search.pick_new_search_target_spiral(ps, bot.entity.position)
-
-        -- move to the entity and then swtich to survey task
         bot.task.target_position = target_pos
+
+        -- Scan for search list entities around current position
+        scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius)
     end
 
     positioning.move_entity_towards(player, bot.entity, target_pos)
@@ -343,20 +115,6 @@ function search.update(player, ps, bot)
 
     -- destination reached, so clear target position
     bot.task.target_position = nil
-
-    -- Do a quick scan for and search list entities around current position
-    scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius)
-
-    -- return if no current search name
-    if bot.task.search_item.name == nil then
-        return
-    end
-
-    bot.task.survey_entity = bot.task.survey_entity or {
-        name = bot.task.search_item.name
-    }
-
-    bot.task.survey_found_entity = false
 end
 
 return search

@@ -95,7 +95,7 @@ local function set_bot_state(player, bot_name, new_task, args)
     local ps = state.get_player_state(player.index)
 
     if not ps.bot_enabled then
-        util.print(player, "red", "bot not enabled")
+        util.print_player_or_game(player, "red", "bot not enabled")
         return
     end
 
@@ -114,7 +114,7 @@ local function command(cmd)
     local bot_name, task, args = string.match(p, "^(%S+)%s+(%S+)%s*(.*)$")
 
     if not bot_name then
-        util.print(player, "yellow", "Usage: /b <c|l|m|r> <task> [args]")
+        util.print_player_or_game(player, "yellow", "Usage: /b <c|l|m|r> <task> [args]")
         return
     end
 
@@ -167,7 +167,7 @@ local function on_entity_died(event)
             local player = game.get_player(idx)
             if player and player.valid then
                 state.destroy_player_bot(player, visual, entity_group.clear_entity_groups)
-                util.print(player, "yellow", "destroyed")
+                util.print_player_or_game(player, "yellow", "destroyed")
             else
                 -- Player not valid; still clear state.
                 storage.mekatrol_game_play_bot[idx] = nil
@@ -275,13 +275,13 @@ script.on_event(defines.events.on_tick, function(event)
     if ps.bot_enabled and ps.bots then
         local bot = ps.bots["surveyor"]
 
-        local future_entities = bot.task.future_survey_entities
-        if not (future_entities and future_entities.add_many and future_entities.take_by_name and
-            future_entities.get_name_counts) then
-            bot.task.future_survey_entities = entity_index.new()
+        local discovered_entities = ps.discovered_entities
+        if not (discovered_entities and discovered_entities.add_many and discovered_entities.take_by_name and
+            discovered_entities.get_name_counts) then
+            ps.discovered_entities = entity_index.new()
         end
 
-        local counts = bot.task.future_survey_entities:get_name_counts()
+        local counts = discovered_entities:get_name_counts()
         overlay_lines[#overlay_lines + 1] = string.format("queued:")
         for name, count in pairs(counts) do
             overlay_lines[#overlay_lines + 1] = string.format("    '%s' = %s", name, count)

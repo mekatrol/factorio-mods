@@ -45,7 +45,7 @@ function repairer_bot.set_bot_task(player, ps, new_task, next_task, args)
 
     -- Validate task
     if not BOT_TASKS.index[new_task] then
-        util.print(player, "red", "task '%s' not found for bot name: '%s'", new_task, bot.name)
+        util.print_player_or_game(player, "red", "task '%s' not found for bot name: '%s'", new_task, bot.name)
         return
     end
 

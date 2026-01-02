@@ -23,7 +23,7 @@ function move_to.update(player, ps, bot)
 
         -- We don't want an endless loop if target position is nil and task is "move_to"
         if task == "move_to" then
-            util.print(player, "red",
+            util.print_player_or_game(player, "red",
                 "Switching bot '%s' from 'move_to' to 'follow' task to stop endless 'move_to' loop...", bot.name)
             task = "follow"
         end

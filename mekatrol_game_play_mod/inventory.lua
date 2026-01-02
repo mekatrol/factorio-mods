@@ -103,7 +103,7 @@ function inventory.transfer_to_player(player, ent, inv)
     local moved_any = false
 
     local inv_count = util.table_size(inv)
-    util.print(player, "red", "inv count: %s", inv_count)
+    util.print_player_or_game(player, "red", "inv count: %s", inv_count)
 
     for i = 1, #inv do
         local stack = inv[i]
@@ -142,7 +142,7 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount, pro
     local item_name = first and first.name
 
     if not item_name then
-        util.print(player, "red", "resource has no mineable product: %s", ent.name)
+        util.print_player_or_game(player, "red", "resource has no mineable product: %s", ent.name)
         return 0
     end
 
@@ -237,7 +237,7 @@ function inventory.harvest_resource_to_player(player, ent, requested_amount, pro
     -- reduce the resource amount by what we actually produced (inserted + spilled)
     ent.amount = ent.amount - mined_units
 
-    -- util.print(player, "yellow",
+    -- util.print_player_or_game(player, "yellow",
     --     "ent name: %s, ent id: %s, product name: %s, product amt: %s (%s: %s), mined: %s, inserted: %s, remainder: %s",
     --     name, id, item_name, ent.amount, start_amount, ent.amount - start_amount, mined_units, inserted, remainder)
 
@@ -269,7 +269,7 @@ function inventory.mine_to_player(player, ent, mine_amount)
         count = amount
     }
 
-    util.print(player, "red", "ent.mine: %s", ok)
+    util.print_player_or_game(player, "red", "ent.mine: %s", ok)
 
     if not ok then
         inv.destroy()
@@ -288,7 +288,7 @@ end
 function inventory.transfer_container_to_player(player, ent)
     local inv = ent.get_inventory(defines.inventory.chest)
     if not inv then
-        util.print(player, "red", "no chest inventory: name=%s type=%s", ent.name, ent.type)
+        util.print_player_or_game(player, "red", "no chest inventory: name=%s type=%s", ent.name, ent.type)
         return false
     end
 

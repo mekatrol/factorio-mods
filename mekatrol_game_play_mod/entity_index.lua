@@ -64,7 +64,7 @@ function entity_index:add_many(ps, surface_index, entities)
     for i = 1, #entities do
         local e = entities[i]
         if e and e.valid then
-            -- preserve your existing “don’t track if already grouped” rule
+            -- don’t add if already in entity group
             if not entity_group.is_in_any_entity_group(ps, surface_index, e) then
                 if self:add(e) then
                     added = added + 1
@@ -77,7 +77,7 @@ function entity_index:add_many(ps, surface_index, entities)
 end
 
 -- The equivalent of your current filter_entities():
--- returns all entities of name, and REMOVES them from the future set.
+-- returns all entities of name, and REMOVES them from the set.
 function entity_index:take_by_name(name)
     local bucket = self.by_name[name]
     if not bucket then
@@ -233,6 +233,27 @@ function entity_index:get_name_counts()
     end
 
     return result
+end
+
+-- Pops (drains) the first available name bucket and returns the entities from it.
+-- Returns nil if no buckets left.
+-- Note: "first" is arbitrary (pairs() order).
+function entity_index:pop_first()
+    for name in pairs(self.by_name) do
+        -- take_by_name() already removes the bucket and updates indexes/count
+        return self:take_by_name(name)
+    end
+
+    return nil
+end
+
+-- Returns name, entities; or nil if none.
+function entity_index:pop_first_with_name()
+    for name in pairs(self.by_name) do
+        return name, self:take_by_name(name)
+    end
+
+    return nil
 end
 
 return entity_index

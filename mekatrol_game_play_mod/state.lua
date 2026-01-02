@@ -9,6 +9,7 @@ local config = require("config")
 local util = require("util")
 
 local constructor_bot = require("constructor_bot")
+local entity_index = require("entity_index")
 local logistics_bot = require("logistics_bot")
 local repairer_bot = require("repairer_bot")
 local searcher_bot = require("searcher_bot")
@@ -40,6 +41,7 @@ function state.get_player_state(player_index)
             last_player_side_offset_x = -BOT_CONF.movement.side_offset_distance,
 
             game_phase = "init",
+            discovered_entities = entity_index.new(),
 
             overlay_next_tick = nil,
 
@@ -111,7 +113,7 @@ function state.destroy_player_bot(player, visual, clear_entity_groups)
         overlay_texts = {}
     }
 
-    util.print(player, "yellow", "deactivated")
+    util.print_player_or_game(player, "yellow", "deactivated")
 end
 
 function state.create_player_bot(player, visual, clear_entity_groups)
@@ -169,7 +171,7 @@ function state.create_player_bot(player, visual, clear_entity_groups)
         }
 
         if not ent then
-            util.print(player, "red", "create failed (%s)", name)
+            util.print_player_or_game(player, "red", "create failed (%s)", name)
         else
             -- Store by role name (the "name" the mod uses internally).
             ps.bots[name].entity = ent
@@ -185,7 +187,7 @@ function state.create_player_bot(player, visual, clear_entity_groups)
     end
 
     if not created_any then
-        util.print(player, "red", "create failed")
+        util.print_player_or_game(player, "red", "create failed")
         return nil
     end
     ps.bot_enabled = true
@@ -193,7 +195,7 @@ function state.create_player_bot(player, visual, clear_entity_groups)
     -- clear entity groups
     clear_entity_groups(ps)
 
-    util.print(player, "green", "created (constructor/logistics/repairer/searcher/surveyor)")
+    util.print_player_or_game(player, "green", "created (constructor/logistics/repairer/searcher/surveyor)")
     return ps.bots
 end
 

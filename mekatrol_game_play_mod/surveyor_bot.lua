@@ -36,18 +36,7 @@ function surveyor_bot.init_state(player, ps)
     common_bot.init_state(player, ps, BOT_NAME)
 
     local bot = ps.bots[BOT_NAME]
-
     bot.task.search_spiral = bot.task.search_spiral or nil
-    bot.task.survey_entity = bot.task.survey_entity or nil
-    bot.task.queued_survey_entities = bot.task.queued_survey_entities or {}
-    bot.task.future_survey_entities = bot.task.future_survey_entities or entity_index.new()
-    bot.task.survey_found_entity = bot.task.survey_found_entity or false
-
-    bot.task.search_item = bot.task.search_item or {
-        name = nil,
-        find_many = false,
-        remove_when_no_more_found = false
-    }
 end
 
 function surveyor_bot.destroy_state(player, ps)
@@ -62,7 +51,7 @@ function surveyor_bot.set_bot_task(player, ps, new_task, next_task, args)
 
     -- Validate task
     if not BOT_TASKS.index[new_task] then
-        util.print(player, "red", "task '%s' not found for bot name: '%s'", new_task, bot.name)
+        util.print_player_or_game(player, "red", "task '%s' not found for bot name: '%s'", new_task, bot.name)
         return
     end
 
@@ -75,8 +64,6 @@ function surveyor_bot.set_bot_task(player, ps, new_task, next_task, args)
         bot.task.target_position = nil
         bot.task.search_spiral = nil
         bot.task.survey_entity = nil
-        bot.task.queued_survey_entities = {}
-        bot.task.future_survey_entities = entity_index.new()
     end
 
     -- set new next_task

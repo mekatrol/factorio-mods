@@ -96,7 +96,7 @@ local function issue_task(player, ps, bot_name, new_task, next_task, args)
     local bot_module = module.get_module(bot_name)
 
     if not bot_module then
-        util.print(player, "red", "bot module not found for bot name: %s", bot_name)
+        util.print_player_or_game(player, "red", "bot module not found for bot name: %s", bot_name)
         return
     end
 
@@ -118,19 +118,6 @@ function common_bot.get_tasks(player, ps, bot_name)
 
     if bot_name == "logistics" and bot.task.pickup_name then
         other = string.format(" [%s: %s]", bot.task.pickup_name, bot.task.pickup_remaining)
-    elseif bot_name == "surveyor" then
-        local search_for_list = util.get_value(bot.task.args, "search_list")
-        local search_next = "no search"
-
-        if search_for_list and #search_for_list > 0 then
-            local names = {}
-            for i = 1, #search_for_list do
-                names[#names + 1] = search_for_list[i].name
-            end
-            search_next = table.concat(names, "|")
-        end
-
-        other = string.format(" [%s|%s]", bot.task.search_item.name or "no search", search_next)
     end
 
     return bot.task.current_task, bot.task.next_task, other
@@ -194,7 +181,7 @@ function common_bot.update(player, bot, bot_conf, tick)
     local target_pos = player.position
 
     if not (bot and bot.task) then
-        util.print(player, "red", "bot or task not set")
+        util.print_player_or_game(player, "red", "bot or task not set")
         return
     end
 

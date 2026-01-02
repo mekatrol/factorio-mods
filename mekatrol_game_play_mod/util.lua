@@ -6,7 +6,7 @@ local module = require("module")
 -- Print helpers
 ----------------------------------------------------------------------
 
-function util.print(player_or_game, color, fmt, ...)
+function util.print_player_or_game(player_or_game, color, fmt, ...)
     local ok, msg = pcall(string.format, fmt, ...)
     if not ok then
         msg = "<format error>"
@@ -22,10 +22,22 @@ function util.print(player_or_game, color, fmt, ...)
     end
 end
 
+function util.print_red(fmt, ...)
+    local ok, msg = pcall(string.format, fmt, ...)
+    if not ok then
+        msg = "<format error>"
+    end
+
+    local color = "red"
+    local text = {"", string.format("[color=%s][Game Play Bot][/color] ", color), msg}
+
+    game.print(text)
+end
+
 function util.print_modules()
-    util.print(game, "red", "modules:")
+    util.print_player_or_game(game, "red", "modules:")
     for key, value in pairs(module.modules) do
-        util.print(game, "red", "  %s = %s", key, tostring(value))
+        util.print_player_or_game(game, "red", "  %s = %s", key, tostring(value))
     end
 end
 
@@ -133,24 +145,25 @@ function util.print_table(player_or_game, t, opts)
         local prefix = indent(level)
 
         if type(value) ~= "table" then
-            util.print(player_or_game, color, "%s[%s] = %s", prefix, tostring(key), tostring(value))
+            util.print_player_or_game(player_or_game, color, "%s[%s] = %s", prefix, tostring(key), tostring(value))
             return
         end
 
         if visited[value] then
-            util.print(player_or_game, color, "%s[%s] = <cycle>", prefix, tostring(key))
+            util.print_player_or_game(player_or_game, color, "%s[%s] = <cycle>", prefix, tostring(key))
             return
         end
 
         if level >= max_depth then
-            util.print(player_or_game, color, "%s[%s] = <max depth>", prefix, tostring(key))
+            util.print_player_or_game(player_or_game, color, "%s[%s] = <max depth>", prefix, tostring(key))
             return
         end
 
         visited[value] = true
 
         local array = is_array(value)
-        util.print(player_or_game, color, "%s[%s] = %s:", prefix, tostring(key), array and "array" or "dict")
+        util.print_player_or_game(player_or_game, color, "%s[%s] = %s:", prefix, tostring(key),
+            array and "array" or "dict")
 
         if array then
             for i = 1, #value do
@@ -164,19 +177,19 @@ function util.print_table(player_or_game, t, opts)
     end
 
     if t == nil then
-        util.print(player_or_game, color, "table is nil")
+        util.print_player_or_game(player_or_game, color, "table is nil")
         return
     end
 
     if type(t) ~= "table" then
-        util.print(player_or_game, color, "<not a table>")
+        util.print_player_or_game(player_or_game, color, "<not a table>")
         return
     end
 
     visited[t] = true
 
     local array = is_array(t)
-    util.print(player_or_game, color, "%s:", array and "array" or "dict")
+    util.print_player_or_game(player_or_game, color, "%s:", array and "array" or "dict")
 
     if array then
         for i = 1, #t do
@@ -376,22 +389,23 @@ function util.find_entities(player, pos, search_radius, surface, find_name, find
     return util.filter_player_and_bots(player, found), util.filter_player_and_bots(player, others)
 end
 
-function util.scan_entities(player, pos, search_radius, surface, find_others)
+function util.scan_entities(player, pos, search_radius, surface, search_list)
     local found = {}
 
     -- Build a set of names to match against
-    local others_set = nil
-    if find_others ~= nil then
-        others_set = {}
-        for i = 1, #find_others do
-            local item = find_others[i]
+    local entity_set = nil
+
+    if search_list ~= nil then
+        entity_set = {}
+        for i = 1, #search_list do
+            local item = search_list[i]
             if item and item.name then
-                others_set[item.name] = true
+                entity_set[item.name] = true
             end
         end
     end
 
-    if not others_set then
+    if not entity_set then
         return {}
     end
 
@@ -405,7 +419,7 @@ function util.scan_entities(player, pos, search_radius, surface, find_others)
             local match = false
 
             -- ent.name contains ANY of the others_set names
-            for name in pairs(others_set) do
+            for name in pairs(entity_set) do
                 if string.find(ent.name, name, 1, true) then
                     match = true
                     break
