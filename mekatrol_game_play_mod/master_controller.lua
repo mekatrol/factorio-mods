@@ -29,6 +29,34 @@ local function init_game(player, ps, tick)
         name = "crash-site",
         find_many = true,
         remove_when_no_more_found = true
+    }, {
+        name = "coal",
+        find_many = true,
+        remove_when_no_more_found = false
+    }, {
+        name = "iron-ore",
+        find_many = true,
+        remove_when_no_more_found = false
+    }, {
+        name = "copper-ore",
+        find_many = true,
+        remove_when_no_more_found = false
+    }, {
+        name = "stone",
+        find_many = true,
+        remove_when_no_more_found = false
+    }, {
+        name = "tree",
+        find_many = true,
+        remove_when_no_more_found = false
+    }, {
+        name = "uranium-ore",
+        find_many = true,
+        remove_when_no_more_found = false
+    }, {
+        name = "oil",
+        find_many = true,
+        remove_when_no_more_found = false
     }}
     searcher_bot.task.target_position = nil
     searcher_module.set_bot_task(player, ps, "search")
@@ -38,27 +66,46 @@ local function init_game(player, ps, tick)
     surveyor_module.set_bot_task(player, ps, "follow")
 end
 
-local function update_survey_state(player, ps, surveyor_module, surveyor_bot)
-    -- task surveyor with next list if one available and surveyor finished processing current list
-    if not surveyor_bot.task.survey_list and not surveyor_bot.task.target_position then
+local function update_collect_state(player, ps, bot_module, bot_state)
+    -- task bot with next group if one available and collector has finished processing any previous group
+    if not bot_state.task.collect_group then
         -- get the next list to target
-        surveyor_bot.task.survey_list = ps.discovered_entities:pop_first()
+        local entity_group = module.get_module("entity_group")
+        local group = entity_group.get_group_entity_name_contains(ps, "crash-site")
 
-        if surveyor_bot.task.survey_list then
-            -- survey the list
-            surveyor_module.set_bot_task(player, ps, "survey")
+        if group then
+            bot_state.task.collect_group = group
+
+            -- collect the group
+            bot_module.set_bot_task(player, ps, "collect")
         else
             -- nothing left to survey, so return to follow mode
-            surveyor_module.set_bot_task(player, ps, "follow")
+            bot_module.set_bot_task(player, ps, "follow")
+        end
+    end
+end
+
+local function update_survey_state(player, ps, bot_module, bot_state)
+    -- task bot with next list if one available and surveyor finished processing and previous list
+    if not (bot_state.task.survey_list or bot_state.task.survey_entity or bot_state.task.target_position) then
+        -- get the next list to target
+        bot_state.task.survey_list = ps.discovered_entities:pop_first()
+
+        if bot_state.task.survey_list then
+            -- survey the list
+            bot_module.set_bot_task(player, ps, "survey")
+        else
+            -- nothing left to survey, so return to follow mode
+            bot_module.set_bot_task(player, ps, "follow")
         end
     end
 end
 
 function master_controller.update(player, ps, tick)
-    local constructor_module = module.get_module("constructor")
-    local logistics_module = module.get_module("logistics")
-    local repairer_module = module.get_module("repairer")
-    local searcher_module = module.get_module("searcher")
+    local constructor_module, constructor_bot = get_bot(ps, "constructor")
+    local logistics_module, logistics_bot = get_bot(ps, "logistics")
+    local repairer_module, repairer_bot = get_bot(ps, "repairer")
+    local searcher_module, searcher_bot = get_bot(ps, "searcher")
     local surveyor_module, surveyor_bot = get_bot(ps, "surveyor")
 
     ps.discovered_entities = ps.discovered_entities or entity_index.new()
@@ -68,6 +115,7 @@ function master_controller.update(player, ps, tick)
         init_game(player, ps, tick)
     end
 
+    update_collect_state(player, ps, logistics_module, logistics_bot)
     update_survey_state(player, ps, surveyor_module, surveyor_bot)
 
     constructor_module.update(player, ps, tick)

@@ -31,10 +31,11 @@ local function full_task_name(task_name)
 end
 
 function logistics_bot.init_state(player, ps)
-    common_bot.init_state(player, ps, BOT_NAME, "follow")
+    common_bot.init_state(player, ps, BOT_NAME)
 
     local bot = ps.bots[BOT_NAME]
 
+    bot.task.collect_group = bot.task.collect_group or nil
     bot.task.pickup_group = bot.task.pickup_group or nil
     bot.task.pickup_name = bot.task.pickup_name or nil
     bot.task.pickup_remaining = bot.task.pickup_remaining or 0

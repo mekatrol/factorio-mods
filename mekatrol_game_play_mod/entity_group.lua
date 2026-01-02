@@ -67,7 +67,7 @@ function entity_group.is_survey_single_target(entity)
     return false
 end
 
-function entity_group.get_group_entity_name_starts_with(ps, entity_name)
+function entity_group.get_group_entity_name_contains(ps, entity_name)
     local groups = ps.entity_groups
 
     if not groups then
@@ -75,8 +75,8 @@ function entity_group.get_group_entity_name_starts_with(ps, entity_name)
     end
 
     for _, g in pairs(groups) do
-        -- test group name starts with
-        if g and string.sub(g.name, 1, #entity_name) == entity_name and g.boundary and #g.boundary >= 3 then
+        -- test group name contains
+        if g and string.find(g.name, entity_name, 1, true) ~= nil and g.boundary and #g.boundary >= 3 then
             return g
         end
     end

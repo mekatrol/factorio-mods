@@ -350,13 +350,9 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 
     local survey_entity_name = bot.task.survey_entity.name
 
-    local search_for_list = util.get_value(bot.task.args, "search_list")
+    local search_list = bot.task.survey_list
     local entities_found, others_found = util.find_entities(player, bot_world_position,
-        BOT_CONFIG.search.detection_radius, surface, survey_entity_name, search_for_list, true, true)
-
-    if #others_found > 0 then
-        ps.discovered_entities:add_many(ps, surface.index, others_found)
-    end
+        BOT_CONFIG.search.detection_radius, surface, survey_entity_name, search_list, true, true)
 
     if #entities_found == 0 then
         return false
@@ -643,6 +639,11 @@ local function advance_trace_one_step(player, ps, bot)
     return nil
 end
 
+local function is_surveying(ps, bot)
+    -- any of these means a survey is underway
+    return bot.task.survey_list or bot.task.survey_entity or bot.task.target_position
+end
+
 --------------------------------------------------------------------------------
 -- Update loop
 --------------------------------------------------------------------------------
@@ -652,7 +653,7 @@ function survey.update(player, ps, bot, tick)
         return
     end
 
-    if not (bot.task.survey_list or bot.task.target_position) then
+    if not is_surveying(ps, bot) then
         -- nothing to do
         return
     end
@@ -664,8 +665,10 @@ function survey.update(player, ps, bot, tick)
 
     local current_target_world_position = bot.task.target_position
     local bot_world_position = bot.entity.position
+    local survey_list = bot.task.survey_list
 
     if bot.task.survey_trace then
+        -- there is a trace already underway
         if not current_target_world_position then
             current_target_world_position = advance_trace_one_step(player, ps, bot)
             bot.task.target_position = current_target_world_position
@@ -674,15 +677,15 @@ function survey.update(player, ps, bot, tick)
         if not current_target_world_position then
             return
         end
-    end
 
-    if bot.task.survey_list and bot.task.target_position == nil then
+    elseif survey_list and bot.task.survey_entity == nil and bot.task.target_position == nil then
+        -- there are entities in the list and bot is not currently surveying an entity
         local entity = util.array_pop(bot.task.survey_list)
 
         if entity then
             bot.task.survey_entity = entity
-            current_target_world_position = entity.position
             bot.task.target_position = entity.position
+            current_target_world_position = entity.position
         else
             -- done with this survey list
             bot.task.survey_list = nil
@@ -702,34 +705,23 @@ function survey.update(player, ps, bot, tick)
             return
         end
 
-        -- Arrived; request the next trace target on the next update tick.
+        -- Arrived at target
         bot.task.target_position = nil
-        return
+
+        -- Scan for the entity; tracing begins once it is seen
+        if survey.perform_survey_scan(player, ps, bot, tick) then
+            -- For single-tile survey targets (e.g. crude-oil), add as a self-contained polygon/group.
+            if entity_group.is_survey_single_target(bot.task.survey_entity) then
+                entity_group.add_single_tile_entity_group(player, ps, bot.entity.surface_index, bot.task.survey_entity)
+                bot.task.survey_entity = nil                
+                return
+            end
+        end
     end
 
-    -- Not tracing: ensure we have a survey target entity configured.
     if not bot.task.survey_entity then
         return
     end
-
-    -- For single-tile survey targets (e.g. crude-oil), add as a self-contained polygon/group.
-    if entity_group.is_survey_single_target(bot.task.survey_entity) then
-        entity_group.add_single_tile_entity_group(player, ps, bot.entity.surface_index, bot.task.survey_entity)
-
-        switch_bot_to_next_task(player, ps, bot)
-        bot.task.survey_found_entity = true
-        return
-    end
-
-    -- For multi-tile targets: scan for the resource; tracing begins once it is seen.
-    local did_find_target = survey.perform_survey_scan(player, ps, bot, tick)
-    if not did_find_target then
-        switch_bot_to_next_task(player, ps, bot)
-        bot.task.survey_found_entity = false
-        return
-    end
-
-    bot.task.survey_found_entity = true
 end
 
 return survey
