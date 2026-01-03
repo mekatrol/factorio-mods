@@ -391,19 +391,17 @@ function survey.perform_survey_scan(player, ps, bot, tick)
 end
 
 --- Switch the bot to its next configured task and clear survey-specific state.
-local function switch_bot_to_next_task(player, ps, bot)
-    local bot_module = module.get_module(bot.name)
+local function finish_task(player, ps, bot)
     local visual = module.get_module("visual")
-    local next_task_name = bot.task.next_task or "search"
 
     if visual and visual.clear_survey_trace then
         visual.clear_survey_trace(ps, bot.name)
     end
 
-    bot_module.set_bot_task(player, ps, next_task_name, nil, bot.task.args)
-
     bot.task.target_position = nil
     bot.task.survey_trace = nil
+    bot.task.survey_entity = nil
+    bot.task.survey_list = nil
 end
 
 --- Perform one step of the trace state machine.
@@ -582,8 +580,8 @@ local function advance_trace_one_step(player, ps, bot)
             -- add to boundary group
             entity_group.add_boundary(player, ps, boundary_world_positions, target_entity, surface.index)
 
-            -- Move on to the next task (typically to search for the next entity).
-            switch_bot_to_next_task(player, ps, bot)
+            -- Finish survey task
+            finish_task(player, ps, bot)
             return nil
         end
 
@@ -619,7 +617,9 @@ local function advance_trace_one_step(player, ps, bot)
 
                     entity_group.add_boundary(player, ps, boundary_world_positions, target_entity, surface.index)
 
-                    switch_bot_to_next_task(player, ps, bot)
+                    -- Finish survey task
+                    finish_task(player, ps, bot)
+
                     return nil
                 end
             else
@@ -687,8 +687,8 @@ function survey.update(player, ps, bot, tick)
             bot.task.target_position = entity.position
             current_target_world_position = entity.position
         else
-            -- done with this survey list
-            bot.task.survey_list = nil
+            -- done with this survey list, finish the task
+            finish_task(player, ps, bot)
 
             -- nothing to survey
             return
@@ -713,7 +713,7 @@ function survey.update(player, ps, bot, tick)
             -- For single-tile survey targets (e.g. crude-oil), add as a self-contained polygon/group.
             if entity_group.is_survey_single_target(bot.task.survey_entity) then
                 entity_group.add_single_tile_entity_group(player, ps, bot.entity.surface_index, bot.task.survey_entity)
-                bot.task.survey_entity = nil                
+                bot.task.survey_entity = nil
                 return
             end
         end

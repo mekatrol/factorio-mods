@@ -257,17 +257,30 @@ function inventory.mine_to_player(player, ent, mine_amount)
         return false
     end
 
-    -- Create a temporary script inventory
     local inv = game.create_inventory(32)
 
-    -- Mine at least 1 unit (or more, if you want)
-    local amount = math.min(mine_amount or 1, ent.amount or 1)
+    local ok
+    if ent.type == "resource" then
+        local amount = mine_amount or 1
+        if amount < 1 then
+            amount = 1
+        end
 
-    -- Mine into script inventory (does NOT require player proximity)
-    local ok = ent.mine {
-        inventory = inv,
-        count = amount
-    }
+        -- Only resources have .amount; clamp safely
+        if ent.amount and ent.amount > 0 then
+            amount = math.min(amount, ent.amount)
+        end
+
+        ok = ent.mine {
+            inventory = inv,
+            count = amount
+        }
+    else
+        -- For non-resources: mine the entity (do NOT touch ent.amount, do NOT pass count)
+        ok = ent.mine {
+            inventory = inv
+        }
+    end
 
     util.print_player_or_game(player, "red", "ent.mine: %s", ok)
 
@@ -276,10 +289,7 @@ function inventory.mine_to_player(player, ent, mine_amount)
         return false
     end
 
-    -- transfer to player
     local moved_any = inventory.transfer_to_player(player, ent, inv)
-
-    -- destroy the created inventory
     inv.destroy()
 
     return moved_any
