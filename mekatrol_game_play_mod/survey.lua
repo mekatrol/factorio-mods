@@ -340,7 +340,7 @@ end
 
 --- Scan for the configured survey entity near the bot. If found, seed tracing state.
 --- @return boolean did_find_survey_target
-function survey.perform_survey_scan(player, ps, bot, tick)
+function survey.scan(player, ps, bot, tick)
     local surface = bot.entity.surface
     local bot_world_position = bot.entity.position
 
@@ -709,7 +709,7 @@ function survey.update(player, ps, bot, tick)
         bot.task.target_position = nil
 
         -- Scan for the entity; tracing begins once it is seen
-        if survey.perform_survey_scan(player, ps, bot, tick) then
+        if survey.scan(player, ps, bot, tick) then
             -- For single-tile survey targets (e.g. crude-oil), add as a self-contained polygon/group.
             if entity_group.is_survey_single_target(bot.task.survey_entity) then
                 entity_group.add_single_tile_entity_group(player, ps, bot.entity.surface_index, bot.task.survey_entity)
