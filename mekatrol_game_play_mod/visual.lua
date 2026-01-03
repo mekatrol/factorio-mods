@@ -15,12 +15,14 @@ local SURVEY_TRACE_EDGE_COLOR = {
     b = 0.85,
     a = 0.65
 } -- light grey
+
 local SURVEY_TRACE_START_COLOR = {
     r = 1.00,
     g = 0.00,
     b = 1.00,
     a = 0.95
 } -- magenta
+
 local SURVEY_TRACE_POINT_COLOR = {
     r = 1.00,
     g = 0.40,
@@ -36,6 +38,11 @@ end
 local function ensure_survey_traces_table(ps)
     ps.visual = ps.visual or {}
     ps.visual.survey_traces = ps.visual.survey_traces or {}
+end
+
+local function ensure_discovered_entities_table(ps)
+    ps.visual = ps.visual or {}
+    ps.visual.discovered_entities = ps.visual.discovered_entities or {}
 end
 
 function visual.clear_survey_trace(ps, trace_id)
@@ -69,6 +76,18 @@ function visual.clear_survey_trace(ps, trace_id)
     end
 
     ps.visual.survey_traces[trace_id] = nil
+end
+
+function visual.clear_discovered_entities(ps)
+    if not ps.visual.discovered_entities then
+        return
+    end
+
+    for _, obj in pairs(ps.visual.discovered_entities) do
+        if obj and obj.valid then
+            obj:destroy()
+        end
+    end
 end
 
 function visual.clear_overlay(ps)
@@ -303,6 +322,49 @@ function visual.append_survey_trace(player, ps, trace_id, points)
             only_in_alt_mode = false,
             players = {player.index}
         }
+    end
+end
+
+function visual.append_discovered_entities(player, ps)
+    if not (player and player.valid and ps) then
+        return
+    end
+
+    local entities = ps.discovered_entities:get_all()
+
+    if not entities or #entities == 0 then
+        return
+    end
+
+    ensure_discovered_entities_table(ps)
+
+    local discovered_entities = ps.visual.discovered_entities
+    local start_index = (discovered_entities.count or 0) + 1
+
+    -- Draw new points
+    local start_index = #discovered_entities
+    for i = 1, #entities do
+        local e = entities[i]
+
+        if e and e.valid then
+            local p = e.position
+
+            discovered_entities[start_index + i] = rendering.draw_circle {
+                surface = player.surface,
+                target = p,
+                color = {
+                    r = 1,
+                    g = 1,
+                    b = 0,
+                    a = 0.5
+                },
+                radius = 1,
+                filled = true,
+                draw_on_ground = false,
+                only_in_alt_mode = false,
+                players = {player.index}
+            }
+        end
     end
 end
 

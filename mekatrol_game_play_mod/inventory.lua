@@ -103,7 +103,6 @@ function inventory.transfer_to_player(player, ent, inv)
     local moved_any = false
 
     local inv_count = util.table_size(inv)
-    util.print_player_or_game(player, "red", "inv count: %s", inv_count)
 
     for i = 1, #inv do
         local stack = inv[i]

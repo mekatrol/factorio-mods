@@ -190,7 +190,7 @@ function entity_index:take_by_name_contains_with_limit(name, limit)
     return out
 end
 
--- Optional: cheap cleanup per tick to avoid invalids accumulating.
+-- Cheap cleanup per tick to avoid invalids accumulating.
 function entity_index:compact(budget)
     budget = budget or 1000
     local n = 0
@@ -254,6 +254,19 @@ function entity_index:pop_first_with_name()
     end
 
     return nil
+end
+
+-- Returns all valid entities across all buckets WITHOUT removing them.
+function entity_index:get_all()
+    local out = {}
+
+    for _, ent in pairs(self.by_id) do
+        if ent and ent.valid then
+            out[#out + 1] = ent
+        end
+    end
+
+    return out
 end
 
 return entity_index

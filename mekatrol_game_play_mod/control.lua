@@ -266,6 +266,9 @@ script.on_event(defines.events.on_tick, function(event)
         return
     end
 
+    visual.clear_discovered_entities(ps)
+    visual.append_discovered_entities(player, ps)
+
     visual.draw_player_light(player, ps)
 
     ps.overlay_next_tick = event.tick + OVERLAY_UPDATE_TICKS
