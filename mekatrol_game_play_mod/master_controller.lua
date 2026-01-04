@@ -85,11 +85,37 @@ local function update_collect_state(player, ps, bot_module, bot_state)
     end
 end
 
+local function get_discovered_entitities(ps, list)
+    local bucket_name, entities
+
+    if list == nil then
+        bucket_name, entities = ps.discovered_entities:pop_first()
+    end
+
+    for _, name in ipairs(list) do
+        bucket_name, entities = ps.discovered_entities:pop_first_contains(name)
+
+        if bucket_name then
+            return entities
+        end
+    end
+
+    -- none found by priority name, so just get next if available
+    bucket_name, entities = ps.discovered_entities:pop_first()
+
+    if bucket_name then
+        return entities
+    end
+
+    return nil
+end
+
 local function update_survey_state(player, ps, bot_module, bot_state)
     -- task bot with next list if one available and surveyor finished processing and previous list
     if not (bot_state.task.survey_list or bot_state.task.survey_entity or bot_state.task.target_position) then
-        -- get the next list to target
-        bot_state.task.survey_list = ps.discovered_entities:pop_first()
+        -- get the next list to target (prioritise the specified entity names)
+        local entities = get_discovered_entitities(ps, {"crash", "coal", "iron", "copper", "stone"})
+        bot_state.task.survey_list = entities
 
         if bot_state.task.survey_list then
             -- survey the list

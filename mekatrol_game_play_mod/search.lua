@@ -117,9 +117,6 @@ function search.update(player, ps, bot, tick)
         return
     end
 
-    -- Scan at end point
-    scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius, tick)
-
     -- destination reached, so clear target position
     bot.task.target_position = nil
 end

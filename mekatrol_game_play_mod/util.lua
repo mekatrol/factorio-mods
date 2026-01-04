@@ -115,7 +115,20 @@ function util.get_value(t, key)
     return t[key]
 end
 
-function util.print_table(player_or_game, t, opts)
+function util.print_entities(entities)
+    if entities == nil then
+        return
+    end
+
+    for i, ent in ipairs(entities) do
+        if ent and ent.valid then
+            local pos = ent.position
+            util.print_player_or_game(game, "yellow", "entity name: %s, position: (%s, %s)", ent.name, pos.x, pos.y)
+        end
+    end
+end
+
+function util.print_table(t, opts)
     local color = "yellow"
 
     opts = opts or {}
@@ -146,25 +159,24 @@ function util.print_table(player_or_game, t, opts)
         local prefix = indent(level)
 
         if type(value) ~= "table" then
-            util.print_player_or_game(player_or_game, color, "%s[%s] = %s", prefix, tostring(key), tostring(value))
+            util.print_player_or_game(game, color, "%s[%s] = %s", prefix, tostring(key), tostring(value))
             return
         end
 
         if visited[value] then
-            util.print_player_or_game(player_or_game, color, "%s[%s] = <cycle>", prefix, tostring(key))
+            util.print_player_or_game(game, color, "%s[%s] = <cycle>", prefix, tostring(key))
             return
         end
 
         if level >= max_depth then
-            util.print_player_or_game(player_or_game, color, "%s[%s] = <max depth>", prefix, tostring(key))
+            util.print_player_or_game(game, color, "%s[%s] = <max depth>", prefix, tostring(key))
             return
         end
 
         visited[value] = true
 
         local array = is_array(value)
-        util.print_player_or_game(player_or_game, color, "%s[%s] = %s:", prefix, tostring(key),
-            array and "array" or "dict")
+        util.print_player_or_game(game, color, "%s[%s] = %s:", prefix, tostring(key), array and "array" or "dict")
 
         if array then
             for i = 1, #value do
@@ -178,19 +190,19 @@ function util.print_table(player_or_game, t, opts)
     end
 
     if t == nil then
-        util.print_player_or_game(player_or_game, color, "table is nil")
+        util.print_player_or_game(game, color, "table is nil")
         return
     end
 
     if type(t) ~= "table" then
-        util.print_player_or_game(player_or_game, color, "<not a table>")
+        util.print_player_or_game(game, color, "<not a table>")
         return
     end
 
     visited[t] = true
 
     local array = is_array(t)
-    util.print_player_or_game(player_or_game, color, "%s:", array and "array" or "dict")
+    util.print_player_or_game(game, color, "%s:", array and "array" or "dict")
 
     if array then
         for i = 1, #t do

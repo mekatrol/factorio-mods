@@ -281,8 +281,6 @@ function inventory.mine_to_player(player, ent, mine_amount)
         }
     end
 
-    util.print_player_or_game(player, "red", "ent.mine: %s", ok)
-
     if not ok then
         inv.destroy()
         return false

@@ -262,6 +262,22 @@ function entity_index:pop_first_with_name()
     return nil
 end
 
+-- Pops (drains) the first bucket whose name contains `substr`
+-- Returns name, entities; or nil if none match.
+function entity_index:pop_first_contains(substr)
+    if not substr then
+        return nil
+    end
+
+    for name in pairs(self.by_name) do
+        if string.find(name, substr, 1, true) then
+            return name, self:take_by_name(name)
+        end
+    end
+
+    return nil
+end
+
 -- Returns all valid entities across all buckets WITHOUT removing them.
 function entity_index:get_all()
     local out = {}
@@ -319,8 +335,6 @@ end
 -- Returns true if it was present and removed, false otherwise.
 function entity_index:remove(entity)
     local id = get_id(entity)
-
-    util.print_red("remove name: %s, id: %s, unit number: %s", entity.name, id, entity.unit_number)
 
     if not id then
         return false
