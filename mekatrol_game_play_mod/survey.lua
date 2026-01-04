@@ -351,8 +351,16 @@ function survey.scan(player, ps, bot, tick)
     local survey_entity_name = bot.task.survey_entity.name
 
     local search_list = bot.task.survey_list
-    local entities_found, others_found = util.find_entities(player, bot_world_position,
-        BOT_CONFIG.survey.radius, surface, survey_entity_name, search_list, true, true)
+    local entities_found, others_found = util.find_entities(player, bot_world_position, BOT_CONFIG.survey.radius,
+        surface, survey_entity_name, search_list, true, true)
+
+    if #others_found > 0 then
+        -- add to discovered entities
+        ps.discovered_entities:add_many(ps, surface.index, others_found, tick)
+
+        -- refresh visuals
+        ps.refresh_discovered_entities = true
+    end
 
     if #entities_found == 0 then
         return false
