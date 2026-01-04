@@ -77,6 +77,8 @@ local function pickup(player, ps, bot)
     local moved_any = false
 
     for _, ent in pairs(ents) do
+        ps.discovered_entities:remove(ent)
+
         if ent.type == "item-entity" then
             if inventory.insert_stack_into_player(player, ent, ent.stack) then
                 moved_any = true
@@ -105,6 +107,8 @@ local function pickup(player, ps, bot)
             end
         end
     end
+
+    ps.refresh_discovered_entities = true
 
     if bot.task.pickup_remaining <= 0 then
         bot.task.pickup_group = nil

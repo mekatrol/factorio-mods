@@ -66,7 +66,8 @@ end
 
 function util.generated_id(ent)
     local pos = util.tile_normalised_position(ent.position)
-    local id = string.format("%d.%d.%d", ent.surface.index, pos.x, pos.y)
+    local unit_number = ent.unit_number or 0
+    local id = string.format("%s.%d.%d.%d.%d", ent.name, ent.surface.index, pos.x, pos.y, unit_number)
     return id
 end
 

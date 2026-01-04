@@ -270,7 +270,7 @@ script.on_event(defines.events.on_tick, function(event)
 
     if ps.refresh_discovered_entities then
         ps.discovered_entities = ps.discovered_entities or entity_index.new()
-        ps.discovered_entities:clear_older_than(tick - 10)
+        ps.discovered_entities:clear_older_than(tick - BOT_CONF.remove_discovered_tick_duration)
         visual.clear_discovered_entities(ps)
         visual.append_discovered_entities(player, ps)
         ps.refresh_discovered_entities = false

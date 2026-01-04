@@ -315,5 +315,46 @@ function entity_index:clear_older_than(min_tick)
     return removed
 end
 
+-- Removes a single entity from the index.
+-- Returns true if it was present and removed, false otherwise.
+function entity_index:remove(entity)
+    local id = get_id(entity)
+
+    util.print_red("remove name: %s, id: %s, unit number: %s", entity.name, id, entity.unit_number)
+
+    if not id then
+        return false
+    end
+
+    return self:remove_by_id(id)
+end
+
+-- Removes a single entity by id.
+-- Returns true if it was present and removed, false otherwise.
+function entity_index:remove_by_id(id)
+    local wrap = self.by_id[id]
+
+    if not wrap then
+        return false
+    end
+
+    local name = self.name_by_id[id]
+
+    -- remove from by_id / name_by_id
+    self.by_id[id] = nil
+    self.name_by_id[id] = nil
+
+    -- remove from name bucket
+    local bucket = name and self.by_name[name]
+    if bucket then
+        bucket[id] = nil
+        if next(bucket) == nil then
+            self.by_name[name] = nil
+        end
+    end
+
+    self.count = self.count - 1
+    return true
+end
 
 return entity_index
