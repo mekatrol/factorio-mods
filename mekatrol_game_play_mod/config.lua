@@ -20,7 +20,7 @@ config.bot = {
     },
 
     survey = {
-        radius = 6.0,
+        radius = 16,
         arrival_threshold = 0.5 -- distance threshold for "arrived at frontier node"
     },
 
