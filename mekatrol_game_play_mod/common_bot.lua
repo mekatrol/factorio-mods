@@ -170,11 +170,10 @@ function common_bot.destroy_state(player, ps, bot_name)
     ps.bots[bot_name] = nil
 end
 
-function common_bot.update(player, bot, bot_conf, tick)
+function common_bot.update(player, bot, bot_conf, radius, line_color, tick)
     common_bot.draw_highlight(player, bot, bot_conf)
     common_bot.draw_bot_light(player, bot)
 
-    local radius = nil
     local radius_color = nil
 
     -- default to targetting player
@@ -190,35 +189,16 @@ function common_bot.update(player, bot, bot_conf, tick)
         target_pos = bot.task.target_position
     end
 
-    local line_color = {
+    -- make sure line color set
+    line_color = line_color or {
         r = 0.3,
         g = 0.3,
         b = 0.3,
         a = 0.1
     }
 
-    if bot.task.current_task == "search" then
-        radius = BOT_CONF.search.detection_radius
-        radius_color = {
-            r = 0,
-            g = 0.6,
-            b = 1,
-            a = 0.8
-        }
-        line_color = radius_color
-    elseif bot.task.current_task == "survey" then
-        radius = BOT_CONF.survey.radius
-        radius_color = {
-            r = 1.0,
-            g = 0.95,
-            b = 0.0,
-            a = 0.8
-        }
-        line_color = radius_color
-    end
-
     if radius and radius > 0 then
-        common_bot.draw_circle(player, bot, radius, radius_color)
+        common_bot.draw_circle(player, bot, radius, line_color)
     else
         common_bot.clear_circle(bot)
     end

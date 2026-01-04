@@ -75,8 +75,9 @@ function repairer_bot.update(player, ps, tick)
         return
     end
 
-    -- perform updates common to all bots
-    common_bot.update(player, bot, bot_conf, tick)
+    local radius = nil
+    local radius_color = nil
+    common_bot.update(player, bot, bot_conf, radius, radius_color, tick)
 
     -- Task behavior step
     if bot.task.current_task == "follow" then

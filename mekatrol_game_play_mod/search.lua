@@ -6,7 +6,6 @@ local positioning = require("positioning")
 local util = require("util")
 
 local BOT_CONFIG = config.bot
-local DETECTION_RADIUS = BOT_CONFIG.search.detection_radius / 3
 
 ----------------------------------------------------------------------
 -- Search task
@@ -34,6 +33,8 @@ local function spiral_advance(ps)
     if not s then
         return
     end
+
+    local DETECTION_RADIUS = BOT_CONFIG.search.detection_radius
 
     -- move DETECTION_RADIUS cells in current direction
     if s.dir == 0 then
@@ -84,6 +85,7 @@ local function scan_entities(player, ps, bot, pos, surface, search_radius, tick)
         -- add to discovered entities
         ps.discovered_entities:add_many(ps, surface.index, entities_found, tick)
 
+        -- refresh visuals
         ps.refresh_discovered_entities = true
     end
 
@@ -105,7 +107,7 @@ function search.update(player, ps, bot, tick)
         target_pos = search.pick_new_search_target_spiral(ps, bot.entity.position)
         bot.task.target_position = target_pos
 
-        -- Scan for search list entities around current position
+        -- Scan at starting point
         scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius, tick)
     end
 
@@ -114,6 +116,9 @@ function search.update(player, ps, bot, tick)
     if not positioning.positions_are_close(target_pos, bpos) then
         return
     end
+
+    -- Scan at end point
+    scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius, tick)
 
     -- destination reached, so clear target position
     bot.task.target_position = nil

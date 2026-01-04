@@ -85,8 +85,14 @@ function surveyor_bot.update(player, ps, tick)
         return
     end
 
-    -- perform updates common to all bots
-    common_bot.update(player, bot, bot_conf, tick)
+    local radius = BOT_CONF.survey.radius
+    local radius_color = {
+            r = 1.0,
+            g = 0.95,
+            b = 0.0,
+            a = 0.8
+        }
+    common_bot.update(player, bot, bot_conf, radius, radius_color, tick)
 
     -- Task behavior step
     if bot.task.current_task == "follow" then
