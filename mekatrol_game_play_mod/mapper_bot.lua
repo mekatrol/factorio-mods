@@ -92,7 +92,7 @@ function mapper_bot.update(player, ps, tick)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
     elseif bot.task.current_task == "search" then
-        search.update(player, ps, bot)
+        search.update(player, ps, bot, tick)
     end
 
     -- Throttle overlay updates

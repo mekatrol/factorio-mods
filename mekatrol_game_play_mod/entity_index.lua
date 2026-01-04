@@ -19,16 +19,16 @@ end
 
 function entity_index.new()
     return setmetatable({
-        by_id = {},
-        by_name = {},
-        name_by_id = {},
+        by_id = {}, -- id -> { tick=number, entity=LuaEntity }
+        by_name = {}, -- name -> { [id]=true, ... }
+        name_by_id = {}, -- id -> name
         count = 0
     }, {
         __index = entity_index
     })
 end
 
-function entity_index:add(entity)
+function entity_index:add(entity, tick)
     local id = get_id(entity)
     if not id then
         return false
@@ -39,7 +39,10 @@ function entity_index:add(entity)
     end
 
     local name = entity.name
-    self.by_id[id] = entity
+    self.by_id[id] = {
+        tick = tick,
+        entity = entity
+    }
     self.name_by_id[id] = name
 
     local bucket = self.by_name[name]
@@ -53,7 +56,7 @@ function entity_index:add(entity)
     return true
 end
 
-function entity_index:add_many(ps, surface_index, entities)
+function entity_index:add_many(ps, surface_index, entities, tick)
     if not entities or #entities == 0 then
         return 0
     end
@@ -66,7 +69,7 @@ function entity_index:add_many(ps, surface_index, entities)
         if e and e.valid then
             -- don’t add if already in entity group
             if not entity_group.is_in_any_entity_group(ps, surface_index, e) then
-                if self:add(e) then
+                if self:add(e, tick) then
                     added = added + 1
                 end
             end
@@ -76,7 +79,6 @@ function entity_index:add_many(ps, surface_index, entities)
     return added
 end
 
--- The equivalent of your current filter_entities():
 -- returns all entities of name, and REMOVES them from the set.
 function entity_index:take_by_name(name)
     local bucket = self.by_name[name]
@@ -87,7 +89,8 @@ function entity_index:take_by_name(name)
     local out = {}
 
     for id in pairs(bucket) do
-        local ent = self.by_id[id]
+        local wrap = self.by_id[id]
+        local ent = wrap and wrap.entity or nil
 
         -- remove from indexes regardless (either consumed or invalid)
         self.by_id[id] = nil
@@ -131,7 +134,8 @@ function entity_index:take_by_name_contains(name)
 
         if bucket then
             for id in pairs(bucket) do
-                local ent = self.by_id[id]
+                local wrap = self.by_id[id]
+                local ent = wrap and wrap.entity or nil
 
                 -- remove from indexes regardless (either consumed or invalid)
                 self.by_id[id] = nil
@@ -163,7 +167,8 @@ function entity_index:take_by_name_contains_with_limit(name, limit)
     for bucket_name, bucket in pairs(self.by_name) do
         if string.find(bucket_name, name, 1, true) then
             for id in pairs(bucket) do
-                local ent = self.by_id[id]
+                local wrap = self.by_id[id]
+                local ent = wrap and wrap.entity or nil
 
                 -- remove one
                 self.by_id[id] = nil
@@ -195,7 +200,8 @@ function entity_index:compact(budget)
     budget = budget or 1000
     local n = 0
 
-    for id, ent in pairs(self.by_id) do
+    for id, wrap in pairs(self.by_id) do
+        local ent = wrap and wrap.entity or nil
         if not (ent and ent.valid) then
             local name = self.name_by_id[id]
             self.by_id[id] = nil
@@ -260,7 +266,8 @@ end
 function entity_index:get_all()
     local out = {}
 
-    for _, ent in pairs(self.by_id) do
+    for _, wrap in pairs(self.by_id) do
+        local ent = wrap and wrap.entity or nil
         if ent and ent.valid then
             out[#out + 1] = ent
         end
@@ -268,5 +275,45 @@ function entity_index:get_all()
 
     return out
 end
+
+-- Get the wrapper for a specific entity id.
+function entity_index:get_wrapper_by_id(id)
+    return self.by_id[id]
+end
+
+-- Removes all entities added before (tick < min_tick).
+-- Returns the number of removed entries.
+function entity_index:clear_older_than(min_tick)
+    if not min_tick then
+        return 0
+    end
+
+    local removed = 0
+
+    for id, wrap in pairs(self.by_id) do
+        if wrap.tick < min_tick then
+            local name = self.name_by_id[id]
+
+            -- remove from by_id / name_by_id
+            self.by_id[id] = nil
+            self.name_by_id[id] = nil
+
+            -- remove from name bucket
+            local bucket = name and self.by_name[name]
+            if bucket then
+                bucket[id] = nil
+                if next(bucket) == nil then
+                    self.by_name[name] = nil
+                end
+            end
+
+            self.count = self.count - 1
+            removed = removed + 1
+        end
+    end
+
+    return removed
+end
+
 
 return entity_index

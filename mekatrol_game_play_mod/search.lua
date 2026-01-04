@@ -75,14 +75,14 @@ function search.pick_new_search_target_spiral(ps, bpos)
     }
 end
 
-local function scan_entities(player, ps, bot, pos, surface, search_radius)
+local function scan_entities(player, ps, bot, pos, surface, search_radius, tick)
     local search_list = bot.task.search_list
 
     local entities_found = util.scan_entities(player, pos, search_radius, surface, search_list)
 
     if #entities_found > 0 then
         -- add to discovered entities
-        ps.discovered_entities:add_many(ps, surface.index, entities_found)
+        ps.discovered_entities:add_many(ps, surface.index, entities_found, tick)
 
         ps.refresh_discovered_entities = true
     end
@@ -90,7 +90,7 @@ local function scan_entities(player, ps, bot, pos, surface, search_radius)
     return entities_found
 end
 
-function search.update(player, ps, bot)
+function search.update(player, ps, bot, tick)
     if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
     end
@@ -106,7 +106,7 @@ function search.update(player, ps, bot)
         bot.task.target_position = target_pos
 
         -- Scan for search list entities around current position
-        scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius)
+        scan_entities(player, ps, bot, bpos, surface, BOT_CONFIG.search.detection_radius, tick)
     end
 
     positioning.move_entity_towards(player, bot.entity, target_pos)

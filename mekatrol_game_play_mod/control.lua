@@ -266,7 +266,11 @@ script.on_event(defines.events.on_tick, function(event)
         return
     end
 
+    local tick = event.tick
+
     if ps.refresh_discovered_entities then
+        ps.discovered_entities = ps.discovered_entities or entity_index.new()
+        ps.discovered_entities:clear_older_than(tick - 10)
         visual.clear_discovered_entities(ps)
         visual.append_discovered_entities(player, ps)
         ps.refresh_discovered_entities = false
@@ -274,7 +278,7 @@ script.on_event(defines.events.on_tick, function(event)
 
     visual.draw_player_light(player, ps)
 
-    ps.overlay_next_tick = event.tick + OVERLAY_UPDATE_TICKS
+    ps.overlay_next_tick = tick + OVERLAY_UPDATE_TICKS
 
     local overlay_lines = {"[game play mod]:", string.format("game phase: %s", ps.game_phase or "none")}
 
@@ -293,7 +297,6 @@ script.on_event(defines.events.on_tick, function(event)
             overlay_lines[#overlay_lines + 1] = string.format("    '%s' = %s", name, count)
         end
 
-        local tick = event.tick
         master_controller.update(player, ps, tick)
 
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "constructor")
