@@ -83,6 +83,8 @@ local function scan_entities(player, ps, bot, pos, surface, search_radius)
     if #entities_found > 0 then
         -- add to discovered entities
         ps.discovered_entities:add_many(ps, surface.index, entities_found)
+
+        ps.refresh_discovered_entities = true
     end
 
     return entities_found

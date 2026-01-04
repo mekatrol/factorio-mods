@@ -266,8 +266,11 @@ script.on_event(defines.events.on_tick, function(event)
         return
     end
 
-    visual.clear_discovered_entities(ps)
-    visual.append_discovered_entities(player, ps)
+    if ps.refresh_discovered_entities then
+        visual.clear_discovered_entities(ps)
+        visual.append_discovered_entities(player, ps)
+        ps.refresh_discovered_entities = false
+    end
 
     visual.draw_player_light(player, ps)
 
