@@ -353,9 +353,9 @@ function visual.append_discovered_entities(player, ps)
                 surface = player.surface,
                 target = p,
                 color = {
-                    r = 1,
-                    g = 1,
-                    b = 0,
+                    r = 0.0,
+                    g = 0.2,
+                    b = 0.5,
                     a = 0.5
                 },
                 radius = 1,
