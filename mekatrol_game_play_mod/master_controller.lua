@@ -57,6 +57,10 @@ local function init_game(player, ps, tick)
         name = "oil",
         find_many = true,
         remove_when_no_more_found = false
+    }, {
+        name = "rock",
+        find_many = true,
+        remove_when_no_more_found = false
     }}
     mapper_bot.task.target_position = nil
     searcher_module.set_bot_task(player, ps, "search")
@@ -114,7 +118,7 @@ local function update_survey_state(player, ps, bot_module, bot_state)
     -- task bot with next list if one available and surveyor finished processing and previous list
     if not (bot_state.task.survey_list or bot_state.task.survey_entity or bot_state.task.target_position) then
         -- get the next list to target (prioritise the specified entity names)
-        local entities = get_discovered_entitities(ps, {"crash", "coal", "iron", "copper", "stone"})
+        local entities = get_discovered_entitities(ps, {"crash", "coal", "iron", "copper", "stone", "rock", "tree"})
         bot_state.task.survey_list = entities
 
         if bot_state.task.survey_list then

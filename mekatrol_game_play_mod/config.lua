@@ -6,7 +6,7 @@ local config = {}
 
 config.bot = {
     update_interval = 1,
-    remove_discovered_tick_duration = 1000,
+    remove_discovered_tick_duration = 5000,
 
     movement = {
         step_distance = 0.18,
