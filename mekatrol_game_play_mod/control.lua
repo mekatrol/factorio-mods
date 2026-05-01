@@ -141,6 +141,81 @@ local function format_command_args(args)
     return table.concat(parts, ", ")
 end
 
+local function format_position(pos)
+    if not pos then
+        return "none"
+    end
+
+    return string.format("(%.1f, %.1f)", pos.x or 0, pos.y or 0)
+end
+
+local function format_bot_status(ps, bot_name)
+    local bot = ps.bots and ps.bots[bot_name] or nil
+    if not bot then
+        return string.format("%s: missing", bot_name)
+    end
+
+    local entity_status = "missing"
+    if bot.entity and bot.entity.valid then
+        entity_status = string.format("active at %s", format_position(bot.entity.position))
+    elseif bot.entity then
+        entity_status = "invalid"
+    end
+
+    local task = bot.task or {}
+    local current_task = task.current_task or "none"
+    local next_task = task.next_task or "none"
+    local target_position = format_position(task.target_position)
+    local args = format_command_args(task.args)
+
+    local detail = ""
+    if bot_name == "logistics" and task.pickup_name then
+        detail = string.format(", pickup=%s remaining=%s", tostring(task.pickup_name), tostring(task.pickup_remaining or 0))
+    elseif bot_name == "mapper" then
+        detail = string.format(", search_targets=%s", tostring(task.search_list and #task.search_list or 0))
+    elseif bot_name == "surveyor" then
+        detail = string.format(", survey_queue=%s, survey_entity=%s", tostring(task.survey_list and #task.survey_list or 0),
+            tostring(task.survey_entity and task.survey_entity.valid and task.survey_entity.name or "none"))
+    end
+
+    return string.format("%s: entity=%s, task=%s, next=%s, target=%s, args=%s%s", bot_name, entity_status,
+        current_task, next_task, target_position, args, detail)
+end
+
+local function emit_status_line(player, line)
+    util.print_player_or_game(player, "cyan", line)
+    if type(log) == "function" then
+        log("[Game Play Bot] " .. line)
+    end
+end
+
+local function bot_status_command(cmd)
+    init_modules()
+
+    local player = game.get_player(cmd.player_index)
+    if not (player and player.valid) then
+        return
+    end
+
+    local ps = state.get_player_state(player.index)
+    ps.discovered_entities = entity_index.ensure(ps.discovered_entities)
+
+    emit_status_line(player, string.format("status: enabled=%s, phase=%s", tostring(ps.bot_enabled == true),
+        tostring(ps.game_phase or "none")))
+
+    local counts = ps.discovered_entities:get_name_counts()
+    local count_parts = {}
+    for name, count in pairs(counts) do
+        count_parts[#count_parts + 1] = string.format("%s=%s", tostring(name), tostring(count))
+    end
+    table.sort(count_parts)
+    emit_status_line(player, "queued: " .. (#count_parts > 0 and table.concat(count_parts, ", ") or "none"))
+
+    for _, bot_name in ipairs(BOT_NAMES) do
+        emit_status_line(player, format_bot_status(ps, bot_name))
+    end
+end
+
 local function command(cmd)
     local player = game.get_player(cmd.player_index)
     if not (player and player.valid) then
@@ -187,6 +262,14 @@ local function register_commands()
     -- a generic command: /b <name> <task>
     if not commands.commands["b"] then
         commands.add_command("b", "Usage: /b <c|l|m|r|s> <task>", command)
+    end
+
+    if not commands.commands["bot-status"] then
+        commands.add_command("bot-status", "Log current Game Play Mod bot status", bot_status_command)
+    end
+
+    if not commands.commands["bs"] then
+        commands.add_command("bs", "Log current Game Play Mod bot status", bot_status_command)
     end
 end
 

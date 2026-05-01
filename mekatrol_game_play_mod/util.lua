@@ -71,6 +71,20 @@ function util.generated_id(ent)
     return id
 end
 
+local function get_valid_name(item)
+    if not item then
+        return nil
+    end
+
+    -- LuaEntity references have a validity flag and must be checked before
+    -- reading fields that throw once the entity is destroyed.
+    if item.valid ~= nil and not item.valid then
+        return nil
+    end
+
+    return item.name
+end
+
 function util.parse_kv_list(args)
     local kv_args = {}
 
@@ -352,8 +366,9 @@ function util.find_entities(player, pos, search_radius, surface, find_name, find
         others_set = {}
         for i = 1, #find_others do
             local item = find_others[i]
-            if item and item.valid then
-                others_set[item.name] = true
+            local name = get_valid_name(item)
+            if name then
+                others_set[name] = true
             end
         end
     end
@@ -412,8 +427,9 @@ function util.scan_entities(player, pos, search_radius, surface, search_list)
         entity_set = {}
         for i = 1, #search_list do
             local item = search_list[i]
-            if item and item.valid then
-                entity_set[item.name] = true
+            local name = get_valid_name(item)
+            if name then
+                entity_set[name] = true
             end
         end
     end

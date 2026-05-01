@@ -75,19 +75,20 @@ local function pickup(player, ps, bot)
     local ents = find_pickup_entities(player, ps, surface, g)
 
     local moved_any = false
+    local collectible_seen = false
+    local resource_work_seen = false
 
     for _, ent in pairs(ents) do
         ps.discovered_entities:remove(ent)
 
         if ent.type == "item-entity" then
+            collectible_seen = true
             if inventory.insert_stack_into_player(player, ent, ent.stack) then
                 moved_any = true
             end
-        elseif ent.type == "simple-entity-with-owner" then
-            if inventory.mine_to_player(player, ent) then
-                moved_any = true
-            end
         elseif ent.type == "resource" then
+            collectible_seen = true
+            resource_work_seen = true
             bot.task.mining_progress = bot.task.mining_progress or {}
 
             local mined = inventory.harvest_resource_to_player(player, ent, bot.task.pickup_remaining or 1,
@@ -102,15 +103,25 @@ local function pickup(player, ps, bot)
                 end
             end
         else
-            if inventory.transfer_container_to_player(player, ent) then
+            local moved, had_inventory = inventory.transfer_entity_inventories_to_player(player, ent)
+            if had_inventory then
+                collectible_seen = true
+            end
+
+            if moved then
                 moved_any = true
+            elseif ent.valid and ent.minable then
+                collectible_seen = true
+                if inventory.mine_to_player(player, ent) then
+                    moved_any = true
+                end
             end
         end
     end
 
     ps.refresh_discovered_entities = true
 
-    if bot.task.pickup_remaining <= 0 then
+    if bot.task.pickup_name and bot.task.pickup_remaining <= 0 then
         bot.task.pickup_group = nil
         bot.task.collect_group = nil
         bot.task.pickup_name = nil
@@ -129,9 +140,19 @@ local function pickup(player, ps, bot)
         return
     end
 
-    -- If nothing moved this tick but stuff remains, we’re likely blocked by full inventory.
-    -- Bail out so we don't spin forever.
+    -- If nothing moved this tick but stuff remains, bail out so we do not keep
+    -- assigning the same uncollectable or blocked group forever.
     if not moved_any then
+        if not collectible_seen then
+            util.print_player_or_game(player, "yellow", "skipping uncollectable group: %s", tostring(g.name))
+            entity_group.remove_group(player, ps, g)
+        elseif not resource_work_seen then
+            util.print_player_or_game(player, "yellow", "skipping blocked group: %s", tostring(g.name))
+            entity_group.remove_group(player, ps, g)
+        else
+            util.print_player_or_game(player, "yellow", "collection blocked for group: %s", tostring(g.name))
+        end
+
         bot.task.pickup_group = nil
         bot.task.collect_group = nil
         bot_module.set_bot_task(player, ps, "collect", nil, bot.task.args)

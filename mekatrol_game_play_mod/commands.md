@@ -17,6 +17,17 @@ The mod registers two equivalent commands:
 
 Arguments after the task are parsed as key/value pairs by `util.parse_kv_list`.
 
+The mod also registers status commands:
+
+```text
+/bot-status
+/bs
+```
+
+These print and log each full bot name, entity state, current task, next task,
+target position, task args, queued discoveries, and selected bot-specific
+details.
+
 ## Bot Names
 
 | Short | Full name |
@@ -51,5 +62,6 @@ string mentions `s`, but `s` is not mapped as a bot name.
 /b r repair
 /b c construct
 /bot logistics pickup
+/bs
+/bot-status
 ```
-

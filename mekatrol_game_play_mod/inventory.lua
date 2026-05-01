@@ -310,4 +310,46 @@ function inventory.transfer_container_to_player(player, ent)
     return moved_any
 end
 
+function inventory.transfer_entity_inventories_to_player(player, ent)
+    if not (ent and ent.valid) then
+        return false
+    end
+
+    local moved_any = false
+    local had_inventory = false
+
+    for _, inventory_index in pairs(defines.inventory) do
+        local ok, inv = pcall(function()
+            return ent.get_inventory(inventory_index)
+        end)
+
+        if ok and inv and inv.valid then
+            had_inventory = true
+            if inventory.transfer_to_player(player, ent, inv) then
+                moved_any = true
+            end
+        end
+    end
+
+    if moved_any and ent.valid and ent.minable then
+        local empty = true
+        for _, inventory_index in pairs(defines.inventory) do
+            local ok, inv = pcall(function()
+                return ent.get_inventory(inventory_index)
+            end)
+
+            if ok and inv and inv.valid and not inv.is_empty() then
+                empty = false
+                break
+            end
+        end
+
+        if empty then
+            inventory.mine_to_player(player, ent)
+        end
+    end
+
+    return moved_any, had_inventory
+end
+
 return inventory

@@ -16,6 +16,44 @@ local BOT_TASKS = {
     index = {}
 }
 
+local DEFAULT_SEARCH_LIST = {{
+    name = "crash-site",
+    find_many = true,
+    remove_when_no_more_found = true
+}, {
+    name = "coal",
+    find_many = true,
+    remove_when_no_more_found = false
+}, {
+    name = "iron-ore",
+    find_many = true,
+    remove_when_no_more_found = false
+}, {
+    name = "copper-ore",
+    find_many = true,
+    remove_when_no_more_found = false
+}, {
+    name = "stone",
+    find_many = true,
+    remove_when_no_more_found = false
+}, {
+    name = "tree",
+    find_many = true,
+    remove_when_no_more_found = false
+}, {
+    name = "uranium-ore",
+    find_many = true,
+    remove_when_no_more_found = false
+}, {
+    name = "oil",
+    find_many = true,
+    remove_when_no_more_found = false
+}, {
+    name = "rock",
+    find_many = true,
+    remove_when_no_more_found = false
+}}
+
 for i, task in ipairs(BOT_TASKS.list) do
     BOT_TASKS.index[task] = i
 end
@@ -36,9 +74,9 @@ function mapper_bot.init_state(player, ps)
     local bot = ps.bots[BOT_NAME]
 
     bot.task.search_spiral = bot.task.search_spiral or nil
-    bot.task.search_list = bot.task.search_list or {
-        ["search_list"] = {}
-    }
+    if not bot.task.search_list or #bot.task.search_list == 0 then
+        bot.task.search_list = DEFAULT_SEARCH_LIST
+    end
 end
 
 function mapper_bot.destroy_state(player, ps)
