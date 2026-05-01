@@ -82,9 +82,6 @@ local function update_collect_state(player, ps, bot_module, bot_state)
 
             -- collect the group
             bot_module.set_bot_task(player, ps, "collect")
-        else
-            -- nothing left to survey, so return to follow mode
-            bot_module.set_bot_task(player, ps, "follow")
         end
     end
 end

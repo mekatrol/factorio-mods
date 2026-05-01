@@ -28,6 +28,10 @@ These print and log each full bot name, entity state, current task, next task,
 target position, task args, queued discoveries, and selected bot-specific
 details.
 
+The mod also logs a warning automatically when a bot remains on the same
+non-follow task, target, and group state for several seconds. The warning
+includes the full bot name and the same status details as `/bs`.
+
 ## Bot Names
 
 | Short | Full name |

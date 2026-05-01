@@ -191,8 +191,13 @@ function collect.update(player, ps, bot)
 
     -- no group or target postion then nothing to do
     if not (group or bot.task.target_position) then
+        if bot.task.current_task == "collect" then
+            bot.task.waiting_reason = "waiting_for_collect_group"
+        end
         return
     end
+
+    bot.task.waiting_reason = nil
 
     if bot.task.current_task == "pickup" then
         pickup(player, ps, bot)

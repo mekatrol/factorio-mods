@@ -25,6 +25,8 @@ local BOT_CONF = config.bot
 local BOT_NAMES = config.bot_names
 
 local OVERLAY_UPDATE_TICKS = 10 -- ~1/6 second
+local REPEATED_TASK_LOG_TICKS = 5 * 60
+local REPEATED_TASK_REPEAT_LOG_TICKS = 10 * 60
 
 local function init_modules()
     module.init_module({
@@ -170,7 +172,14 @@ local function format_bot_status(ps, bot_name)
 
     local detail = ""
     if bot_name == "logistics" and task.pickup_name then
-        detail = string.format(", pickup=%s remaining=%s", tostring(task.pickup_name), tostring(task.pickup_remaining or 0))
+        detail = string.format(", pickup=%s remaining=%s, collect_group=%s, pickup_group=%s, waiting=%s",
+            tostring(task.pickup_name), tostring(task.pickup_remaining or 0),
+            tostring(task.collect_group and task.collect_group.name or "none"),
+            tostring(task.pickup_group and task.pickup_group.name or "none"), tostring(task.waiting_reason or "none"))
+    elseif bot_name == "logistics" then
+        detail = string.format(", collect_group=%s, pickup_group=%s, waiting=%s",
+            tostring(task.collect_group and task.collect_group.name or "none"),
+            tostring(task.pickup_group and task.pickup_group.name or "none"), tostring(task.waiting_reason or "none"))
     elseif bot_name == "mapper" then
         detail = string.format(", search_targets=%s", tostring(task.search_list and #task.search_list or 0))
     elseif bot_name == "surveyor" then
@@ -180,6 +189,82 @@ local function format_bot_status(ps, bot_name)
 
     return string.format("%s: entity=%s, task=%s, next=%s, target=%s, args=%s%s", bot_name, entity_status,
         current_task, next_task, target_position, args, detail)
+end
+
+local function task_signature_value(value)
+    if not value then
+        return "none"
+    end
+
+    if type(value) == "table" then
+        if value.name then
+            return tostring(value.name)
+        elseif value.id then
+            return tostring(value.id)
+        elseif value.x and value.y then
+            return format_position(value)
+        end
+    end
+
+    return tostring(value)
+end
+
+local function bot_task_signature(bot)
+    if not bot then
+        return "missing"
+    end
+
+    local task = bot.task or {}
+    return table.concat({task_signature_value(task.current_task), task_signature_value(task.next_task),
+        task_signature_value(task.target_position), task_signature_value(task.collect_group),
+        task_signature_value(task.pickup_group), task_signature_value(task.pickup_name),
+        task_signature_value(task.pickup_remaining), task_signature_value(task.survey_entity),
+        task_signature_value(task.survey_list and #task.survey_list or nil),
+        task_signature_value(task.waiting_reason)}, "|")
+end
+
+local function log_repeated_task_if_stuck(player, ps, bot_name, tick)
+    local bot = ps.bots and ps.bots[bot_name] or nil
+    if not bot then
+        return
+    end
+
+    if bot.task and bot.task.current_task == "follow" then
+        bot.debug_task_monitor = nil
+        return
+    end
+
+    local signature = bot_task_signature(bot)
+    bot.debug_task_monitor = bot.debug_task_monitor or {
+        signature = signature,
+        since_tick = tick,
+        last_log_tick = nil
+    }
+
+    local monitor = bot.debug_task_monitor
+    if monitor.signature ~= signature then
+        monitor.signature = signature
+        monitor.since_tick = tick
+        monitor.last_log_tick = nil
+        return
+    end
+
+    local duration = tick - (monitor.since_tick or tick)
+    if duration < REPEATED_TASK_LOG_TICKS then
+        return
+    end
+
+    if monitor.last_log_tick and tick - monitor.last_log_tick < REPEATED_TASK_REPEAT_LOG_TICKS then
+        return
+    end
+
+    monitor.last_log_tick = tick
+    local line = string.format("repeated task for %s for %.1fs: %s", bot_name, duration / 60.0,
+        format_bot_status(ps, bot_name))
+    util.print_player_or_game(player, "yellow", line)
+    if type(log) == "function" then
+        log("[Game Play Bot] " .. line)
+    end
 end
 
 local function emit_status_line(player, line)
@@ -432,6 +517,10 @@ script.on_event(defines.events.on_tick, function(event)
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "mapper")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "repairer")
         overlay_lines[#overlay_lines + 1] = get_tasks(player, ps, "surveyor")
+
+        for _, bot_name in ipairs(BOT_NAMES) do
+            log_repeated_task_if_stuck(player, ps, bot_name, tick)
+        end
     else
         overlay_lines[#overlay_lines + 1] = "bot is currently disabled"
     end
