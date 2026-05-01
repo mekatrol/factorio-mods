@@ -4,6 +4,10 @@ local entity_index = {}
 local module = require("module")
 local util = require("util")
 
+local ENTITY_INDEX_METATABLE = {
+    __index = entity_index
+}
+
 -- Same idea as util.generated_id() but avoid collisions when unit_number exists.
 local function get_id(entity)
     if not (entity and entity.valid) then
@@ -23,9 +27,20 @@ function entity_index.new()
         by_name = {}, -- name -> { [id]=true, ... }
         name_by_id = {}, -- id -> name
         count = 0
-    }, {
-        __index = entity_index
-    })
+    }, ENTITY_INDEX_METATABLE)
+end
+
+function entity_index.ensure(index)
+    if not index then
+        return entity_index.new()
+    end
+
+    index.by_id = index.by_id or {}
+    index.by_name = index.by_name or {}
+    index.name_by_id = index.name_by_id or {}
+    index.count = index.count or 0
+
+    return setmetatable(index, ENTITY_INDEX_METATABLE)
 end
 
 function entity_index:add(entity, tick)

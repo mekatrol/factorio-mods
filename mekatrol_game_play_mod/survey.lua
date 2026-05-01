@@ -344,7 +344,8 @@ function survey.scan(player, ps, bot, tick)
     local surface = bot.entity.surface
     local bot_world_position = bot.entity.position
 
-    if not bot.task.survey_entity then
+    if not (bot.task.survey_entity and bot.task.survey_entity.valid) then
+        bot.task.survey_entity = nil
         return false
     end
 
@@ -372,8 +373,8 @@ function survey.scan(player, ps, bot, tick)
     for i = 1, #entities_found do
         local found_entity = entities_found[i]
 
-        -- Skip entities already grouped
-        if not entity_group.is_in_any_entity_group(ps, surface.index, found_entity) then
+        -- Skip invalid entities and entities already grouped.
+        if found_entity.valid and not entity_group.is_in_any_entity_group(ps, surface.index, found_entity) then
             -- Select this entity
             bot.task.survey_entity = found_entity
 
@@ -418,6 +419,13 @@ end
 local function advance_trace_one_step(player, ps, bot)
     local visual = module.get_module("visual")
     local target_entity = bot.task.survey_entity
+    if not (target_entity and target_entity.valid) then
+        bot.task.survey_entity = nil
+        bot.task.survey_trace = nil
+        bot.task.target_position = nil
+        return nil
+    end
+
     local tracked_entity_name = target_entity and target_entity.name or nil
 
     local trace_state = bot.task.survey_trace
@@ -657,7 +665,7 @@ end
 --------------------------------------------------------------------------------
 
 function survey.update(player, ps, bot, tick)
-    if not (player and player.valid and bot and bot.entity.valid) then
+    if not (player and player.valid and bot and bot.entity and bot.entity.valid) then
         return
     end
 
@@ -689,6 +697,10 @@ function survey.update(player, ps, bot, tick)
     elseif survey_list and bot.task.survey_entity == nil and bot.task.target_position == nil then
         -- there are entities in the list and bot is not currently surveying an entity
         local entity = util.array_pop(bot.task.survey_list)
+
+        while entity and not entity.valid do
+            entity = util.array_pop(bot.task.survey_list)
+        end
 
         if entity then
             bot.task.survey_entity = entity

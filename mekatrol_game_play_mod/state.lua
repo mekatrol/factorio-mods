@@ -55,6 +55,7 @@ function state.get_player_state(player_index)
     end
 
     ps.game_phase = ps.game_phase or "init"
+    ps.discovered_entities = entity_index.ensure(ps.discovered_entities)
 
     ps.bots = ps.bots or {}
 

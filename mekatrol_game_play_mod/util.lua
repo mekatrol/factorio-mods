@@ -352,7 +352,7 @@ function util.find_entities(player, pos, search_radius, surface, find_name, find
         others_set = {}
         for i = 1, #find_others do
             local item = find_others[i]
-            if item and item.name then
+            if item and item.valid then
                 others_set[item.name] = true
             end
         end
@@ -412,7 +412,7 @@ function util.scan_entities(player, pos, search_radius, surface, search_list)
         entity_set = {}
         for i = 1, #search_list do
             local item = search_list[i]
-            if item and item.name then
+            if item and item.valid then
                 entity_set[item.name] = true
             end
         end

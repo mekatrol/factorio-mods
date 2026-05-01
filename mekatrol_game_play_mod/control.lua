@@ -91,6 +91,26 @@ local function full_bot_name(bot_name)
     return bot_name
 end
 
+local function full_task_name(bot_name, task_name)
+    if task_name == "f" then
+        return "follow"
+    end
+
+    if bot_name == "constructor" and task_name == "c" then
+        return "construct"
+    elseif bot_name == "logistics" and task_name == "c" then
+        return "collect"
+    elseif bot_name == "mapper" and task_name == "s" then
+        return "search"
+    elseif bot_name == "repairer" and task_name == "r" then
+        return "repair"
+    elseif bot_name == "surveyor" and task_name == "s" then
+        return "search"
+    end
+
+    return task_name
+end
+
 local function set_bot_state(player, bot_name, new_task, args)
     local ps = state.get_player_state(player.index)
 
@@ -100,6 +120,25 @@ local function set_bot_state(player, bot_name, new_task, args)
     end
 
     common_bot.issue_task(player, ps, bot_name, new_task, nil, args)
+end
+
+local function format_command_args(args)
+    if not args or next(args) == nil then
+        return "none"
+    end
+
+    local keys = {}
+    for key in pairs(args) do
+        keys[#keys + 1] = key
+    end
+    table.sort(keys)
+
+    local parts = {}
+    for _, key in ipairs(keys) do
+        parts[#parts + 1] = string.format("%s=%s", tostring(key), tostring(args[key]))
+    end
+
+    return table.concat(parts, ", ")
 end
 
 local function command(cmd)
@@ -120,10 +159,19 @@ local function command(cmd)
 
     -- Normalize short task names, if you use them
     bot_name = full_bot_name(bot_name)
+    task = full_task_name(bot_name, task)
 
     local kv_args = {}
     if args then
         kv_args = util.parse_kv_list(args)
+    end
+
+    local raw_command = string.format("/%s %s", cmd.name or "b", p)
+    local message = string.format("command received: %s -> bot=%s task=%s args=%s", raw_command, bot_name, task,
+        format_command_args(kv_args))
+    util.print_player_or_game(player, "green", message)
+    if type(log) == "function" then
+        log("[Game Play Bot] " .. message)
     end
 
     -- Default behavior: /b <name> <task> <args>
@@ -268,8 +316,9 @@ script.on_event(defines.events.on_tick, function(event)
 
     local tick = event.tick
 
+    ps.discovered_entities = entity_index.ensure(ps.discovered_entities)
+
     if ps.refresh_discovered_entities then
-        ps.discovered_entities = ps.discovered_entities or entity_index.new()
         ps.discovered_entities:clear_older_than(tick - BOT_CONF.remove_discovered_tick_duration)
         visual.clear_discovered_entities(ps)
         visual.append_discovered_entities(player, ps)
@@ -285,12 +334,8 @@ script.on_event(defines.events.on_tick, function(event)
     if ps.bot_enabled and ps.bots then
         local bot = ps.bots["surveyor"]
 
-        local discovered_entities = ps.discovered_entities
-        if not (discovered_entities and discovered_entities.add_many and discovered_entities.take_by_name and
-            discovered_entities.get_name_counts) then
-            ps.discovered_entities = entity_index.new()
-        end
-
+        local discovered_entities = entity_index.ensure(ps.discovered_entities)
+        ps.discovered_entities = discovered_entities
         local counts = discovered_entities:get_name_counts()
         overlay_lines[#overlay_lines + 1] = string.format("queued:")
         for name, count in pairs(counts) do

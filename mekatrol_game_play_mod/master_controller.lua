@@ -138,7 +138,7 @@ function master_controller.update(player, ps, tick)
     local repairer_module, repairer_bot = get_bot(ps, "repairer")
     local surveyor_module, surveyor_bot = get_bot(ps, "surveyor")
 
-    ps.discovered_entities = ps.discovered_entities or entity_index.new()
+    ps.discovered_entities = entity_index.ensure(ps.discovered_entities)
 
     if ps.game_phase == "init" then
         ps.game_phase = "init_pending"
