@@ -172,14 +172,17 @@ local function format_bot_status(ps, bot_name)
 
     local detail = ""
     if bot_name == "logistics" and task.pickup_name then
-        detail = string.format(", pickup=%s remaining=%s, collect_group=%s, pickup_group=%s, waiting=%s",
+        detail = string.format(
+            ", pickup=%s remaining=%s, collect_group=%s, pickup_group=%s, source=%s, queued_count=%s, waiting=%s",
             tostring(task.pickup_name), tostring(task.pickup_remaining or 0),
             tostring(task.collect_group and task.collect_group.name or "none"),
-            tostring(task.pickup_group and task.pickup_group.name or "none"), tostring(task.waiting_reason or "none"))
+            tostring(task.pickup_group and task.pickup_group.name or "none"), tostring(task.collect_source or "none"),
+            tostring(task.collect_group and task.collect_group.queued_count or "none"), tostring(task.waiting_reason or "none"))
     elseif bot_name == "logistics" then
-        detail = string.format(", collect_group=%s, pickup_group=%s, waiting=%s",
+        detail = string.format(", collect_group=%s, pickup_group=%s, source=%s, queued_count=%s, waiting=%s",
             tostring(task.collect_group and task.collect_group.name or "none"),
-            tostring(task.pickup_group and task.pickup_group.name or "none"), tostring(task.waiting_reason or "none"))
+            tostring(task.pickup_group and task.pickup_group.name or "none"), tostring(task.collect_source or "none"),
+            tostring(task.collect_group and task.collect_group.queued_count or "none"), tostring(task.waiting_reason or "none"))
     elseif bot_name == "mapper" then
         detail = string.format(", search_targets=%s", tostring(task.search_list and #task.search_list or 0))
     elseif bot_name == "surveyor" then
@@ -220,7 +223,7 @@ local function bot_task_signature(bot)
         task_signature_value(task.pickup_group), task_signature_value(task.pickup_name),
         task_signature_value(task.pickup_remaining), task_signature_value(task.survey_entity),
         task_signature_value(task.survey_list and #task.survey_list or nil),
-        task_signature_value(task.waiting_reason)}, "|")
+        task_signature_value(task.waiting_reason), task_signature_value(task.collect_source)}, "|")
 end
 
 local function log_repeated_task_if_stuck(player, ps, bot_name, tick)

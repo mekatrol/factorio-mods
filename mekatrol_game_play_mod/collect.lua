@@ -3,6 +3,8 @@ local collect = {}
 local module = require("module")
 local util = require("util")
 
+local COLLECT_ACTION_INTERVAL_TICKS = 60
+
 -- Max different item types the bot can carry at once.
 local BOT_MAX_ITEM_COUNT = 100
 
@@ -43,23 +45,50 @@ end
 local function find_pickup_entities(player, ps, surface, group)
     local ents
 
+    if group.target_entity then
+        if group.target_entity.valid then
+            return {group.target_entity}
+        end
+
+        return {}
+    end
+
     if group.bounding_box then
-        ents = surface.find_entities_filtered {
-            area = group.bounding_box,
-            name = group.name
+        local filter = {
+            area = group.bounding_box
         }
+
+        if not group.names then
+            filter.name = group.name
+        end
+
+        ents = surface.find_entities_filtered(filter)
     else
-        ents = surface.find_entities_filtered {
+        local filter = {
             position = group.center,
-            name = group.name,
             radius = 2.0
         }
+
+        if not group.names then
+            filter.name = group.name
+        end
+
+        ents = surface.find_entities_filtered(filter)
+    end
+
+    if group.names then
+        for i = #ents, 1, -1 do
+            local ent = ents[i]
+            if not (ent and ent.valid and group.names[ent.name]) then
+                table.remove(ents, i)
+            end
+        end
     end
 
     return util.filter_player_and_bots(player, ents)
 end
 
-local function pickup(player, ps, bot)
+local function pickup(player, ps, bot, tick)
     local inventory = module.get_module("inventory")
     local entity_group = module.get_module("entity_group")
     local bot_module = module.get_module(bot.name)
@@ -77,14 +106,24 @@ local function pickup(player, ps, bot)
     local moved_any = false
     local collectible_seen = false
     local resource_work_seen = false
+    local action_performed = false
+    local waiting_for_action = false
 
     for _, ent in pairs(ents) do
         ps.discovered_entities:remove(ent)
+
+        if ent.type ~= "resource" and bot.task.next_collect_tick and tick < bot.task.next_collect_tick then
+            collectible_seen = true
+            waiting_for_action = true
+            bot.task.waiting_reason = "waiting_for_collect_action"
+            break
+        end
 
         if ent.type == "item-entity" then
             collectible_seen = true
             if inventory.insert_stack_into_player(player, ent, ent.stack) then
                 moved_any = true
+                action_performed = true
             end
         elseif ent.type == "resource" then
             collectible_seen = true
@@ -103,19 +142,26 @@ local function pickup(player, ps, bot)
                 end
             end
         else
-            local moved, had_inventory = inventory.transfer_entity_inventories_to_player(player, ent)
+            local moved, had_inventory = inventory.transfer_one_stack_from_entity_to_player(player, ent)
             if had_inventory then
                 collectible_seen = true
             end
 
             if moved then
                 moved_any = true
+                action_performed = true
             elseif ent.valid and ent.minable then
                 collectible_seen = true
                 if inventory.mine_to_player(player, ent) then
                     moved_any = true
+                    action_performed = true
                 end
             end
+        end
+
+        if action_performed then
+            bot.task.next_collect_tick = tick + COLLECT_ACTION_INTERVAL_TICKS
+            break
         end
     end
 
@@ -124,9 +170,11 @@ local function pickup(player, ps, bot)
     if bot.task.pickup_name and bot.task.pickup_remaining <= 0 then
         bot.task.pickup_group = nil
         bot.task.collect_group = nil
+        bot.task.collect_source = nil
         bot.task.pickup_name = nil
         bot.task.pickup_remaining = 0
         bot.task.mining_progress = {}
+        bot.task.next_collect_tick = nil
         moved_any = false
     end
 
@@ -136,7 +184,13 @@ local function pickup(player, ps, bot)
         entity_group.remove_group(player, ps, g)
         bot.task.pickup_group = nil
         bot.task.collect_group = nil
+        bot.task.collect_source = nil
+        bot.task.next_collect_tick = nil
         bot_module.set_bot_task(player, ps, "collect", nil, bot.task.args)
+        return
+    end
+
+    if waiting_for_action then
         return
     end
 
@@ -155,6 +209,8 @@ local function pickup(player, ps, bot)
 
         bot.task.pickup_group = nil
         bot.task.collect_group = nil
+        bot.task.collect_source = nil
+        bot.task.next_collect_tick = nil
         bot_module.set_bot_task(player, ps, "collect", nil, bot.task.args)
     end
 end
@@ -181,7 +237,7 @@ function collect.try_pickup_item(player, ps, bot, name, count)
     return false
 end
 
-function collect.update(player, ps, bot)
+function collect.update(player, ps, bot, tick)
     if not (bot and bot.entity and bot.entity.valid) then
         return
     end
@@ -192,7 +248,7 @@ function collect.update(player, ps, bot)
     -- no group or target postion then nothing to do
     if not (group or bot.task.target_position) then
         if bot.task.current_task == "collect" then
-            bot.task.waiting_reason = "waiting_for_collect_group"
+            bot.task.waiting_reason = bot.task.waiting_reason or "waiting_for_collect_group"
         end
         return
     end
@@ -200,12 +256,13 @@ function collect.update(player, ps, bot)
     bot.task.waiting_reason = nil
 
     if bot.task.current_task == "pickup" then
-        pickup(player, ps, bot)
+        pickup(player, ps, bot, tick)
         return
     end
 
     if group then
-        bot.task.target_position = group.center
+        bot.task.target_position = group.target_entity and group.target_entity.valid and group.target_entity.position or
+                                       group.center
         bot.task.pickup_group = group
         bot_module.set_bot_task(player, ps, "move_to", "pickup", bot.task.args)
         return

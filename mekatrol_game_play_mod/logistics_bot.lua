@@ -93,7 +93,7 @@ function logistics_bot.update(player, ps, tick)
     elseif bot.task.current_task == "move_to" then
         move_to.update(player, ps, bot)
     elseif bot.task.current_task == "collect" or bot.task.current_task == "pickup" then
-        collect.update(player, ps, bot)
+        collect.update(player, ps, bot, tick)
     end
 
     -- Throttle overlay updates

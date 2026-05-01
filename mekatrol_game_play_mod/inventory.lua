@@ -352,4 +352,27 @@ function inventory.transfer_entity_inventories_to_player(player, ent)
     return moved_any, had_inventory
 end
 
+function inventory.transfer_one_stack_from_entity_to_player(player, ent)
+    if not (ent and ent.valid) then
+        return false, false
+    end
+
+    for _, inventory_index in pairs(defines.inventory) do
+        local ok, inv = pcall(function()
+            return ent.get_inventory(inventory_index)
+        end)
+
+        if ok and inv and inv.valid then
+            for i = 1, #inv do
+                local stack = inv[i]
+                if stack and stack.valid_for_read then
+                    return inventory.insert_stack_into_player(player, ent, stack) > 0, true
+                end
+            end
+        end
+    end
+
+    return false, false
+end
+
 return inventory
