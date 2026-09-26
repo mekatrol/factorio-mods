@@ -131,7 +131,25 @@ function track.refresh(player, value, task)
         return false
     end
 
-    value.track = track.discover(seed, task)
+    local refreshed = track.discover(seed, task)
+
+    -- A mixed-tier underground pair may temporarily disappear from Factorio's
+    -- live belt graph after one endpoint is replaced. Preserve still-valid,
+    -- still-upgradeable underground endpoints from the locked group so they do
+    -- not lose their outline or escape completion of the current track.
+    local included = {}
+    for _, entity in pairs(refreshed.entities) do
+        if entity and entity.valid and entity.unit_number then included[entity.unit_number] = true end
+    end
+    for _, entity in pairs(group.entities or {}) do
+        if entity and entity.valid and entity.type == constants.ENTITY_TYPE.UNDERGROUND_BELT and
+                task.mappings[entity.name] and entity.unit_number and not included[entity.unit_number] then
+            refreshed.entities[#refreshed.entities + constants.ITEM_TRANSFER_COUNT] = entity
+            included[entity.unit_number] = true
+        end
+    end
+
+    value.track = refreshed
     track.draw(player, value, task)
     return true
 end

@@ -66,6 +66,14 @@ local function cargo_count(value, item_name)
     return value.cargo[item_name] or constants.EMPTY_COUNT
 end
 
+local function cargo_total(value)
+    -- Capacity counts individual items rather than distinct names, allowing a
+    -- five-item batch to contain any mixture required by belts and splitters.
+    local total = constants.EMPTY_COUNT
+    for _, count in pairs(value.cargo) do total = total + count end
+    return total
+end
+
 local function cargo_add(value, item_name, count)
     -- Ignore incomplete mappings and non-positive transfers rather than creating
     -- unusable cargo entries that would obscure status output.
@@ -80,6 +88,20 @@ local function cargo_remove(value, item_name, count)
     value.cargo[item_name] = value.cargo[item_name] - count
     if value.cargo[item_name] == constants.EMPTY_COUNT then value.cargo[item_name] = nil end
     return true
+end
+
+local function remember_cargo_origin(value, item_name, source)
+    value.cargo_origins[item_name] = value.cargo_origins[item_name] or {}
+    local origins = value.cargo_origins[item_name]
+    origins[#origins + constants.ITEM_TRANSFER_COUNT] = source
+end
+
+local function consume_cargo_origin(value, item_name)
+    local origins = value.cargo_origins[item_name]
+    if not origins or #origins == constants.EMPTY_COUNT then return nil end
+    local source = table.remove(origins, constants.FIRST_INDEX)
+    if #origins == constants.EMPTY_COUNT then value.cargo_origins[item_name] = nil end
+    return source
 end
 
 local function follow_player(player, value)
@@ -105,8 +127,22 @@ local function follow_player(player, value)
 end
 
 local function prepare_job(player, value, task)
-    -- Evaluate candidates until one has a real material path. An unavailable
-    -- belt type must not block another mapping whose supplies are available.
+    if #value.pickup_queue > constants.EMPTY_COUNT then
+        value.supply = value.pickup_queue[constants.FIRST_INDEX].source
+        value.phase = constants.PHASE.FETCH
+        return true
+    end
+
+    -- A finished track must unload recovered items before locking another line;
+    -- otherwise five occupied slots could strand useful cargo indefinitely.
+    if not value.track and #value.delivery_queue > constants.EMPTY_COUNT then
+        local delivery = value.delivery_queue[constants.FIRST_INDEX]
+        value.return_destination = delivery.destination
+        value.return_item = delivery.item_name
+        value.phase = constants.PHASE.RETURN
+        return true
+    end
+
     -- Lock a connected group before considering supplies. A temporarily starved
     -- track therefore waits instead of letting the bot start another line.
     if not value.track then
@@ -122,40 +158,135 @@ local function prepare_job(player, value, task)
         -- Only after every upgradeable member is gone may the scheduler choose a
         -- seed from another physical belt component.
         state.clear_track(value)
+        if #value.delivery_queue > constants.EMPTY_COUNT then
+            local delivery = value.delivery_queue[constants.FIRST_INDEX]
+            value.return_destination = delivery.destination
+            value.return_item = delivery.item_name
+            value.phase = constants.PHASE.RETURN
+            return true
+        end
         return false
     end
+
+    -- Consume every useful replacement already on board before considering
+    -- either unloading or another collection trip. This completes the upgrade
+    -- portion of the current configured-size batch as one coherent operation.
+    for _, target in ipairs(remaining) do
+        local mapping = registry.mapping_for(task, target.name)
+        if mapping and cargo_count(value, mapping.required_item) > constants.EMPTY_COUNT then
+            value.target = target
+            value.phase = constants.PHASE.UPGRADE
+            highlight(player, value)
+            return true
+        end
+    end
+
+    -- Recover cargo produced by older versions that did not retain a delivery
+    -- instruction when network storage was unavailable. This migration path
+    -- prevents a full legacy cargo hold from permanently stopping the bot.
+    local queued_by_item = {}
+    for _, delivery in pairs(value.delivery_queue) do
+        queued_by_item[delivery.item_name] = (queued_by_item[delivery.item_name] or constants.EMPTY_COUNT) +
+                                                 constants.ITEM_TRANSFER_COUNT
+    end
+    for source_name in pairs(task.mappings) do
+        local mapping = registry.mapping_for(task, source_name)
+        local recovered_item = mapping and mapping.recovered_item
+        local missing_deliveries = recovered_item and
+                                       (cargo_count(value, recovered_item) -
+                                           (queued_by_item[recovered_item] or constants.EMPTY_COUNT)) or
+                                       constants.EMPTY_COUNT
+        if missing_deliveries > constants.EMPTY_COUNT then
+            local network = supply.first_network(player, remaining[constants.FIRST_INDEX])
+            local destination = supply.find_drop(network, recovered_item) or
+                                    supply.find_blocked_drop(network, value.entity.position) or
+                                    supply.find_nearby_drop_container(player, remaining[constants.FIRST_INDEX],
+                                        recovered_item, config.nearby_container_radius)
+            if destination then
+                for _ = constants.ITEM_TRANSFER_COUNT, missing_deliveries do
+                    value.delivery_queue[#value.delivery_queue + constants.ITEM_TRANSFER_COUNT] = {
+                        item_name = recovered_item,
+                        destination = destination
+                    }
+                end
+            end
+        end
+    end
+
+    -- Once no carried replacement can advance this track, empty every queued
+    -- recovered item before collecting again. Returning only one item would
+    -- create one free slot and degrade all later trips into one-item batches.
+    if #value.delivery_queue > constants.EMPTY_COUNT then
+        local delivery = value.delivery_queue[constants.FIRST_INDEX]
+        value.return_destination = delivery.destination
+        value.return_item = delivery.item_name
+        value.phase = constants.PHASE.RETURN
+        return true
+    end
+
+    -- Reserve existing replacement cargo against nearby targets before planning
+    -- pickups. This prevents collecting duplicates while another item type in
+    -- the same configured-size batch is still needed.
+    local unallocated_cargo = {}
+    for item_name, count in pairs(value.cargo) do unallocated_cargo[item_name] = count end
+    local planned_count = constants.EMPTY_COUNT
 
     for _, target in ipairs(remaining) do
         local mapping = registry.mapping_for(task, target.name)
         local required_item = mapping and mapping.required_item
         if required_item then
-            local source = nil
-            local network = nil
-            if cargo_count(value, required_item) == constants.EMPTY_COUNT then
-                -- Prefer the vanilla network selector; ordinary containers are
-                -- a deliberate fallback only when the network cannot supply.
-                source = supply.find_source(player, target, required_item)
+            if (unallocated_cargo[required_item] or constants.EMPTY_COUNT) > constants.EMPTY_COUNT then
+                unallocated_cargo[required_item] = unallocated_cargo[required_item] -
+                                                       constants.ITEM_TRANSFER_COUNT
+            elseif cargo_total(value) + planned_count < config.cargo_capacity then
+                -- Prefer vanilla logistic selection, then fall back to an
+                -- ordinary local container exactly as single-item mode did.
+                local source = supply.find_source(player, target, required_item)
                 if not source then
                     source = supply.find_nearby_container(player, target, value.entity, required_item,
                         task.nearby_container_radius or config.nearby_container_radius)
                 end
-                network = source and source.network
-            else
-                network = supply.first_network(player, target)
-            end
-            if cargo_count(value, required_item) > constants.EMPTY_COUNT or source then
-                value.target = target
-                value.supply = source
-                value.job_network = network
-                value.source_container = source and source.local_container and source or nil
-                value.phase = source and constants.PHASE.FETCH or constants.PHASE.UPGRADE
-                highlight(player, value)
-                return true
+                if source then
+                    value.pickup_queue[#value.pickup_queue + constants.ITEM_TRANSFER_COUNT] = {
+                        item_name = required_item,
+                        source = source
+                    }
+                    planned_count = planned_count + constants.ITEM_TRANSFER_COUNT
+                end
             end
         end
     end
+
+    if #value.pickup_queue > constants.EMPTY_COUNT then
+        local pickup = value.pickup_queue[constants.FIRST_INDEX]
+        value.supply = pickup.source
+        value.phase = constants.PHASE.FETCH
+        return true
+    end
+
     state.clear_target(value)
     return false
+end
+
+local function show_blocked_destination(player, value, destination, item_name)
+    state.clear_blocked_destination(value)
+    value.blocked_destination = {destination = destination, item_name = item_name}
+    value.blocked_highlight = rendering.draw_rectangle {
+        color = config.blocked_container_color,
+        width = constants.BLOCKED_CONTAINER_LINE_WIDTH,
+        filled = false,
+        left_top = destination.entity.bounding_box.left_top,
+        right_bottom = destination.entity.bounding_box.right_bottom,
+        surface = destination.entity.surface,
+        draw_on_ground = true,
+        players = {player.index}
+    }
+    -- The item icon and explanatory text appear on both the map and minimap.
+    value.blocked_tag = player.force.add_chart_tag(destination.entity.surface, {
+        position = destination.entity.position,
+        icon = {type = "item", name = item_name},
+        text = constants.BLOCKED_CONTAINER_TAG_TEXT
+    })
 end
 
 function bot.enable(player)
@@ -215,8 +346,13 @@ function bot.request_track_refresh(entity)
     if not (entity and entity.valid) then return end
     state.ensure()
     for _, value in pairs(storage[constants.STORAGE_KEY].players) do
+        -- The bot's own fast replacement fires script_raised_built while an
+        -- underground pair can be temporarily disconnected by mixed tiers.
+        -- Preserve the locked group for that internal event; player/robot edits
+        -- in every other phase still request a full graph rebuild.
         if value.enabled and value.track and value.entity and value.entity.valid and
-                value.entity.surface == entity.surface and value.entity.force == entity.force then
+                value.entity.surface == entity.surface and value.entity.force == entity.force and
+                value.phase ~= constants.PHASE.UPGRADE then
             value.track_refresh_requested = true
         end
     end
@@ -231,6 +367,27 @@ function bot.update(player, tick)
         value.enabled = false
         print(player, constants.COLOR.ERROR, "was destroyed")
         return
+    end
+
+    -- While storage is full the helper follows the player and performs no new
+    -- upgrades. A non-mutating capacity probe resumes the return automatically.
+    if value.blocked_destination then
+        local blocked = value.blocked_destination
+        if not (blocked.destination and blocked.destination.entity and blocked.destination.entity.valid) then
+            -- A destroyed destination cannot ever become writable. Keep the
+            -- physical cargo, discard only the obsolete delivery instruction.
+            state.clear_blocked_destination(value)
+            table.remove(value.delivery_queue, constants.FIRST_INDEX)
+        elseif supply.can_put_one(blocked.destination, blocked.item_name) then
+            state.clear_blocked_destination(value)
+            value.return_destination = blocked.destination
+            value.return_item = blocked.item_name
+            value.phase = constants.PHASE.RETURN
+        else
+            value.phase = constants.PHASE.FOLLOW
+            follow_player(player, value)
+            return
+        end
     end
     local task = registry.get(value.task_name)
     if not task then
@@ -252,6 +409,9 @@ function bot.update(player, tick)
     if value.target and not value.target.valid then state.clear_target(value) end
     if value.supply and (not value.supply.entity or not value.supply.entity.valid or
             (value.supply.network and not value.supply.network.valid)) then
+        if value.phase == constants.PHASE.FETCH and #value.pickup_queue > constants.EMPTY_COUNT then
+            table.remove(value.pickup_queue, constants.FIRST_INDEX)
+        end
         state.clear_target(value)
     end
     if value.return_destination and (not value.return_destination.entity or
@@ -268,19 +428,29 @@ function bot.update(player, tick)
         prepare_job(player, value, task)
     end
 
-    if value.phase == constants.PHASE.FETCH and value.target and value.supply then
-        local mapping = registry.mapping_for(task, value.target.name)
-        local required_item = mapping and mapping.required_item
+    if value.phase == constants.PHASE.FETCH and value.supply then
+        local pickup = value.pickup_queue[constants.FIRST_INDEX]
+        local required_item = pickup and pickup.item_name
         if movement.distance_squared(value.entity.position, value.supply.entity.position) <=
                 config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
             -- Withdrawal occurs only after physical arrival, making the visible
             -- chest count and bot animation describe the same transaction.
             if supply.take_one(value.supply, required_item) then
                 cargo_add(value, required_item, constants.ITEM_TRANSFER_COUNT)
+                remember_cargo_origin(value, required_item, pickup.source)
+                table.remove(value.pickup_queue, constants.FIRST_INDEX)
                 value.supply = nil
-                value.phase = constants.PHASE.UPGRADE
+                if #value.pickup_queue > constants.EMPTY_COUNT then
+                    value.supply = value.pickup_queue[constants.FIRST_INDEX].source
+                    value.phase = constants.PHASE.FETCH
+                else
+                    value.phase = constants.PHASE.FOLLOW
+                    value.next_scan_tick = tick
+                end
             else
-                state.clear_target(value)
+                table.remove(value.pickup_queue, constants.FIRST_INDEX)
+                value.supply = nil
+                value.phase = constants.PHASE.FOLLOW
                 value.next_scan_tick = tick + config.scan_interval
             end
         else
@@ -292,24 +462,45 @@ function bot.update(player, tick)
             -- Capture mapping and source identity before fast replacement makes
             -- the original LuaEntity invalid.
             local source_name = value.target.name
+            local source_position = {x = value.target.position.x, y = value.target.position.y}
             local mapping = registry.mapping_for(task, source_name)
+            local fallback_network = supply.first_network(player, value.target)
             local success, detail = executor.execute(player, value.target, mapping, task)
             if success then
                 -- Commit the material exchange only after the world replacement
                 -- succeeds: one higher-tier item in, one lower-tier item out.
                 cargo_remove(value, mapping.required_item, constants.ITEM_TRANSFER_COUNT)
+                local origin = consume_cargo_origin(value, mapping.required_item)
                 cargo_add(value, mapping.recovered_item, constants.ITEM_TRANSFER_COUNT)
                 value.upgraded = value.upgraded + constants.ITEM_TRANSFER_COUNT
-                local destination = supply.find_drop(value.job_network, mapping.recovered_item)
-                if not destination and value.source_container and value.source_container.entity.valid then
-                    destination = value.source_container
+                local destination = supply.find_drop(origin and origin.network or fallback_network,
+                    mapping.recovered_item)
+                if not destination then
+                    destination = supply.find_blocked_drop(origin and origin.network or fallback_network,
+                        source_position)
+                end
+                if not destination and origin and origin.local_container and origin.entity.valid then
+                    destination = origin
+                end
+                if not destination and origin and origin.entity and origin.entity.valid then
+                    -- A provider network may have ample replacement stock but no
+                    -- storage chest. Returning the recovered item to its source
+                    -- is preferable to filling cargo with an undeliverable item.
+                    destination = origin
                 end
                 state.clear_target(value)
                 if destination then
-                    value.return_destination = destination
-                    value.return_item = mapping.recovered_item
-                    value.phase = constants.PHASE.RETURN
+                    value.delivery_queue[#value.delivery_queue + constants.ITEM_TRANSFER_COUNT] = {
+                        item_name = mapping.recovered_item,
+                        destination = destination
+                    }
                 end
+                -- Continue consuming the batch before making a storage trip.
+                value.phase = constants.PHASE.FOLLOW
+                -- Internal replacements deliberately suppress graph rebuilding,
+                -- so redraw against the locked group to remove only completed
+                -- entities while retaining unmatched underground endpoints.
+                track.draw(player, value, task)
             else
                 value.failures = value.failures + constants.ITEM_TRANSFER_COUNT
                 print(player, constants.COLOR.ERROR, "could not upgrade " .. source_name .. ": " .. tostring(detail))
@@ -326,11 +517,19 @@ function bot.update(player, tick)
             -- cargo, preserving it for status inspection and a future policy.
             if supply.put_one(value.return_destination, value.return_item) then
                 cargo_remove(value, value.return_item, constants.ITEM_TRANSFER_COUNT)
+                table.remove(value.delivery_queue, constants.FIRST_INDEX)
+                value.return_destination = nil
+                value.return_item = nil
+                value.phase = constants.PHASE.FOLLOW
+                value.next_scan_tick = tick
+            else
+                local destination = value.return_destination
+                local item_name = value.return_item
+                value.return_destination = nil
+                value.return_item = nil
+                value.phase = constants.PHASE.FOLLOW
+                show_blocked_destination(player, value, destination, item_name)
             end
-            value.return_destination = nil
-            value.return_item = nil
-            value.phase = constants.PHASE.FOLLOW
-            value.next_scan_tick = tick
         else
             movement.towards(value.entity, value.return_destination.entity.position)
         end
@@ -356,7 +555,7 @@ function bot.status(player)
         tostring(value.enabled), value.task_name, value.phase, value.upgraded, value.failures,
         value.target and value.target.valid and value.target.name or constants.NONE_TEXT,
         #cargo > constants.EMPTY_COUNT and table.concat(cargo, constants.LIST_SEPARATOR) or
-            constants.EMPTY_CARGO_TEXT, remaining_track_entities))
+            constants.EMPTY_CARGO_TEXT, cargo_total(value), config.cargo_capacity, remaining_track_entities))
 end
 
 return bot

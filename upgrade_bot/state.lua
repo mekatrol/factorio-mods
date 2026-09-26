@@ -21,6 +21,9 @@ function state.get(player_index)
                  source_container = nil,
                  track = nil, track_highlights = {},
                  track_refresh_requested = false,
+                 pickup_queue = {}, delivery_queue = {},
+                 blocked_destination = nil, blocked_tag = nil, blocked_highlight = nil,
+                 cargo_origins = {},
                  last_player_position = nil, side_offset_x = config.follow_offset.x,
                  upgraded = constants.EMPTY_COUNT, failures = constants.EMPTY_COUNT, highlight = nil}
         storage[constants.STORAGE_KEY].players[player_index] = value
@@ -31,6 +34,9 @@ function state.get(player_index)
     value.phase = value.phase or constants.PHASE.FOLLOW
     value.side_offset_x = value.side_offset_x or config.follow_offset.x
     value.track_highlights = value.track_highlights or {}
+    value.pickup_queue = value.pickup_queue or {}
+    value.delivery_queue = value.delivery_queue or {}
+    value.cargo_origins = value.cargo_origins or {}
     return value
 end
 
@@ -44,6 +50,16 @@ function state.clear_track(value)
     value.track_highlights = {}
     value.track = nil
     value.track_refresh_requested = false
+end
+
+function state.clear_blocked_destination(value)
+    -- Map tags and rendering objects are independent engine resources. Destroy
+    -- both when the blockage clears so warning markers cannot become stale.
+    if value.blocked_tag and value.blocked_tag.valid then value.blocked_tag.destroy() end
+    if value.blocked_highlight and value.blocked_highlight.valid then value.blocked_highlight.destroy() end
+    value.blocked_tag = nil
+    value.blocked_highlight = nil
+    value.blocked_destination = nil
 end
 
 function state.clear_target(value)
@@ -67,6 +83,7 @@ function state.destroy(value)
     -- the helper off must not silently delete resources it was carrying.
     state.clear_target(value)
     state.clear_track(value)
+    state.clear_blocked_destination(value)
     if value.entity and value.entity.valid then value.entity.destroy() end
     value.entity = nil
     value.enabled = false

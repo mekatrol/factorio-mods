@@ -26,6 +26,10 @@ return {
     -- for building a connected logistics network across the whole factory.
     nearby_container_radius = 64,
 
+    -- Slots allow a useful batch while keeping the helper materially less
+    -- capable than a train or large logistics chest. Item types may be mixed.
+    cargo_capacity = 20,
+
     -- The bot must visibly reach an entity before mutating its inventory/world
     -- state, while allowing enough tolerance for differently sized entities.
     work_distance = 1.25,
@@ -46,5 +50,8 @@ return {
     track_highlight_inner_color = {r = 1, g = 0.75, b = 0.15, a = 1},
     -- The wider translucent stroke provides the requested glow without hiding
     -- belt contents or making dense splitter layouts unreadable.
-    track_highlight_outer_color = {r = 1, g = 0.3, b = 0, a = 0.22}
+    track_highlight_outer_color = {r = 1, g = 0.3, b = 0, a = 0.22},
+
+    -- Red distinguishes a blocked storage destination from orange track work.
+    blocked_container_color = {r = 1, g = 0, b = 0, a = 0.9}
 }

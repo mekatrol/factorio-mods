@@ -20,7 +20,8 @@ local constants = {
         FOLLOW = "follow",
         FETCH = "fetch",
         UPGRADE = "upgrade",
-        RETURN = "return"
+        RETURN = "return",
+        BLOCKED_RETURN = "blocked-return"
     },
 
     -- Command actions are centralized so parsing and help text describe the
@@ -68,6 +69,7 @@ local constants = {
     HIGHLIGHT_LINE_WIDTH = 2,
     TRACK_HIGHLIGHT_INNER_WIDTH = 2,
     TRACK_HIGHLIGHT_OUTER_WIDTH = 6,
+    BLOCKED_CONTAINER_LINE_WIDTH = 6,
     DISTANCE_SQUARED_EXPONENT = 2,
     COMMAND_DESCRIPTION = "Control the upgrade bot",
     COMMAND_USAGE = "[Upgrade Bot] usage: /upgrade-bot <on|off|toggle|task NAME|tasks|status|refresh>",
@@ -78,7 +80,8 @@ local constants = {
     LIST_SEPARATOR = ",",
     LIST_DISPLAY_SEPARATOR = ", ",
     COMMAND_PATTERN = "^(%S+)%s*(.-)%s*$",
-    STATUS_FORMAT = "enabled=%s task=%s phase=%s upgraded=%d failures=%d target=%s cargo=%s track_remaining=%d"
+    STATUS_FORMAT = "enabled=%s task=%s phase=%s upgraded=%d failures=%d target=%s cargo=%s/%d track_remaining=%d",
+    BLOCKED_CONTAINER_TAG_TEXT = "Upgrade Bot: make room"
 }
 
 return constants

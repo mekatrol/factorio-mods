@@ -26,6 +26,15 @@ Build, mining, destruction, rotation, robot-build, and script-raised events queu
 an outline rebuild for the next bot tick; no periodic graph polling is used.
 `/ub refresh` forces an immediate rebuild of the current track and its outline.
 
+The bot's cargo capacity is configured in `config.lua` and is currently twenty
+individual items, not twenty item types. It can collect a mixed batch of belts,
+underground belts, and splitters, perform as many upgrades as that batch permits,
+and then return all recovered items before collecting the next batch. When a
+return container has no room, the bot stops upgrading and follows the player. A
+red world-space border and an item-labelled chart tag mark the blocked container
+on the map and minimap. The bot checks that destination for space and resumes the
+return and upgrade workflow automatically when room becomes available.
+
 Commands:
 
 ```text
