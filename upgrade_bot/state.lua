@@ -20,6 +20,7 @@ function state.get(player_index)
                  job_network = nil, return_destination = nil, return_item = nil,
                  source_container = nil,
                  track = nil, track_highlights = {},
+                 paired_underground_target = nil,
                  track_refresh_requested = false,
                  pickup_queue = {}, delivery_queue = {},
                  blocked_destination = nil, blocked_tag = nil, blocked_highlight = nil,
@@ -49,6 +50,7 @@ function state.clear_track(value)
     end
     value.track_highlights = {}
     value.track = nil
+    value.paired_underground_target = nil
     value.track_refresh_requested = false
 end
 

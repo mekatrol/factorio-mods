@@ -49,6 +49,7 @@ local constants = {
     -- Prototype type identifiers used by generic surface filters.
     ENTITY_TYPE = {
         CONTAINER = "container",
+        LOGISTIC_CONTAINER = "logistic-container",
         UNDERGROUND_BELT = "underground-belt"
     },
 
@@ -59,6 +60,7 @@ local constants = {
     -- Scalar constants below capture invariants and engine-facing defaults;
     -- their names explain why a particular number participates in the logic.
     ITEM_TRANSFER_COUNT = 1,
+    UNDERGROUND_PAIR_SIZE = 2,
     EMPTY_COUNT = 0,
     FIRST_INDEX = 1,
     NO_TICK_DELAY = 0,

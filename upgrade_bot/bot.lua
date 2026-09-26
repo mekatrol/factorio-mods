@@ -90,6 +90,16 @@ local function cargo_remove(value, item_name, count)
     return true
 end
 
+local function upgradeable_underground_peer(entity, task)
+    if not (entity and entity.valid and entity.type == constants.ENTITY_TYPE.UNDERGROUND_BELT) then return nil end
+    local peer = entity.neighbours
+    if peer and peer.valid and peer.type == constants.ENTITY_TYPE.UNDERGROUND_BELT and
+            task.mappings[peer.name] then
+        return peer
+    end
+    return nil
+end
+
 local function remember_cargo_origin(value, item_name, source)
     value.cargo_origins[item_name] = value.cargo_origins[item_name] or {}
     local origins = value.cargo_origins[item_name]
@@ -168,12 +178,34 @@ local function prepare_job(player, value, task)
         return false
     end
 
+    -- Finish a reserved underground pair before considering any other entity.
+    -- Replacing the first endpoint can make Factorio remove the live neighbour
+    -- relationship, so the original LuaEntity reference is the pair contract.
+    local paired_target = value.paired_underground_target
+    if paired_target and not (paired_target.valid and task.mappings[paired_target.name]) then
+        value.paired_underground_target = nil
+        paired_target = nil
+    end
+    if paired_target then
+        local mapping = registry.mapping_for(task, paired_target.name)
+        if mapping and cargo_count(value, mapping.required_item) > constants.EMPTY_COUNT then
+            value.target = paired_target
+            value.phase = constants.PHASE.UPGRADE
+            highlight(player, value)
+            return true
+        end
+    end
+
     -- Consume every useful replacement already on board before considering
-    -- either unloading or another collection trip. This completes the upgrade
-    -- portion of the current configured-size batch as one coherent operation.
+    -- either unloading or another collection trip. An intact underground pair
+    -- is selected only when both replacements are aboard; the second item is
+    -- thereby reserved even if replacing the first endpoint disconnects it.
     for _, target in ipairs(remaining) do
         local mapping = registry.mapping_for(task, target.name)
-        if mapping and cargo_count(value, mapping.required_item) > constants.EMPTY_COUNT then
+        local peer = upgradeable_underground_peer(target, task)
+        local required_count = peer and constants.UNDERGROUND_PAIR_SIZE or constants.ITEM_TRANSFER_COUNT
+        if mapping and cargo_count(value, mapping.required_item) >= required_count then
+            value.paired_underground_target = peer
             value.target = target
             value.phase = constants.PHASE.UPGRADE
             highlight(player, value)
@@ -488,7 +520,11 @@ function bot.update(player, tick)
                     -- is preferable to filling cargo with an undeliverable item.
                     destination = origin
                 end
+                local completed_reserved_endpoint = value.paired_underground_target == value.target
                 state.clear_target(value)
+                if completed_reserved_endpoint then
+                    value.paired_underground_target = nil
+                end
                 if destination then
                     value.delivery_queue[#value.delivery_queue + constants.ITEM_TRANSFER_COUNT] = {
                         item_name = mapping.recovered_item,
@@ -503,6 +539,7 @@ function bot.update(player, tick)
                 track.draw(player, value, task)
             else
                 value.failures = value.failures + constants.ITEM_TRANSFER_COUNT
+                value.paired_underground_target = nil
                 print(player, constants.COLOR.ERROR, "could not upgrade " .. source_name .. ": " .. tostring(detail))
             end
             if not success then state.clear_target(value) end

@@ -46,17 +46,31 @@ function supply.find_source(player, target, item_name)
     return best
 end
 
--- Fallback for ordinary player-owned chests that are not logistic providers.
--- Logistic containers remain the responsibility of the network selector.
+-- Fallback for nearby player-owned chests. Logistic containers normally pass
+-- through the network selector first, but they must remain usable when the
+-- target lies outside that network's construction area; otherwise visible
+-- replacement stock can leave the bot following with an empty cargo hold.
 function supply.find_nearby_container(player, target, bot_entity, item_name, radius)
-    -- Only ordinary `container` prototypes belong in this fallback. Logistic
-    -- containers must pass through Factorio's priority and network rules above.
-    local entities = target.surface.find_entities_filtered {
-        position = target.position,
-        radius = radius,
-        type = constants.ENTITY_TYPE.CONTAINER,
-        force = player.force
-    }
+    local entities = {}
+    local seen = {}
+    -- A player may lead the following bot to a supply chest after the track has
+    -- already been locked. Search around both ends of that workflow: the work
+    -- site and the bot's current position beside the player.
+    for _, position in pairs({target.position, bot_entity.position}) do
+        local nearby = target.surface.find_entities_filtered {
+            position = position,
+            radius = radius,
+            type = {constants.ENTITY_TYPE.CONTAINER, constants.ENTITY_TYPE.LOGISTIC_CONTAINER},
+            force = player.force
+        }
+        for _, entity in pairs(nearby) do
+            local identity = entity.unit_number
+            if not identity or not seen[identity] then
+                if identity then seen[identity] = true end
+                entities[#entities + constants.ITEM_TRANSFER_COUNT] = entity
+            end
+        end
+    end
     local best, best_distance
     for _, entity in pairs(entities) do
         local inventory = chest_inventory(entity)

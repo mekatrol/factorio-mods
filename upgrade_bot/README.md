@@ -7,8 +7,11 @@ roboport construction area, the bot first asks that logistic network for the
 required item using Factorio's provider/storage/buffer source selection. It
 flies to the selected source, removes one item, and carries it to the target.
 If the logistic network cannot supply an item, the bot also searches ordinary
-player-owned containers within 64 tiles of the target. Logistic-network supply
-still has priority. After a network-backed upgrade, the bot carries the removed
+and logistic player-owned containers within 64 tiles of either the target or
+the bot. This lets the player lead the following bot to a supply chest even
+when the locked track is farther away, and also allows a nearby logistic chest
+to supply a target outside its network's construction area. Logistic-network
+supply still has priority. After a network-backed upgrade, the bot carries the removed
 lower-tier item to the network's normal selected storage destination. After an
 ordinary-container upgrade, it returns that item to the same container. If the
 destination has no space, it retains the item in cargo. When no target or supply
@@ -30,6 +33,10 @@ The bot's cargo capacity is configured in `config.lua` and is currently twenty
 individual items, not twenty item types. It can collect a mixed batch of belts,
 underground belts, and splitters, perform as many upgrades as that batch permits,
 and then return all recovered items before collecting the next batch. When a
+yellow underground-belt pair is still connected, the bot reserves and carries
+both replacement belts before upgrading either endpoint. It then completes the
+remembered second endpoint even when replacing the first temporarily removes the
+pair from Factorio's live belt graph. When a
 return container has no room, the bot stops upgrading and follows the player. A
 red world-space border and an item-labelled chart tag mark the blocked container
 on the map and minimap. The bot checks that destination for space and resumes the
