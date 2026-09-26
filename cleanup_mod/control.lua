@@ -3,7 +3,7 @@
 --
 -- Cleanup bot logic:
 --   - Each player can toggle a cleanup bot on/off via hotkey.
---   - The bot roams randomly within a radius around the player.
+--   - The bot follows the player when it has no cleanup target.
 --   - It looks for items on the ground (type = "item-entity").
 --   - When carrying items, it returns to the nearest iron chest and
 --     inserts them. If no chest is found, it uses the player inventory
@@ -23,21 +23,19 @@ local CUSTOM_BOT_HEALTH = 500
 -- per second.
 local CLEANUP_BOT_UPDATE_INTERVAL = 1
 
--- Bot movement:
--- Tiles per second, converted to tiles per update step.
-local BOT_SPEED_TILES_PER_SECOND = 6.0
-local TICKS_PER_SECOND = 60
-local BOT_STEP_DISTANCE = (BOT_SPEED_TILES_PER_SECOND * CLEANUP_BOT_UPDATE_INTERVAL) / TICKS_PER_SECOND
+-- Match upgrade_bot's scripted movement exactly: both bots update every tick
+-- and teleport at most 0.18 tiles toward their destination per update.
+local BOT_STEP_DISTANCE = 0.18
+
+-- Keep the same following formation and dead band as upgrade_bot.
+local BOT_FOLLOW_DISTANCE = 2.5
+local BOT_HORIZONTAL_DIRECTION_THRESHOLD = 0.1
 
 -- Distance considered "arrived" at a target point (squared for comparison).
 local BOT_TARGET_REACH_DISTANCE = 0.7
 
 -- If the bot appears not to move for this many game ticks, pick a new direction.
 local BOT_STUCK_TICKS = 120
-
--- Roaming radius around the player. The bot will try to stay within
--- this distance of the player position.
-local CLEANUP_ROAM_RADIUS = 25.0
 
 -- Radius to search for ground items (around bot, and occasionally around player).
 local ITEM_SEARCH_RADIUS = 12.0
@@ -54,7 +52,7 @@ local BOT_MAX_ITEM_COUNT = 100
 -- Where the bot sits relative to the player when it can't place items.
 local FOLLOW_OFFSET = {
     x = -2,
-    y = 2
+    y = -1
 }
 
 -- Radius (around the player) to search for containers that already
@@ -72,7 +70,7 @@ local STORAGE_KEY = "mekatrol_cleanup_mod"
 ----------------------------------------------------------------------
 -- MODE MEANING
 -- "idle"	    Bot just spawned or is enabled but has not selected any behavior yet.
--- "roam"	    Bot is searching randomly within the player radius.
+-- "follow"	Bot is following the player in a trailing side formation.
 -- "pickup"	    Bot has located an item on the ground and is moving to pick it up.
 -- "returning"	Bot is carrying items and is moving to the storage chest to deposit.
 ----------------------------------------------------------------------
@@ -113,16 +111,18 @@ local function init_player(player)
     pdata.storage_chest = pdata.storage_chest or nil
 
     -- Movement state:
-    pdata.mode = pdata.mode or "idle" -- "idle", "roam", "pickup", "returning"
+    pdata.mode = pdata.mode or "idle" -- "idle", "follow", "pickup", "returning"
     pdata.target_position = pdata.target_position or nil
     pdata.last_bot_position = pdata.last_bot_position or nil
     pdata.stuck_tick_counter = pdata.stuck_tick_counter or 0
+    pdata.last_player_position = pdata.last_player_position or nil
+    pdata.side_offset_x = pdata.side_offset_x or FOLLOW_OFFSET.x
 
     -- Carried items: table[name] = count, plus running total.
     pdata.carried_items = pdata.carried_items or {}
     pdata.unplaceable_items = pdata.unplaceable_items or {}
 
-    -- line from bot to current target (item, chest, or roam point).
+    -- Line from bot to its current item or chest target.
     -- The visual function itself will only show it in pickup mode.
     if pdata.target_position then
         visual.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
@@ -341,40 +341,7 @@ local function find_nearest_storage_chest(player, pdata)
 end
 
 ----------------------------------------------------------------------
--- RANDOM TARGET SELECTION (ROAMING)
 ----------------------------------------------------------------------
-
-local function pick_random_roam_target(player, bot, pdata)
-    if not (player and player.valid and bot and bot.valid) then
-        return
-    end
-
-    local center = player.position
-    local radius = CLEANUP_ROAM_RADIUS
-
-    -- Try a few random points within radius.
-    for _ = 1, 10 do
-        local offset_x = (math.random() * 2 - 1) * radius
-        local offset_y = (math.random() * 2 - 1) * radius
-        local target = {
-            x = center.x + offset_x,
-            y = center.y + offset_y
-        }
-
-        if distance_squared(target, center) <= radius * radius then
-            pdata.target_position = target
-            pdata.mode = "roam"
-            return
-        end
-    end
-
-    -- Fallback: stay near player if no random target chosen.
-    pdata.target_position = {
-        x = center.x - 1,
-        y = center.y - 1
-    }
-    pdata.mode = "roam"
-end
 
 ----------------------------------------------------------------------
 -- BOT MOVEMENT
@@ -389,38 +356,48 @@ local function move_entity_towards(bot, target)
         return
     end
 
-    local before = bot.position
-    local dx = target.x - before.x
-    local dy = target.y - before.y
-    local d2 = dx * dx + dy * dy
-
-    if d2 == 0 then
+    local pos = bot.position
+    local dx, dy = target.x - pos.x, target.y - pos.y
+    local distance = math.sqrt(dx * dx + dy * dy)
+    if distance == 0 then
         return
     end
 
-    local dist = math.sqrt(d2)
-    if BOT_STEP_DISTANCE <= 0 then
-        game.print("[color=green][MekatrolCleanupBot][/color] ERROR: BOT_STEP_DISTANCE <= 0")
-        return
+    local step = math.min(BOT_STEP_DISTANCE, distance)
+    bot.teleport({x = pos.x + dx / distance * step, y = pos.y + dy / distance * step})
+end
+
+-- Match upgrade_bot's follow behavior: trail on the opposite side of the
+-- player's horizontal movement and stop adjusting inside the follow dead band.
+local function follow_player(player, bot, pdata)
+    -- Existing saves may already have player data created before the dynamic
+    -- side-follow fields were introduced. Backfill at the point of use so an
+    -- on-tick update can never perform arithmetic on nil state.
+    pdata.side_offset_x = pdata.side_offset_x or FOLLOW_OFFSET.x
+
+    local previous = pdata.last_player_position
+    if previous then
+        local dx = player.position.x - previous.x
+        if dx < -BOT_HORIZONTAL_DIRECTION_THRESHOLD then
+            pdata.side_offset_x = math.abs(FOLLOW_OFFSET.x)
+        elseif dx > BOT_HORIZONTAL_DIRECTION_THRESHOLD then
+            pdata.side_offset_x = -math.abs(FOLLOW_OFFSET.x)
+        end
     end
 
-    local new_pos
-    if dist <= BOT_STEP_DISTANCE then
-        new_pos = target
-    else
-        local nx = dx / dist
-        local ny = dy / dist
-        new_pos = {
-            x = before.x + nx * BOT_STEP_DISTANCE,
-            y = before.y + ny * BOT_STEP_DISTANCE
-        }
+    pdata.last_player_position = {
+        x = player.position.x,
+        y = player.position.y
+    }
+
+    local position = {
+        x = player.position.x + pdata.side_offset_x,
+        y = player.position.y + FOLLOW_OFFSET.y
+    }
+
+    if distance_squared(bot.position, position) > BOT_FOLLOW_DISTANCE * BOT_FOLLOW_DISTANCE then
+        move_entity_towards(bot, position)
     end
-
-    local ok = bot.teleport(new_pos)
-    local after = bot.position
-
-    -- game.print(string.format("[color=green][MekatrolCleanupBot][/color] STEP from (%.2f, %.2f) to (%.2f, %.2f), ok=%s, after=(%.2f, %.2f)", before.x,
-    --     before.y, new_pos.x, new_pos.y, tostring(ok), after.x, after.y))
 end
 
 ----------------------------------------------------------------------
@@ -523,7 +500,7 @@ local function pickup_nearby_items(player, bot, pdata)
 
     if picked_any then
         local total = get_total_carried(pdata)
-        if total > 0 and (pdata.mode == "idle" or pdata.mode == "roam") then
+        if total > 0 and (pdata.mode == "idle" or pdata.mode == "follow") then
             pdata.mode = "pickup"
         end
     end
@@ -612,7 +589,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     -- Decide what we are trying to do next:
     --   1. If carrying items and we have a suitable container: go there.
     --   2. If carrying items but no container: follow the player (no-container mode).
-    --   3. If not carrying items: look for ground items or roam.
+    --   3. If not carrying items: look for ground items or follow the player.
     ------------------------------------------------------------------
     local carried_total = get_total_carried(pdata)
     local carrying_anything = carried_total > 0
@@ -671,8 +648,8 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
                 carried_total = get_total_carried(pdata)
 
                 if carried_total <= 0 then
-                    -- All done, go back to roaming.
-                    pdata.mode = "roam"
+                    -- All done; the normal empty state will resume following.
+                    pdata.mode = "follow"
                     pdata.target_position = nil
                 end
             else
@@ -700,16 +677,15 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
         end
     end
 
-    -- If any items are unplaceable, follow the player at offset.
+    -- If any items are unplaceable, follow the player using the same dynamic
+    -- side-switching formation as upgrade_bot.
     if has_unplaceable and not collecting_more then
         pdata.mode = "no-container"
-        pdata.target_position = {
-            x = pp.x + FOLLOW_OFFSET.x,
-            y = pp.y + FOLLOW_OFFSET.y
-        }
+        pdata.target_position = nil
+        follow_player(player, bot, pdata)
     elseif not carrying_anything then
         ------------------------------------------------------------------
-        -- Normal behaviour when empty: look for items to pick up, otherwise roam.
+        -- Normal behaviour when empty: look for items, otherwise follow the player.
         ------------------------------------------------------------------
         local nearest_item = find_nearest_ground_item(surface, bp, ITEM_SEARCH_RADIUS)
         if not nearest_item then
@@ -723,9 +699,9 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
                 y = nearest_item.position.y
             }
         else
-            if not pdata.target_position or pdata.mode ~= "roam" then
-                pick_random_roam_target(player, bot, pdata)
-            end
+            pdata.mode = "follow"
+            pdata.target_position = nil
+            follow_player(player, bot, pdata)
         end
     end
 
@@ -751,9 +727,6 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
             if pdata.stuck_tick_counter >= BOT_STUCK_TICKS then
                 pdata.stuck_tick_counter = 0
                 pdata.target_position = nil
-                if pdata.mode == "roam" then
-                    pick_random_roam_target(player, bot, pdata)
-                end
             end
         else
             pdata.stuck_tick_counter = 0
@@ -770,13 +743,10 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     ------------------------------------------------------------------
     -- Visual overlays
     ------------------------------------------------------------------
-    local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
-    visual.draw_bot_highlight(bot, pdata, has_unplaceable)
-
-    -- search circle
-    if visual.update_search_radius_circle then
-        visual.update_search_radius_circle(player, pdata, bot, ITEM_SEARCH_RADIUS)
-    end
+    -- These overlays were visually overpowering. Clear any instances retained
+    -- by an existing save and do not recreate them.
+    visual.clear_bot_highlight(pdata)
+    visual.clear_search_radius_circle(pdata)
 
     if chest and chest.valid then
         visual.draw_chest_highlight(chest, pdata, CHEST_HIGHLIGHT_Y_OFFSET)
@@ -789,7 +759,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
     visual.draw_status_text(bot, pdata, pdata.mode or "idle", carried_total_for_ui, BOT_MAX_ITEM_COUNT)
 
-    -- line from bot to current target (item, chest, or roam point).
+    -- Line from bot to its current item or chest target.
     -- The visual function itself will only show it in pickup mode.
     if pdata.target_position then
         visual.draw_target_line(bot, pdata, pdata.target_position, pdata.mode or "idle")
