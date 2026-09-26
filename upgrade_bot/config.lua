@@ -18,6 +18,9 @@ return {
     -- Targets remain local to the player; network supplies can be much farther
     -- away without requiring an expensive surface-wide entity scan.
     search_radius = 32,
+    -- A small anchor search reconnects a saved track to the replacement entity
+    -- occupying its original seed position after fast replacement.
+    track_anchor_search_radius = 2,
 
     -- Ordinary containers are a local convenience fallback, not a replacement
     -- for building a connected logistics network across the whole factory.
@@ -38,5 +41,10 @@ return {
     
     -- Orange visually distinguishes upgrade work from the role colors used by
     -- the reference gameplay mod's other bots.
-    highlight_color = {r = 1, g = 0.45, b = 0, a = 0.8}
+    highlight_color = {r = 1, g = 0.45, b = 0, a = 0.8},
+    -- The narrow bright stroke remains legible over belts and their moving items.
+    track_highlight_inner_color = {r = 1, g = 0.75, b = 0.15, a = 1},
+    -- The wider translucent stroke provides the requested glow without hiding
+    -- belt contents or making dense splitter layouts unreadable.
+    track_highlight_outer_color = {r = 1, g = 0.3, b = 0, a = 0.22}
 }

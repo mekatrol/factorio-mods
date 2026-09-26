@@ -19,6 +19,8 @@ function state.get(player_index)
                  supply = nil, phase = constants.PHASE.FOLLOW, cargo = {}, next_scan_tick = constants.NO_TICK_DELAY,
                  job_network = nil, return_destination = nil, return_item = nil,
                  source_container = nil,
+                 track = nil, track_highlights = {},
+                 track_refresh_requested = false,
                  last_player_position = nil, side_offset_x = config.follow_offset.x,
                  upgraded = constants.EMPTY_COUNT, failures = constants.EMPTY_COUNT, highlight = nil}
         storage[constants.STORAGE_KEY].players[player_index] = value
@@ -28,7 +30,20 @@ function state.get(player_index)
     -- existing save's useful task and cargo state.
     value.phase = value.phase or constants.PHASE.FOLLOW
     value.side_offset_x = value.side_offset_x or config.follow_offset.x
+    value.track_highlights = value.track_highlights or {}
     return value
+end
+
+function state.clear_track(value)
+    -- Track render objects outlive invalidated belt entities unless explicitly
+    -- destroyed. Clearing both visual and logical state makes task switching
+    -- atomic from the player's perspective.
+    for _, object in pairs(value.track_highlights or {}) do
+        if object and object.valid then object.destroy() end
+    end
+    value.track_highlights = {}
+    value.track = nil
+    value.track_refresh_requested = false
 end
 
 function state.clear_target(value)
@@ -51,6 +66,7 @@ function state.destroy(value)
     -- Cargo intentionally remains in persistent state across toggles. Turning
     -- the helper off must not silently delete resources it was carrying.
     state.clear_target(value)
+    state.clear_track(value)
     if value.entity and value.entity.valid then value.entity.destroy() end
     value.entity = nil
     value.enabled = false

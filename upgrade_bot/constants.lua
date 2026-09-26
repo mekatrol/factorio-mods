@@ -33,7 +33,8 @@ local constants = {
         TOGGLE = "toggle",
         TASK = "task",
         TASKS = "tasks",
-        STATUS = "status"
+        STATUS = "status",
+        REFRESH = "refresh"
     },
 
     -- Semantic colors keep message intent readable at every call site.
@@ -46,7 +47,12 @@ local constants = {
 
     -- Prototype type identifiers used by generic surface filters.
     ENTITY_TYPE = {
-        CONTAINER = "container"
+        CONTAINER = "container",
+        UNDERGROUND_BELT = "underground-belt"
+    },
+
+    GROUP_STRATEGY = {
+        BELT_NETWORK = "belt-network"
     },
 
     -- Scalar constants below capture invariants and engine-facing defaults;
@@ -60,9 +66,11 @@ local constants = {
     BOT_COLLISION_HALF_SIZE = 0.2,
     BOT_MAX_HEALTH = 500,
     HIGHLIGHT_LINE_WIDTH = 2,
+    TRACK_HIGHLIGHT_INNER_WIDTH = 2,
+    TRACK_HIGHLIGHT_OUTER_WIDTH = 6,
     DISTANCE_SQUARED_EXPONENT = 2,
     COMMAND_DESCRIPTION = "Control the upgrade bot",
-    COMMAND_USAGE = "[Upgrade Bot] usage: /upgrade-bot <on|off|toggle|task NAME|tasks|status>",
+    COMMAND_USAGE = "[Upgrade Bot] usage: /upgrade-bot <on|off|toggle|task NAME|tasks|status|refresh>",
     TASK_LIST_PREFIX = "[Upgrade Bot] tasks: ",
     EMPTY_TEXT = "",
     NONE_TEXT = "none",
@@ -70,7 +78,7 @@ local constants = {
     LIST_SEPARATOR = ",",
     LIST_DISPLAY_SEPARATOR = ", ",
     COMMAND_PATTERN = "^(%S+)%s*(.-)%s*$",
-    STATUS_FORMAT = "enabled=%s task=%s phase=%s upgraded=%d failures=%d target=%s cargo=%s"
+    STATUS_FORMAT = "enabled=%s task=%s phase=%s upgraded=%d failures=%d target=%s cargo=%s track_remaining=%d"
 }
 
 return constants

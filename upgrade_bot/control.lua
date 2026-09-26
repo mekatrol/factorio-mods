@@ -24,6 +24,7 @@ local function command(command_data)
     elseif action == constants.ACTION.TOGGLE then bot.toggle(player)
     elseif action == constants.ACTION.TASK then bot.select_task(player, argument)
     elseif action == constants.ACTION.STATUS then bot.status(player)
+    elseif action == constants.ACTION.REFRESH then bot.refresh_track(player)
     elseif action == constants.ACTION.TASKS then
         player.print(constants.TASK_LIST_PREFIX .. table.concat(registry.names(), constants.LIST_DISPLAY_SEPARATOR))
     else player.print(constants.COMMAND_USAGE) end
@@ -48,6 +49,22 @@ script.on_event(constants.CUSTOM_INPUT_NAME, function(event)
     local player = player_for(event)
     if player and player.valid then bot.toggle(player) end
 end)
+
+local function request_track_refresh(event)
+    -- Mutation events can fire before the engine finishes every connection
+    -- update. The bot therefore records intent here and rebuilds next tick.
+    bot.request_track_refresh(event.entity or event.created_entity or event.destination)
+end
+
+-- These events cover player, robot, combat, and script-driven changes without
+-- polling the belt graph. Unrelated entities are inexpensive because the bot
+-- filters by surface/force before setting a refresh request.
+script.on_event({defines.events.on_built_entity, defines.events.on_robot_built_entity,
+                 defines.events.script_raised_built, defines.events.script_raised_revive,
+                 defines.events.on_pre_player_mined_item, defines.events.on_robot_pre_mined,
+                 defines.events.on_player_mined_entity, defines.events.on_robot_mined_entity,
+                 defines.events.on_entity_died, defines.events.script_raised_destroy,
+                 defines.events.on_player_rotated_entity}, request_track_refresh)
 
 script.on_event(defines.events.on_player_removed, function(event)
     -- Player removal is permanent, unlike disconnecting. Destroying references

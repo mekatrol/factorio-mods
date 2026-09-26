@@ -9,6 +9,7 @@ return {{
     name = constants.DEFAULT_TASK_NAME,
     aliases = {"belts", "yellow-red", "default"},
     description = "Upgrade yellow transport belts, underground belts and splitters to red",
+    grouping = constants.GROUP_STRATEGY.BELT_NETWORK,
     mappings = {
         -- Each mapping declares both sides of the material exchange so the
         -- scheduler never infers inventory items from prototype naming rules.

@@ -5,6 +5,7 @@ local movement = require("movement")
 local registry = require("task_registry")
 local state = require("state")
 local supply = require("supply")
+local track = require("track")
 local bot = {}
 
 local function print(player, color, message)
@@ -106,7 +107,25 @@ end
 local function prepare_job(player, value, task)
     -- Evaluate candidates until one has a real material path. An unavailable
     -- belt type must not block another mapping whose supplies are available.
-    for _, target in ipairs(target_candidates(player, value, task)) do
+    -- Lock a connected group before considering supplies. A temporarily starved
+    -- track therefore waits instead of letting the bot start another line.
+    if not value.track then
+        local candidates = target_candidates(player, value, task)
+        local seed = candidates[constants.FIRST_INDEX]
+        if not seed then return false end
+        value.track = track.discover(seed, task)
+        track.draw(player, value, task)
+    end
+
+    local remaining = track.remaining_entities(value.track, task, value.entity.position)
+    if #remaining == constants.EMPTY_COUNT then
+        -- Only after every upgradeable member is gone may the scheduler choose a
+        -- seed from another physical belt component.
+        state.clear_track(value)
+        return false
+    end
+
+    for _, target in ipairs(remaining) do
         local mapping = registry.mapping_for(task, target.name)
         local required_item = mapping and mapping.required_item
         if required_item then
@@ -168,9 +187,39 @@ function bot.select_task(player, task_name)
     end
     local value = state.get(player.index)
     state.clear_target(value)
+    state.clear_track(value)
     value.task_name, value.next_scan_tick = task.name, constants.NO_TICK_DELAY
     print(player, constants.COLOR.SUCCESS, "task selected: " .. task.name)
     return true
+end
+
+function bot.refresh_track(player)
+    local value = state.get(player.index)
+    local task = registry.get(value.task_name)
+    if not value.track then
+        print(player, constants.COLOR.WARNING, "there is no active track to refresh")
+        return false
+    end
+    if not task or not track.refresh(player, value, task) then
+        print(player, constants.COLOR.WARNING, "the active track no longer has a valid anchor")
+        return false
+    end
+    value.track_refresh_requested = false
+    print(player, constants.COLOR.SUCCESS, "active track outline refreshed")
+    return true
+end
+
+function bot.request_track_refresh(entity)
+    -- World-change events are global. Mark only active bots on the same surface
+    -- and force so another player's unrelated factory does not trigger work.
+    if not (entity and entity.valid) then return end
+    state.ensure()
+    for _, value in pairs(storage[constants.STORAGE_KEY].players) do
+        if value.enabled and value.track and value.entity and value.entity.valid and
+                value.entity.surface == entity.surface and value.entity.force == entity.force then
+            value.track_refresh_requested = true
+        end
+    end
 end
 
 function bot.update(player, tick)
@@ -190,6 +239,14 @@ function bot.update(player, tick)
         value.enabled = false
         print(player, constants.COLOR.ERROR, "task is no longer registered")
         return
+    end
+
+
+    -- Event handlers defer rebuilding until the next normal bot tick. By then a
+    -- mined entity is gone and a built or rotated entity has final connections.
+    if value.track_refresh_requested then
+        value.track_refresh_requested = false
+        track.refresh(player, value, task)
     end
 
     if value.target and not value.target.valid then state.clear_target(value) end
@@ -289,12 +346,17 @@ function bot.status(player)
     table.sort(cargo)
     -- Sorting cargo produces stable output that is easy to compare between
     -- repeated diagnostics and log captures.
+    local task = registry.get(value.task_name)
+    local remaining_track_entities = task and value.track and
+                                         #track.remaining_entities(value.track, task, value.entity and
+                                             value.entity.valid and value.entity.position or player.position) or
+                                         constants.EMPTY_COUNT
     print(player, constants.COLOR.INFORMATION,
         string.format(constants.STATUS_FORMAT,
         tostring(value.enabled), value.task_name, value.phase, value.upgraded, value.failures,
         value.target and value.target.valid and value.target.name or constants.NONE_TEXT,
         #cargo > constants.EMPTY_COUNT and table.concat(cargo, constants.LIST_SEPARATOR) or
-            constants.EMPTY_CARGO_TEXT))
+            constants.EMPTY_CARGO_TEXT, remaining_track_entities))
 end
 
 return bot
