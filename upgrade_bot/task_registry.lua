@@ -1,4 +1,4 @@
-local registry = {tasks = {}, aliases = {}}
+local registry = {tasks = {}, aliases = {}, ordered_names = {}}
 local constants = require("constants")
 
 local function validate(definition)
@@ -17,11 +17,23 @@ function registry.register(definition)
 
     -- Canonical names and aliases resolve to one definition so command parsing
     -- never needs task-specific conditionals.
+    if not registry.tasks[definition.name] then
+        registry.ordered_names[#registry.ordered_names + constants.ITEM_TRANSFER_COUNT] = definition.name
+    end
     registry.tasks[definition.name] = definition
     registry.aliases[definition.name] = definition.name
     for _, alias in ipairs(definition.aliases or {}) do
         registry.aliases[alias] = definition.name
     end
+end
+
+function registry.next(current_name)
+    for index, name in ipairs(registry.ordered_names) do
+        if name == current_name then
+            return registry.tasks[registry.ordered_names[index % #registry.ordered_names + constants.ITEM_TRANSFER_COUNT]]
+        end
+    end
+    return registry.tasks[registry.ordered_names[constants.FIRST_INDEX]]
 end
 
 function registry.get(name)

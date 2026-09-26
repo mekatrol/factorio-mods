@@ -45,6 +45,7 @@ return and upgrade workflow automatically when room becomes available.
 Commands:
 
 ```text
+/ub                         (cycle upgrade mode)
 /upgrade-bot on
 /upgrade-bot off
 /upgrade-bot task yellow-to-red-belts
@@ -53,7 +54,10 @@ Commands:
 /upgrade-bot refresh
 ```
 
-`/ub` is a short alias. New jobs belong in `tasks.lua`; the bot engine does not
+The built-in modes are `Yellow -> Red`, `Red -> Blue`, and `Containers`
+(wooden to iron, then iron to steel). The current mode is displayed underneath
+the bot. `/ub` cycles modes; it also remains a short alias when followed by a
+command. New jobs belong in `tasks.lua`; the bot engine does not
 contain entity names. Each job has a name, optional aliases, and a `mappings`
 table of source prototype names to target prototype names. A mapping may instead
 be a table with `target`, `required_item`, `recovered_item`, and optional

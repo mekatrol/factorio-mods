@@ -26,7 +26,8 @@ function state.get(player_index)
                  blocked_destination = nil, blocked_tag = nil, blocked_highlight = nil,
                  cargo_origins = {},
                  last_player_position = nil, side_offset_x = config.follow_offset.x,
-                 upgraded = constants.EMPTY_COUNT, failures = constants.EMPTY_COUNT, highlight = nil}
+                 upgraded = constants.EMPTY_COUNT, failures = constants.EMPTY_COUNT, highlight = nil,
+                 mode_label = nil}
         storage[constants.STORAGE_KEY].players[player_index] = value
     end
     value.cargo = value.cargo or {}
@@ -86,6 +87,8 @@ function state.destroy(value)
     state.clear_target(value)
     state.clear_track(value)
     state.clear_blocked_destination(value)
+    if value.mode_label and value.mode_label.valid then value.mode_label.destroy() end
+    value.mode_label = nil
     if value.entity and value.entity.valid then value.entity.destroy() end
     value.entity = nil
     value.enabled = false

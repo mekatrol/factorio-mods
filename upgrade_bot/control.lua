@@ -14,8 +14,14 @@ local function command(command_data)
     local player = player_for(command_data)
     if not (player and player.valid) then return end
     -- Split once so task aliases remain free to grow without changing the
-    -- command grammar. Missing input intentionally means a harmless status read.
+    -- command grammar. Missing input is handled below according to the alias.
     local action, argument = string.match(command_data.parameter or constants.EMPTY_TEXT, constants.COMMAND_PATTERN)
+    -- The short command is the in-game mode switch. Keep the long command's
+    -- empty form as a status query for diagnostics and backwards compatibility.
+    if not action and command_data.name == constants.SHORT_COMMAND_NAME then
+        bot.next_task(player)
+        return
+    end
     action = action or constants.ACTION.STATUS
     -- Every branch delegates to the bot API so command aliases and hotkeys share
     -- one implementation of lifecycle, validation, and resource behavior.

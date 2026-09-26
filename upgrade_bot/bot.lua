@@ -8,6 +8,25 @@ local supply = require("supply")
 local track = require("track")
 local bot = {}
 
+local function draw_mode_label(player, value)
+    if value.mode_label and value.mode_label.valid then value.mode_label.destroy() end
+    value.mode_label = nil
+    if not (value.entity and value.entity.valid) then return end
+    local task = registry.get(value.task_name)
+    value.mode_label = rendering.draw_text {
+        text = task and (task.label or task.name) or value.task_name,
+        surface = value.entity.surface,
+        target = value.entity,
+        target_offset = constants.MODE_LABEL_OFFSET,
+        color = config.highlight_color,
+        scale = constants.MODE_LABEL_SCALE,
+        alignment = "center",
+        vertical_alignment = "top",
+        only_in_alt_mode = false,
+        players = {player.index}
+    }
+end
+
 local function print(player, color, message)
     -- A consistent prefix distinguishes autonomous-bot feedback from Factorio's
     -- own messages while the caller-provided color communicates severity.
@@ -26,7 +45,10 @@ local function create(player, value)
     }
     -- Destructibility makes the helper obey the same environmental risks as the
     -- reference bots rather than acting as an invulnerable utility cursor.
-    if value.entity then value.entity.destructible = true end
+    if value.entity then
+        value.entity.destructible = true
+        draw_mode_label(player, value)
+    end
     return value.entity ~= nil
 end
 
@@ -330,6 +352,7 @@ function bot.enable(player)
     -- An immediate scan makes activation responsive instead of waiting through
     -- the normal idle polling interval.
     value.enabled, value.next_scan_tick = true, constants.NO_TICK_DELAY
+    draw_mode_label(player, value)
     print(player, constants.COLOR.SUCCESS, "enabled; task: " .. value.task_name)
 end
 
@@ -352,8 +375,15 @@ function bot.select_task(player, task_name)
     state.clear_target(value)
     state.clear_track(value)
     value.task_name, value.next_scan_tick = task.name, constants.NO_TICK_DELAY
+    draw_mode_label(player, value)
     print(player, constants.COLOR.SUCCESS, "task selected: " .. task.name)
     return true
+end
+
+function bot.next_task(player)
+    local value = state.get(player.index)
+    local task = registry.next(value.task_name)
+    return task and bot.select_task(player, task.name) or false
 end
 
 function bot.refresh_track(player)
@@ -400,6 +430,9 @@ function bot.update(player, tick)
         print(player, constants.COLOR.ERROR, "was destroyed")
         return
     end
+    -- Backfill the label for bots created by saves from before mode labels were
+    -- introduced. Once created it follows the entity without per-tick redraws.
+    if not (value.mode_label and value.mode_label.valid) then draw_mode_label(player, value) end
 
     -- While storage is full the helper follows the player and performs no new
     -- upgrades. A non-mutating capacity probe resumes the return automatically.
