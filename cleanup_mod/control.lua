@@ -18,9 +18,10 @@ local visual = require("visual")
 ----------------------------------------------------------------------
 local CUSTOM_BOT_HEALTH = 500
 
--- How often the bot logic runs (in ticks).
--- 5 ticks ~ 12 updates per second.
-local CLEANUP_BOT_UPDATE_INTERVAL = 5
+-- Move and update every simulation tick so the scripted teleport motion is
+-- visually continuous, matching the upgrade bot instead of jumping 12 times
+-- per second.
+local CLEANUP_BOT_UPDATE_INTERVAL = 1
 
 -- Bot movement:
 -- Tiles per second, converted to tiles per update step.
@@ -193,7 +194,12 @@ local function find_best_container_for_item(player, bot, item_name)
     for _, c in pairs(candidates) do
         if c.valid then
             local inv = c.get_inventory(defines.inventory.chest)
-            if inv and inv.valid and inv.get_item_count(item_name) > 0 then
+            -- A matching but full container is not a usable destination. Skip
+            -- it so the bot can select the next-nearest container with room.
+            if inv and inv.valid and inv.get_item_count(item_name) > 0 and inv.can_insert {
+                name = item_name,
+                count = 1
+            } then
                 local d2 = distance_squared(bp, c.position)
                 if not best_d2 or d2 < best_d2 then
                     best = c
@@ -556,20 +562,20 @@ local function deposit_carried_items(player, pdata, bot)
                     local remaining = count - inserted
 
                     if remaining > 0 then
-                        -- Container already has the item but is now full.
+                        -- This container filled up during the transfer. Keep the
+                        -- remainder available so the next update can route it to
+                        -- another matching container with free space.
                         pdata.carried_items[name] = remaining
-                        pdata.unplaceable_items[name] = true
-                        player.print(
-                            "[color=green][MekatrolCleanupBot][/color] No container space for item '" .. name .. "'.")
+                        pdata.unplaceable_items[name] = nil
                     else
                         pdata.carried_items[name] = nil
                         pdata.unplaceable_items[name] = nil
                     end
                 end
             else
-                -- Rule 1: no container available that already has this type.
+                -- No matching container currently has room for this item.
                 pdata.unplaceable_items[name] = true
-                player.print("[color=green][MekatrolCleanupBot][/color] No container found that already contains '" ..
+                player.print("[color=green][MekatrolCleanupBot][/color] No container with space found for item '" ..
                                  name .. "'.")
             end
         end
@@ -614,6 +620,28 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     local has_unplaceable = pdata.unplaceable_items and next(pdata.unplaceable_items) ~= nil
 
     ------------------------------------------------------------------
+    -- Keep building a useful batch before returning to storage. The old
+    -- behavior returned as soon as the first small ground stack was picked up,
+    -- so the nominal 100-item capacity was rarely used.
+    ------------------------------------------------------------------
+    local collecting_more = false
+    if carrying_anything and get_free_capacity(pdata) > 0 then
+        local nearest_item = find_nearest_ground_item(surface, bp, ITEM_SEARCH_RADIUS)
+        if not nearest_item then
+            nearest_item = find_nearest_ground_item(surface, pp, ITEM_SEARCH_RADIUS)
+        end
+
+        if nearest_item and nearest_item.valid then
+            collecting_more = true
+            pdata.mode = "pickup"
+            pdata.target_position = {
+                x = nearest_item.position.x,
+                y = nearest_item.position.y
+            }
+        end
+    end
+
+    ------------------------------------------------------------------
     -- Retry: if we previously had unplaceable items, see if a
     -- suitable container exists now. If so, clear the flag so the
     -- normal container logic runs again.
@@ -631,7 +659,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     ------------------------------------------------------------------
     -- Normal container / no-container logic
     ------------------------------------------------------------------
-    if carrying_anything and not has_unplaceable then
+    if carrying_anything and not has_unplaceable and not collecting_more then
         -- We have items and (currently) no unplaceable ones: try to find a container.
         local container = find_any_container_for_carried_items(player, bot, pdata)
 
@@ -663,7 +691,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
                     if not pdata.unplaceable_items[name] then
                         pdata.unplaceable_items[name] = true
                         player.print(
-                            "[color=green][MekatrolCleanupBot][/color] No container found that already contains '" ..
+                            "[color=green][MekatrolCleanupBot][/color] No container with space found for item '" ..
                                 name .. "'.")
                     end
                 end
@@ -673,7 +701,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     end
 
     -- If any items are unplaceable, follow the player at offset.
-    if has_unplaceable then
+    if has_unplaceable and not collecting_more then
         pdata.mode = "no-container"
         pdata.target_position = {
             x = pp.x + FOLLOW_OFFSET.x,

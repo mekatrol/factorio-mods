@@ -28,7 +28,7 @@ return {
 
     -- Slots allow a useful batch while keeping the helper materially less
     -- capable than a train or large logistics chest. Item types may be mixed.
-    cargo_capacity = 20,
+    cargo_capacity = 100,
 
     -- The bot must visibly reach an entity before mutating its inventory/world
     -- state, while allowing enough tolerance for differently sized entities.
