@@ -14,6 +14,7 @@ local constants = {
     SHORT_COMMAND_NAME = "ub",
     STORAGE_KEY = "upgrade_bot",
     DEFAULT_TASK_NAME = "yellow-to-red-belts",
+    LAMP_MODE_KIND = "place-lamps",
 
     -- Phase names define the persisted state-machine vocabulary.
     PHASE = {
@@ -50,7 +51,9 @@ local constants = {
     ENTITY_TYPE = {
         CONTAINER = "container",
         LOGISTIC_CONTAINER = "logistic-container",
-        UNDERGROUND_BELT = "underground-belt"
+        UNDERGROUND_BELT = "underground-belt",
+        ELECTRIC_POLE = "electric-pole",
+        LAMP = "lamp"
     },
 
     GROUP_STRATEGY = {

@@ -54,8 +54,14 @@ Commands:
 /upgrade-bot refresh
 ```
 
-The built-in modes are `Yellow -> Red`, `Red -> Blue`, and `Containers`
-(wooden to iron, then iron to steel). The current mode is displayed underneath
+The built-in modes are `Yellow -> Red`, `Red -> Blue`, `Containers` (wooden to
+iron, then iron to steel), and
+`Place lamps`. In lamp mode the bot follows the player and only works outside
+full daylight (during dusk, night, and dawn),
+uses lamps from the player's inventory. It places at most one lamp per scan in
+a buildable spot covered by an electric pole and outside the lit radius of any
+existing lamp. The next scan includes the newly placed lamp, preventing the bot
+from filling the area that lamp has just illuminated. The current mode is displayed underneath
 the bot. `/ub` cycles modes; it also remains a short alias when followed by a
 command. New jobs belong in `tasks.lua`; the bot engine does not
 contain entity names. Each job has a name, optional aliases, and a `mappings`

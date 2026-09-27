@@ -753,7 +753,9 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     else
         visual.clear_chest_highlight(pdata)
     end
-    visual.draw_bot_player_line(player, bot, pdata, pdata.mode or "idle")
+    -- Remove player-to-bot lines retained by saves from older versions. This
+    -- visual is deliberately not recreated.
+    visual.clear_bot_line(pdata)
 
     local carried_total_for_ui = get_total_carried(pdata)
 

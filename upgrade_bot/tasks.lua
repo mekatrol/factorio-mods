@@ -67,4 +67,10 @@ return {{
         ["wooden-chest"] = {target = "iron-chest", required_item = "iron-chest", recovered_item = "wooden-chest"},
         ["iron-chest"] = {target = "steel-chest", required_item = "steel-chest", recovered_item = "iron-chest"}
     }
+}, {
+    name = "place-lamps",
+    label = "Place lamps",
+    aliases = {"lamps", "lamp"},
+    description = "Place carried lamps in dark, powered areas near the player",
+    kind = constants.LAMP_MODE_KIND
 }}

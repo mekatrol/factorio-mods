@@ -7,7 +7,8 @@ local function validate(definition)
     if type(definition) ~= "table" or type(definition.name) ~= "string" then
         error("Upgrade task requires a name")
     end
-    if type(definition.mappings) ~= "table" or next(definition.mappings) == nil then
+    if definition.kind ~= constants.LAMP_MODE_KIND and
+            (type(definition.mappings) ~= "table" or next(definition.mappings) == nil) then
         error("Upgrade task '" .. definition.name .. "' requires mappings")
     end
 end
@@ -55,7 +56,7 @@ function registry.source_names(definition)
     -- Factorio accepts an array of names in an entity filter. Deriving it from
     -- mappings keeps entity knowledge entirely inside task configuration.
     local names = {}
-    for source in pairs(definition.mappings) do names[#names + constants.ITEM_TRANSFER_COUNT] = source end
+    for source in pairs(definition.mappings or {}) do names[#names + constants.ITEM_TRANSFER_COUNT] = source end
     return names
 end
 

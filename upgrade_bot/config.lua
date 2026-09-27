@@ -15,6 +15,13 @@ return {
     -- unnecessary while factory state is unchanged.
     scan_interval = 30,
 
+    -- Lamp mode works locally around the player. Existing lamps reserve their
+    -- illuminated neighbourhood so each placement changes the next scan.
+    lamp_darkness_threshold = 0,
+    lamp_search_radius = 14,
+    lamp_light_radius = 8,
+    lamp_candidate_spacing = 2,
+
     -- Targets remain local to the player; network supplies can be much farther
     -- away without requiring an expensive surface-wide entity scan.
     search_radius = 32,

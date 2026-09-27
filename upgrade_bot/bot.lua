@@ -1,6 +1,7 @@
 local config = require("config")
 local constants = require("constants")
 local executor = require("upgrade_executor")
+local lamp_placer = require("lamp_placer")
 local movement = require("movement")
 local registry = require("task_registry")
 local state = require("state")
@@ -349,6 +350,7 @@ function bot.enable(player)
         print(player, constants.COLOR.ERROR, "could not create bot")
         return
     end
+
     -- An immediate scan makes activation responsive instead of waiting through
     -- the normal idle polling interval.
     value.enabled, value.next_scan_tick = true, constants.NO_TICK_DELAY
@@ -430,6 +432,7 @@ function bot.update(player, tick)
         print(player, constants.COLOR.ERROR, "was destroyed")
         return
     end
+
     -- Backfill the label for bots created by saves from before mode labels were
     -- introduced. Once created it follows the entity without per-tick redraws.
     if not (value.mode_label and value.mode_label.valid) then draw_mode_label(player, value) end
@@ -463,6 +466,16 @@ function bot.update(player, tick)
         return
     end
 
+    if task.kind == constants.LAMP_MODE_KIND then
+        follow_player(player, value)
+        if tick >= value.next_scan_tick then
+            value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
+            -- Place at most one lamp per scan. The following scan sees that new
+            -- lamp and excludes the area it has just illuminated.
+            lamp_placer.try_place(player)
+        end
+        return
+    end
 
     -- Event handlers defer rebuilding until the next normal bot tick. By then a
     -- mined entity is gone and a built or rotated entity has final connections.
