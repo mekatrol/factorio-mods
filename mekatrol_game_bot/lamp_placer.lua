@@ -1,5 +1,6 @@
 local config = require("config")
 local constants = require("constants")
+local player_anchor = require("player_anchor")
 
 local lamp_placer = {}
 
@@ -62,9 +63,10 @@ local function candidates(origin)
 end
 
 local function placeable(player, entity_name, position)
-    return not already_lit(player.surface, position) and
-               in_power_area(player.surface, player.force, position) and
-               player.surface.can_place_entity {
+    local surface = player_anchor.surface(player)
+    return not already_lit(surface, position) and
+               in_power_area(surface, player.force, position) and
+               surface.can_place_entity {
                    name = entity_name,
                    position = position,
                    force = player.force,
@@ -75,22 +77,23 @@ end
 function lamp_placer.find_target(player)
     -- Factorio reports zero darkness during full daylight. Dusk, night, and
     -- dawn are eligible, while daytime can never trigger lamp placement.
-    if player.surface.darkness <= config.lamp_darkness_threshold then return nil end
+    if player_anchor.surface(player).darkness <= config.lamp_darkness_threshold then return nil end
     local inventory, _, _, entity_name = carried_lamp(player)
     if not inventory then return nil end
 
-    for _, position in ipairs(candidates(player.position)) do
+    for _, position in ipairs(candidates(player_anchor.position(player))) do
         if placeable(player, entity_name, position) then return position end
     end
     return nil
 end
 
 function lamp_placer.try_place_at(player, position)
-    if player.surface.darkness <= config.lamp_darkness_threshold then return false end
+    local surface = player_anchor.surface(player)
+    if surface.darkness <= config.lamp_darkness_threshold then return false end
     local inventory, item_name, quality, entity_name = carried_lamp(player)
     if not inventory or not placeable(player, entity_name, position) then return false end
 
-    local lamp = player.surface.create_entity {
+    local lamp = surface.create_entity {
         name = entity_name,
         position = position,
         force = player.force,

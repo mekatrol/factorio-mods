@@ -3,6 +3,7 @@ local constants = require("constants")
 local executor = require("upgrade_executor")
 local lamp_placer = require("lamp_placer")
 local movement = require("movement")
+local player_anchor = require("player_anchor")
 local registry = require("task_registry")
 local state = require("state")
 local supply = require("supply")
@@ -38,9 +39,10 @@ local function create(player, value)
     -- Spawn near the player's configured follow position so activation does not
     -- place the bot on top of the character or an unrelated factory entity.
     local offset = config.follow_offset
-    value.entity = player.surface.create_entity {
+    local position = player_anchor.position(player)
+    value.entity = player_anchor.surface(player).create_entity {
         name = constants.BOT_ENTITY_NAME,
-        position = {x = player.position.x + offset.x, y = player.position.y + offset.y},
+        position = {x = position.x + offset.x, y = position.y + offset.y},
         force = player.force,
         raise_built = true
     }
@@ -57,8 +59,8 @@ local function target_candidates(player, value, task)
     -- Automatic discovery remains local to the player. Supply lookup is allowed
     -- to span a connected network, but scanning an entire surface every tick is
     -- both surprising and expensive on mature factories.
-    local entities = player.surface.find_entities_filtered {
-        position = player.position,
+    local entities = player_anchor.surface(player).find_entities_filtered {
+        position = player_anchor.position(player),
         radius = task.search_radius or config.search_radius,
         name = registry.source_names(task),
         force = player.force
@@ -141,16 +143,18 @@ local function follow_player(player, value)
     -- Mirror the reference mod's side switching: when the player changes
     -- horizontal direction, move the bot to the trailing side of travel.
     local previous = value.last_player_position
+    local player_position = player_anchor.position(player)
     if previous then
-        local dx = player.position.x - previous.x
+        local dx = player_position.x - previous.x
         if dx < -constants.HORIZONTAL_DIRECTION_THRESHOLD then
             value.side_offset_x = math.abs(config.follow_offset.x)
         elseif dx > constants.HORIZONTAL_DIRECTION_THRESHOLD then
             value.side_offset_x = -math.abs(config.follow_offset.x)
         end
     end
-    value.last_player_position = {x = player.position.x, y = player.position.y}
-    local position = {x = player.position.x + value.side_offset_x, y = player.position.y + config.follow_offset.y}
+    value.last_player_position = {x = player_position.x, y = player_position.y}
+    local position = {x = player_position.x + value.side_offset_x,
+                      y = player_position.y + config.follow_offset.y}
     -- A dead band prevents jitter once the bot is acceptably close to its
     -- formation position.
     if movement.distance_squared(value.entity.position, position) >
@@ -645,7 +649,8 @@ function bot.status(player)
     local task = registry.get(value.task_name)
     local remaining_track_entities = task and value.track and
                                          #track.remaining_entities(value.track, task, value.entity and
-                                             value.entity.valid and value.entity.position or player.position) or
+                                             value.entity.valid and value.entity.position or
+                                                 player_anchor.position(player)) or
                                          constants.EMPTY_COUNT
     print(player, constants.COLOR.INFORMATION,
         string.format(constants.STATUS_FORMAT,

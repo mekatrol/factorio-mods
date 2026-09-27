@@ -1,6 +1,7 @@
 local config = require("config")
 local constants = require("constants")
 local movement = require("movement")
+local player_anchor = require("player_anchor")
 local state = require("state")
 
 local cleanup = {}
@@ -53,9 +54,10 @@ end
 
 local function create(player, value)
     local offset = conf.follow_offset
-    value.entity = player.surface.create_entity {
+    local position = player_anchor.position(player)
+    value.entity = player_anchor.surface(player).create_entity {
         name = constants.CLEANUP_BOT_ENTITY_NAME,
-        position = {x = player.position.x + offset.x, y = player.position.y + offset.y},
+        position = {x = position.x + offset.x, y = position.y + offset.y},
         force = player.force, raise_built = true
     }
     if value.entity then value.entity.destructible = true end
@@ -64,17 +66,18 @@ end
 
 local function follow(player, value)
     local previous = value.last_player_position
+    local player_position = player_anchor.position(player)
     if previous then
-        local dx = player.position.x - previous.x
+        local dx = player_position.x - previous.x
         if dx < -constants.HORIZONTAL_DIRECTION_THRESHOLD then
             value.side_offset_x = math.abs(conf.follow_offset.x)
         elseif dx > constants.HORIZONTAL_DIRECTION_THRESHOLD then
             value.side_offset_x = -math.abs(conf.follow_offset.x)
         end
     end
-    value.last_player_position = {x = player.position.x, y = player.position.y}
-    local target = {x = player.position.x + value.side_offset_x,
-                    y = player.position.y + conf.follow_offset.y}
+    value.last_player_position = {x = player_position.x, y = player_position.y}
+    local target = {x = player_position.x + value.side_offset_x,
+                    y = player_position.y + conf.follow_offset.y}
     if movement.distance_squared(value.entity.position, target) > config.follow_distance ^ 2 then
         movement.towards(value.entity, target)
     end
@@ -206,7 +209,7 @@ function cleanup.update(player)
     local carried = cargo_total(value)
     local item = carried < conf.cargo_capacity and
                      (nearest_item(value.entity.surface, value.entity.position) or
-                         nearest_item(value.entity.surface, player.position)) or nil
+                         nearest_item(value.entity.surface, player_anchor.position(player))) or nil
 
     if item and item.valid then
         value.mode = "pickup"
@@ -214,13 +217,15 @@ function cleanup.update(player)
         movement.towards(value.entity, value.target)
     elseif carried > 0 then
         local target = destination(player, value)
-        if target and target.valid and movement.distance_squared(value.entity.position, target.position) <=
+        local target_position = target == player and player_anchor.position(player) or
+                                    (target and target.position)
+        if target and target.valid and movement.distance_squared(value.entity.position, target_position) <=
                 conf.work_distance ^ 2 then
             deposit(player, value, target)
             value.mode, value.target = "follow", nil
         elseif target and target.valid then
             value.mode = "returning"
-            value.target = {x = target.position.x, y = target.position.y}
+            value.target = {x = target_position.x, y = target_position.y}
             movement.towards(value.entity, value.target)
         else
             value.mode, value.target = "no-container", nil
