@@ -68,12 +68,22 @@ script.on_init(function() state.ensure(); register_commands() end)
 script.on_configuration_changed(function() state.ensure(); register_commands() end)
 script.on_load(register_commands)
 
-script.on_event(constants.CUSTOM_INPUT_NAME, function(event)
+local function register_custom_input(name, handler)
+    -- During mod development, Factorio can load a changed control.lua into a
+    -- session whose data stage predates a newly added custom-input prototype.
+    -- Register only prototypes present in this session; a full restart runs the
+    -- data stage and makes newly introduced inputs available.
+    if prototypes.custom_input and prototypes.custom_input[name] then
+        script.on_event(name, handler)
+    end
+end
+
+register_custom_input(constants.CUSTOM_INPUT_NAME, function(event)
     local player = player_for(event)
     if player and player.valid then bot.toggle(player) end
 end)
 
-script.on_event(constants.CLEANUP_CUSTOM_INPUT_NAME, function(event)
+register_custom_input(constants.CLEANUP_CUSTOM_INPUT_NAME, function(event)
     local player = player_for(event)
     if player and player.valid then cleanup.toggle(player) end
 end)
