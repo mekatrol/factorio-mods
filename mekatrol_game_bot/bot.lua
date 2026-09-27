@@ -467,12 +467,26 @@ function bot.update(player, tick)
     end
 
     if task.kind == constants.LAMP_MODE_KIND then
-        follow_player(player, value)
-        if tick >= value.next_scan_tick then
+        if not value.lamp_target and tick >= value.next_scan_tick then
             value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
-            -- Place at most one lamp per scan. The following scan sees that new
-            -- lamp and excludes the area it has just illuminated.
-            lamp_placer.try_place(player)
+            value.lamp_target = lamp_placer.find_target(player)
+        end
+
+        if value.lamp_target then
+            -- Lamp placement is a world mutation, so the helper must visibly
+            -- reach the selected tile just as it does for upgrade targets.
+            if movement.distance_squared(value.entity.position, value.lamp_target) <=
+                    config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
+                lamp_placer.try_place_at(player, value.lamp_target)
+                value.lamp_target = nil
+                -- Wait for the next scan so the newly placed lamp participates
+                -- in illumination exclusion before another site is selected.
+                value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
+            else
+                movement.towards(value.entity, value.lamp_target)
+            end
+        else
+            follow_player(player, value)
         end
         return
     end

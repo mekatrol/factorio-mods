@@ -61,37 +61,46 @@ local function candidates(origin)
     return result
 end
 
-function lamp_placer.try_place(player)
+local function placeable(player, entity_name, position)
+    return not already_lit(player.surface, position) and
+               in_power_area(player.surface, player.force, position) and
+               player.surface.can_place_entity {
+                   name = entity_name,
+                   position = position,
+                   force = player.force,
+                   build_check_type = defines.build_check_type.manual
+               }
+end
+
+function lamp_placer.find_target(player)
     -- Factorio reports zero darkness during full daylight. Dusk, night, and
     -- dawn are eligible, while daytime can never trigger lamp placement.
-    if player.surface.darkness <= config.lamp_darkness_threshold then return false end
-    local inventory, item_name, quality, entity_name = carried_lamp(player)
-    if not inventory then return false end
+    if player.surface.darkness <= config.lamp_darkness_threshold then return nil end
+    local inventory, _, _, entity_name = carried_lamp(player)
+    if not inventory then return nil end
 
     for _, position in ipairs(candidates(player.position)) do
-        if not already_lit(player.surface, position) and
-                in_power_area(player.surface, player.force, position) and
-                player.surface.can_place_entity {
-                    name = entity_name,
-                    position = position,
-                    force = player.force,
-                    build_check_type = defines.build_check_type.manual
-                } then
-            local lamp = player.surface.create_entity {
-                name = entity_name,
-                position = position,
-                force = player.force,
-                quality = quality,
-                player = player,
-                raise_built = true
-            }
-            if lamp then
-                inventory.remove {name = item_name, quality = quality, count = constants.ITEM_TRANSFER_COUNT}
-                return true
-            end
-        end
+        if placeable(player, entity_name, position) then return position end
     end
-    return false
+    return nil
+end
+
+function lamp_placer.try_place_at(player, position)
+    if player.surface.darkness <= config.lamp_darkness_threshold then return false end
+    local inventory, item_name, quality, entity_name = carried_lamp(player)
+    if not inventory or not placeable(player, entity_name, position) then return false end
+
+    local lamp = player.surface.create_entity {
+        name = entity_name,
+        position = position,
+        force = player.force,
+        quality = quality,
+        player = player,
+        raise_built = true
+    }
+    if not lamp then return false end
+    inventory.remove {name = item_name, quality = quality, count = constants.ITEM_TRANSFER_COUNT}
+    return true
 end
 
 return lamp_placer

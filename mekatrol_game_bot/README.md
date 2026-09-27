@@ -61,9 +61,10 @@ Commands:
 
 The built-in modes are `Yellow -> Red`, `Red -> Blue`, `Containers` (wooden to
 iron, then iron to steel), and
-`Place lamps`. In lamp mode the bot follows the player and only works outside
-full daylight (during dusk, night, and dawn),
-uses lamps from the player's inventory. It places at most one lamp per scan in
+`Place lamps`. In lamp mode the bot follows the player, only works outside
+full daylight (during dusk, night, and dawn), and uses lamps from the player's
+inventory. The bot flies to each selected location
+before placing its lamp, and places at most one lamp per scan in
 a buildable spot covered by an electric pole and outside the lit radius of any
 existing lamp. The next scan includes the newly placed lamp, preventing the bot
 from filling the area that lamp has just illuminated. The current mode is displayed underneath
