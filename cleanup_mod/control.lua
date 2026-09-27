@@ -5,9 +5,8 @@
 --   - Each player can toggle a cleanup bot on/off via hotkey.
 --   - The bot follows the player when it has no cleanup target.
 --   - It looks for items on the ground (type = "item-entity").
---   - When carrying items, it returns to the nearest iron chest and
---     inserts them. If no chest is found, it uses the player inventory
---     and finally spills any leftovers near the player.
+--   - When carrying items, it prefers a nearby container already holding
+--     that item. Otherwise it returns to the player and uses their inventory.
 --
 -- Factorio 2.0: uses `storage` instead of `global`.
 ----------------------------------------------------------------------
@@ -72,7 +71,7 @@ local STORAGE_KEY = "mekatrol_cleanup_mod"
 -- "idle"	    Bot just spawned or is enabled but has not selected any behavior yet.
 -- "follow"	Bot is following the player in a trailing side formation.
 -- "pickup"	    Bot has located an item on the ground and is moving to pick it up.
--- "returning"	Bot is carrying items and is moving to the storage chest to deposit.
+-- "returning"	Bot is carrying items and is moving to a container or the player to deposit.
 ----------------------------------------------------------------------
 
 ----------------------------------------------------------------------
@@ -187,29 +186,44 @@ local function find_best_container_for_item(player, bot, item_name)
         type = CONTAINER_TYPES
     }
 
-    local best
-    local best_d2
+    local best_matching
+    local best_matching_d2
     local bp = bot.position
 
     for _, c in pairs(candidates) do
         if c.valid then
             local inv = c.get_inventory(defines.inventory.chest)
-            -- A matching but full container is not a usable destination. Skip
-            -- it so the bot can select the next-nearest container with room.
-            if inv and inv.valid and inv.get_item_count(item_name) > 0 and inv.can_insert {
-                name = item_name,
-                count = 1
-            } then
+            if inv and inv.valid and inv.can_insert {name = item_name, count = 1} then
                 local d2 = distance_squared(bp, c.position)
-                if not best_d2 or d2 < best_d2 then
-                    best = c
-                    best_d2 = d2
+
+                -- Only containers already holding this item are eligible. A
+                -- matching but full container is excluded by can_insert above.
+                if inv.get_item_count(item_name) > 0 then
+                    if not best_matching_d2 or d2 < best_matching_d2 then
+                        best_matching = c
+                        best_matching_d2 = d2
+                    end
                 end
             end
         end
     end
 
-    return best
+    return best_matching
+end
+
+local function player_can_accept_item(player, item_name)
+    local inv = player and player.valid and player.get_main_inventory()
+    return inv and inv.valid and inv.can_insert {name = item_name, count = 1} or false
+end
+
+local function player_can_accept_any_carried_item(player, bot, pdata)
+    for name, count in pairs(pdata.carried_items or {}) do
+        if count and count > 0 and not find_best_container_for_item(player, bot, name) and
+            player_can_accept_item(player, name) then
+            return true
+        end
+    end
+    return false
 end
 
 -- Find the nearest suitable container for ANY carried item type.
@@ -511,7 +525,7 @@ end
 ----------------------------------------------------------------------
 -- DEPOSITING ITEMS INTO CHEST / PLAYER
 ----------------------------------------------------------------------
-local function deposit_carried_items(player, pdata, bot)
+local function deposit_carried_items(player, pdata, bot, destination_container)
     local total = get_total_carried(pdata)
     if total <= 0 then
         return false
@@ -524,36 +538,41 @@ local function deposit_carried_items(player, pdata, bot)
     for name, count in pairs(pdata.carried_items) do
         if count and count > 0 then
             local container = find_best_container_for_item(player, bot, name)
-            if container then
-                local inv = container.get_inventory(defines.inventory.chest)
-                if inv and inv.valid then
-                    local inserted = inv.insert {
-                        name = name,
-                        count = count
-                    }
+            local inv
 
-                    if inserted > 0 then
-                        any_inserted = true
-                    end
+            if destination_container and container == destination_container then
+                inv = destination_container.get_inventory(defines.inventory.chest)
+            elseif not destination_container and not container then
+                inv = player.get_main_inventory()
+            end
 
-                    local remaining = count - inserted
+            if inv and inv.valid and inv.can_insert {name = name, count = 1} then
+                local inserted = inv.insert {
+                    name = name,
+                    count = count
+                }
 
-                    if remaining > 0 then
-                        -- This container filled up during the transfer. Keep the
-                        -- remainder available so the next update can route it to
-                        -- another matching container with free space.
-                        pdata.carried_items[name] = remaining
-                        pdata.unplaceable_items[name] = nil
-                    else
-                        pdata.carried_items[name] = nil
-                        pdata.unplaceable_items[name] = nil
-                    end
+                if inserted > 0 then
+                    any_inserted = true
                 end
-            else
-                -- No matching container currently has room for this item.
+
+                local remaining = count - inserted
+
+                if remaining > 0 then
+                    -- Keep the remainder available so the next update can find
+                    -- another matching container or wait for player space.
+                    pdata.carried_items[name] = remaining
+                    pdata.unplaceable_items[name] = nil
+                else
+                    pdata.carried_items[name] = nil
+                    pdata.unplaceable_items[name] = nil
+                end
+            elseif not container and not player_can_accept_item(player, name) then
+                if not pdata.unplaceable_items[name] then
+                    player.print("[color=green][MekatrolCleanupBot][/color] No matching container or player inventory space found for item '" ..
+                                     name .. "'.")
+                end
                 pdata.unplaceable_items[name] = true
-                player.print("[color=green][MekatrolCleanupBot][/color] No container with space found for item '" ..
-                                 name .. "'.")
             end
         end
     end
@@ -587,9 +606,10 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
     ------------------------------------------------------------------
     -- Decide what we are trying to do next:
-    --   1. If carrying items and we have a suitable container: go there.
-    --   2. If carrying items but no container: follow the player (no-container mode).
-    --   3. If not carrying items: look for ground items or follow the player.
+    --   1. If carrying items and a matching container exists: go there.
+    --   2. Otherwise, go to the player if their inventory can accept the item.
+    --   3. If neither destination can accept it: follow the player and wait.
+    --   4. If not carrying items: look for ground items or follow the player.
     ------------------------------------------------------------------
     local carried_total = get_total_carried(pdata)
     local carrying_anything = carried_total > 0
@@ -620,13 +640,13 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
 
     ------------------------------------------------------------------
     -- Retry: if we previously had unplaceable items, see if a
-    -- suitable container exists now. If so, clear the flag so the
-    -- normal container logic runs again.
+    -- matching container or player inventory slot exists now. If so, clear
+    -- the flag so the normal deposit logic runs again.
     ------------------------------------------------------------------
     if has_unplaceable and carrying_anything then
         local retry_container = find_any_container_for_carried_items(player, bot, pdata)
-        if retry_container and retry_container.valid then
-            -- A container for at least one carried item exists now.
+        if (retry_container and retry_container.valid) or player_can_accept_any_carried_item(player, bot, pdata) then
+            -- A matching container or player inventory slot exists now.
             -- Let the normal logic below handle movement/deposit.
             pdata.unplaceable_items = {}
             has_unplaceable = false
@@ -634,7 +654,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     end
 
     ------------------------------------------------------------------
-    -- Normal container / no-container logic
+    -- Normal container / player / unavailable logic
     ------------------------------------------------------------------
     if carrying_anything and not has_unplaceable and not collecting_more then
         -- We have items and (currently) no unplaceable ones: try to find a container.
@@ -644,7 +664,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
             local d2_chest = distance_squared(bp, container.position)
             if d2_chest <= (CHEST_INTERACT_DISTANCE * CHEST_INTERACT_DISTANCE) then
                 -- Close enough: actually deposit now.
-                deposit_carried_items(player, pdata, bot)
+                deposit_carried_items(player, pdata, bot, container)
                 carried_total = get_total_carried(pdata)
 
                 if carried_total <= 0 then
@@ -660,15 +680,32 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
                     y = container.position.y
                 }
             end
+        elseif player_can_accept_any_carried_item(player, bot, pdata) then
+            local d2_player = distance_squared(bp, player.position)
+            if d2_player <= (CHEST_INTERACT_DISTANCE * CHEST_INTERACT_DISTANCE) then
+                deposit_carried_items(player, pdata, bot, nil)
+                carried_total = get_total_carried(pdata)
+
+                if carried_total <= 0 then
+                    pdata.mode = "follow"
+                    pdata.target_position = nil
+                end
+            else
+                pdata.mode = "returning"
+                pdata.target_position = {
+                    x = player.position.x,
+                    y = player.position.y
+                }
+            end
         else
-            -- No container for any carried item type.
+            -- No matching container or player inventory space for any carried item type.
             pdata.unplaceable_items = pdata.unplaceable_items or {}
             for name, count in pairs(pdata.carried_items) do
                 if count and count > 0 then
                     if not pdata.unplaceable_items[name] then
                         pdata.unplaceable_items[name] = true
                         player.print(
-                            "[color=green][MekatrolCleanupBot][/color] No container with space found for item '" ..
+                            "[color=green][MekatrolCleanupBot][/color] No matching container or player inventory space found for item '" ..
                                 name .. "'.")
                     end
                 end
