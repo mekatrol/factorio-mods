@@ -48,7 +48,16 @@ return {
     follow_distance = 2.5,
     
     -- The offset keeps the helper beside and slightly behind the character.
-    follow_offset = {x = -2, y = -1},
+    follow_offset = {x = -2, y = -0.75},
+
+    cleanup = {
+        follow_offset = {x = -2, y = 0.75},
+        search_radius = 12,
+        container_radius = 30,
+        work_distance = 1.5,
+        target_reach_distance = 0.7,
+        cargo_capacity = 100
+    },
     
     -- Orange visually distinguishes upgrade work from the role colors used by
     -- the reference gameplay mod's other bots.

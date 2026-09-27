@@ -7,6 +7,7 @@ function state.ensure()
     -- supports adding this mod to an existing game and configuration changes.
     storage[constants.STORAGE_KEY] = storage[constants.STORAGE_KEY] or {players = {}}
     storage[constants.STORAGE_KEY].players = storage[constants.STORAGE_KEY].players or {}
+    storage[constants.STORAGE_KEY].cleanup_players = storage[constants.STORAGE_KEY].cleanup_players or {}
 end
 
 function state.get(player_index)
@@ -40,6 +41,35 @@ function state.get(player_index)
     value.delivery_queue = value.delivery_queue or {}
     value.cargo_origins = value.cargo_origins or {}
     return value
+end
+
+function state.get_cleanup(player_index)
+    state.ensure()
+    local players = storage[constants.STORAGE_KEY].cleanup_players
+    local value = players[player_index]
+    if not value then
+        value = {enabled = false, entity = nil, mode = "follow", target = nil, cargo = {},
+                 unplaceable = {}, last_player_position = nil,
+                 side_offset_x = config.cleanup.follow_offset.x, status_label = nil,
+                 target_line = nil, chest_highlight = nil}
+        players[player_index] = value
+    end
+    value.cargo = value.cargo or {}
+    value.unplaceable = value.unplaceable or {}
+    value.mode = value.mode or "follow"
+    value.side_offset_x = value.side_offset_x or config.cleanup.follow_offset.x
+    return value
+end
+
+function state.destroy_cleanup(value)
+    for _, field in ipairs({"status_label", "target_line", "chest_highlight"}) do
+        local object = value[field]
+        if object and object.valid then object.destroy() end
+        value[field] = nil
+    end
+    if value.entity and value.entity.valid then value.entity.destroy() end
+    value.entity = nil
+    value.enabled = false
 end
 
 function state.clear_track(value)

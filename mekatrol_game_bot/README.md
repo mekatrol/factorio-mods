@@ -1,5 +1,10 @@
 # Upgrade Bot
 
+This mod contains two independently controlled helpers. The upgrade bot uses
+`Ctrl+Shift+U` and `/ub`; the cleanup bot uses `Ctrl+Shift+C` and `/cb`. When
+both are following, they use separate formation slots around the player while
+sharing the same scripted movement implementation.
+
 `Ctrl+Shift+U` toggles the bot. It starts with the `yellow-to-red-belts` task,
 which upgrades transport belts, underground belts, and splitters near the player.
 It does not create replacement items. For targets inside a player-force
@@ -70,3 +75,17 @@ be a table with `target`, `required_item`, `recovered_item`, and optional
 `create_parameters(entity, player)` fields when an
 entity has state that must be preserved. Jobs may also provide an
 `execute(player, entity, mapping)` function for entirely non-standard upgrades.
+
+## Cleanup bot
+
+The cleanup bot collects ground item entities within 12 tiles until its
+100-item cargo is full. It deposits each item into the nearest player-owned
+container that already holds that item, falling back to the player's inventory.
+If neither destination has room, it keeps the cargo and follows the player.
+
+```text
+/cb on
+/cb off
+/cb toggle
+/cb status
+```
