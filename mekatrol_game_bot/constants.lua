@@ -12,7 +12,7 @@ local constants = {
     CUSTOM_INPUT_KEY_SEQUENCE = "CONTROL + SHIFT + U",
     PRIMARY_COMMAND_NAME = "upgrade-bot",
     SHORT_COMMAND_NAME = "ub",
-    STORAGE_KEY = "upgrade_bot",
+    STORAGE_KEY = "mekatrol_game_bot",
     DEFAULT_TASK_NAME = "yellow-to-red-belts",
     LAMP_MODE_KIND = "place-lamps",
 

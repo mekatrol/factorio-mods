@@ -22,11 +22,11 @@ local CUSTOM_BOT_HEALTH = 500
 -- per second.
 local CLEANUP_BOT_UPDATE_INTERVAL = 1
 
--- Match upgrade_bot's scripted movement exactly: both bots update every tick
+-- Match mekatrol_game_bot's scripted movement exactly: both bots update every tick
 -- and teleport at most 0.18 tiles toward their destination per update.
 local BOT_STEP_DISTANCE = 0.18
 
--- Keep the same following formation and dead band as upgrade_bot.
+-- Keep the same following formation and dead band as mekatrol_game_bot.
 local BOT_FOLLOW_DISTANCE = 2.5
 local BOT_HORIZONTAL_DIRECTION_THRESHOLD = 0.1
 
@@ -381,7 +381,7 @@ local function move_entity_towards(bot, target)
     bot.teleport({x = pos.x + dx / distance * step, y = pos.y + dy / distance * step})
 end
 
--- Match upgrade_bot's follow behavior: trail on the opposite side of the
+-- Match mekatrol_game_bot's follow behavior: trail on the opposite side of the
 -- player's horizontal movement and stop adjusting inside the follow dead band.
 local function follow_player(player, bot, pdata)
     -- Existing saves may already have player data created before the dynamic
@@ -715,7 +715,7 @@ local function update_cleanup_bot_for_player(player, pdata, tick)
     end
 
     -- If any items are unplaceable, follow the player using the same dynamic
-    -- side-switching formation as upgrade_bot.
+    -- side-switching formation as mekatrol_game_bot.
     if has_unplaceable and not collecting_more then
         pdata.mode = "no-container"
         pdata.target_position = nil
