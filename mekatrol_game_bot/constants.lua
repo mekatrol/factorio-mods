@@ -20,6 +20,7 @@ local constants = {
     STORAGE_KEY = "mekatrol_game_bot",
     DEFAULT_TASK_NAME = "yellow-to-red-belts",
     LAMP_MODE_KIND = "place-lamps",
+    PASSIVE_PROVIDER_CHEST_NAME = "passive-provider-chest",
 
     -- Phase names define the persisted state-machine vocabulary.
     PHASE = {

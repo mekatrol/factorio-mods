@@ -471,12 +471,30 @@ function bot.update(player, tick)
     end
 
     if task.kind == constants.LAMP_MODE_KIND then
-        if not value.lamp_target and tick >= value.next_scan_tick then
-            value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
-            value.lamp_target = lamp_placer.find_target(player)
+        if value.lamp_supply and not (value.lamp_supply.entity and value.lamp_supply.entity.valid) then
+            value.lamp_supply = nil
         end
 
-        if value.lamp_target then
+        if not value.lamp_target and not value.lamp_supply and tick >= value.next_scan_tick then
+            value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
+            value.lamp_target = lamp_placer.find_target(player)
+            if not value.lamp_target and not lamp_placer.has_carried_lamp(player) and
+                    player_anchor.surface(player).darkness > config.lamp_darkness_threshold then
+                value.lamp_supply = lamp_placer.find_red_container(player, value.entity)
+            end
+        end
+
+        if value.lamp_supply then
+            if movement.distance_squared(value.entity.position, value.lamp_supply.entity.position) <=
+                    config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
+                local collected = lamp_placer.take_from_red_container(player, value.lamp_supply)
+                value.lamp_supply = nil
+                value.next_scan_tick = collected and tick or
+                                           tick + (task.scan_interval or config.scan_interval)
+            else
+                movement.towards(value.entity, value.lamp_supply.entity.position)
+            end
+        elseif value.lamp_target then
             -- Lamp placement is a world mutation, so the helper must visibly
             -- reach the selected tile just as it does for upgrade targets.
             if movement.distance_squared(value.entity.position, value.lamp_target) <=

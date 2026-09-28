@@ -1,5 +1,6 @@
 local config = require("config")
 local constants = require("constants")
+local movement = require("movement")
 local player_anchor = require("player_anchor")
 
 local lamp_placer = {}
@@ -17,6 +18,60 @@ local function carried_lamp(player)
         end
     end
     return nil
+end
+
+function lamp_placer.has_carried_lamp(player)
+    return carried_lamp(player) ~= nil
+end
+
+local function lamp_stack(inventory)
+    if not (inventory and inventory.valid) then return nil end
+    for _, stack in ipairs(inventory.get_contents()) do
+        if stack.count > constants.EMPTY_COUNT then
+            local item = prototypes.item[stack.name]
+            local placed = item and item.place_result
+            if placed and placed.type == constants.ENTITY_TYPE.LAMP then return stack end
+        end
+    end
+    return nil
+end
+
+function lamp_placer.find_red_container(player, bot_entity)
+    local best, best_distance
+    local surface = player_anchor.surface(player)
+    for _, chest in pairs(surface.find_entities_filtered {
+        position = player_anchor.position(player),
+        radius = config.nearby_container_radius,
+        name = constants.PASSIVE_PROVIDER_CHEST_NAME,
+        force = player.force
+    }) do
+        local inventory = chest.valid and chest.get_inventory(defines.inventory.chest)
+        local stack = lamp_stack(inventory)
+        if stack then
+            local distance = movement.distance_squared(bot_entity.position, chest.position)
+            if not best_distance or distance < best_distance then
+                best = {entity = chest, item_name = stack.name, quality = stack.quality}
+                best_distance = distance
+            end
+        end
+    end
+    return best
+end
+
+function lamp_placer.take_from_red_container(player, source)
+    if not (source and source.entity and source.entity.valid) then return false end
+    local chest_inventory = source.entity.get_inventory(defines.inventory.chest)
+    local player_inventory = player.get_main_inventory()
+    if not (chest_inventory and chest_inventory.valid and player_inventory) then return false end
+    local stack = {name = source.item_name, quality = source.quality,
+                   count = constants.ITEM_TRANSFER_COUNT}
+    if not player_inventory.can_insert(stack) then return false end
+    if chest_inventory.remove(stack) ~= constants.ITEM_TRANSFER_COUNT then return false end
+    if player_inventory.insert(stack) == constants.ITEM_TRANSFER_COUNT then return true end
+    -- Preserve the item if the player's inventory changed between the capacity
+    -- check and insertion (for example, another script filled its final slot).
+    chest_inventory.insert(stack)
+    return false
 end
 
 local function in_power_area(surface, force, position)

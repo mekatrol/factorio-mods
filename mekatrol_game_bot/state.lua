@@ -28,7 +28,7 @@ function state.get(player_index)
                  cargo_origins = {},
                  last_player_position = nil, side_offset_x = config.follow_offset.x,
                  upgraded = constants.EMPTY_COUNT, failures = constants.EMPTY_COUNT, highlight = nil,
-                 mode_label = nil, lamp_target = nil}
+                 mode_label = nil, lamp_target = nil, lamp_supply = nil}
         storage[constants.STORAGE_KEY].players[player_index] = value
     end
     value.cargo = value.cargo or {}
@@ -100,6 +100,7 @@ function state.clear_target(value)
     -- source or destination could make the next task move to the wrong entity.
     value.target = nil
     value.lamp_target = nil
+    value.lamp_supply = nil
     value.supply = nil
     value.job_network = nil
     value.source_container = nil
