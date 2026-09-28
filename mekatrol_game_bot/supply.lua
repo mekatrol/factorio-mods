@@ -10,6 +10,55 @@ local function chest_inventory(entity)
     return inventory and inventory.valid and inventory or nil
 end
 
+local function source_inventory(source)
+    if not source then return nil end
+    if source.player_inventory then
+        local inventory = source.player and source.player.get_main_inventory()
+        return inventory and inventory.valid and inventory or nil
+    end
+    return chest_inventory(source.entity)
+end
+
+function supply.find_player_source(player, item_name)
+    local inventory = player.get_main_inventory()
+    local character = player.character
+    if inventory and inventory.valid and character and character.valid and
+            inventory.get_item_count(item_name) > constants.EMPTY_COUNT then
+        return {entity = character, player = player, player_inventory = true}
+    end
+    return nil
+end
+
+function supply.find_red_container(player, target, bot_entity, item_name, radius)
+    local entities, seen = {}, {}
+    for _, position in pairs({target.position, bot_entity.position}) do
+        local nearby = target.surface.find_entities_filtered {
+            position = position,
+            radius = radius,
+            name = "logistic-chest-passive-provider",
+            force = player.force
+        }
+        for _, entity in pairs(nearby) do
+            if not seen[entity.unit_number] then
+                seen[entity.unit_number] = true
+                entities[#entities + constants.ITEM_TRANSFER_COUNT] = entity
+            end
+        end
+    end
+    local best, best_distance
+    for _, entity in pairs(entities) do
+        local inventory = chest_inventory(entity)
+        if inventory and inventory.get_item_count(item_name) > constants.EMPTY_COUNT then
+            local distance = movement.distance_squared(bot_entity.position, entity.position)
+            if not best_distance or distance < best_distance then
+                best = {entity = entity, network = nil, local_container = true}
+                best_distance = distance
+            end
+        end
+    end
+    return best
+end
+
 function supply.networks_for(player, target)
     -- Construction-area lookup mirrors vanilla construction eligibility. It
     -- can return multiple networks where disconnected green areas overlap.
@@ -159,7 +208,7 @@ function supply.put_one(destination, item_name)
     -- destination during the bot's flight.
     if not (destination and destination.entity and destination.entity.valid) then return false end
     if destination.network and not destination.network.valid then return false end
-    local inventory = chest_inventory(destination.entity)
+    local inventory = source_inventory(destination)
     return inventory and inventory.insert({name = item_name, count = constants.ITEM_TRANSFER_COUNT}) ==
                constants.ITEM_TRANSFER_COUNT or false
 end
@@ -169,7 +218,7 @@ function supply.can_put_one(destination, item_name)
     -- consuming or duplicating the item while merely checking available space.
     if not (destination and destination.entity and destination.entity.valid) then return false end
     if destination.network and not destination.network.valid then return false end
-    local inventory = chest_inventory(destination.entity)
+    local inventory = source_inventory(destination)
     return inventory and inventory.can_insert({name = item_name, count = constants.ITEM_TRANSFER_COUNT}) or false
 end
 
@@ -180,7 +229,7 @@ function supply.take_one(source, item_name)
     if source.network and not source.network.valid then return false end
     -- Remove from the exact source selected above so the chest the bot visits
     -- is also the chest whose visible item count decreases.
-    local inventory = chest_inventory(source.entity)
+    local inventory = source_inventory(source)
     if not inventory then return false end
     return inventory.remove({name = item_name, count = constants.ITEM_TRANSFER_COUNT}) ==
                constants.ITEM_TRANSFER_COUNT

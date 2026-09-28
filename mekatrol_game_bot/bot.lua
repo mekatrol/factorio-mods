@@ -300,10 +300,17 @@ local function prepare_job(player, value, task)
             elseif cargo_total(value) + planned_count < config.cargo_capacity then
                 -- Prefer vanilla logistic selection, then fall back to an
                 -- ordinary local container exactly as single-item mode did.
-                local source = supply.find_source(player, target, required_item)
-                if not source then
-                    source = supply.find_nearby_container(player, target, value.entity, required_item,
-                        task.nearby_container_radius or config.nearby_container_radius)
+                local source
+                if task.player_or_red_container_supply then
+                    source = supply.find_player_source(player, required_item) or
+                                 supply.find_red_container(player, target, value.entity, required_item,
+                            task.nearby_container_radius or config.nearby_container_radius)
+                else
+                    source = supply.find_source(player, target, required_item)
+                    if not source then
+                        source = supply.find_nearby_container(player, target, value.entity, required_item,
+                            task.nearby_container_radius or config.nearby_container_radius)
+                    end
                 end
                 if source then
                     value.pickup_queue[#value.pickup_queue + constants.ITEM_TRANSFER_COUNT] = {
@@ -470,6 +477,17 @@ function bot.update(player, tick)
         return
     end
 
+    -- Strictly local tasks recheck at execution time. The player may have moved
+    -- since discovery while the bot was fetching a replacement item.
+    if task.enforce_player_radius and value.phase == constants.PHASE.UPGRADE and
+            value.target and value.target.valid and
+            movement.distance_squared(player_anchor.position(player), value.target.position) >
+                (task.search_radius or config.search_radius) ^ constants.DISTANCE_SQUARED_EXPONENT then
+        state.clear_target(value)
+        state.clear_track(value)
+        value.next_scan_tick = tick
+    end
+
     if task.kind == constants.LAMP_MODE_KIND then
         if value.lamp_supply and not (value.lamp_supply.entity and value.lamp_supply.entity.valid) then
             value.lamp_supply = nil
@@ -587,8 +605,9 @@ function bot.update(player, tick)
                 local origin = consume_cargo_origin(value, mapping.required_item)
                 cargo_add(value, mapping.recovered_item, constants.ITEM_TRANSFER_COUNT)
                 value.upgraded = value.upgraded + constants.ITEM_TRANSFER_COUNT
-                local destination = supply.find_drop(origin and origin.network or fallback_network,
-                    mapping.recovered_item)
+                local destination = task.return_to_source and origin or
+                                        supply.find_drop(origin and origin.network or fallback_network,
+                                            mapping.recovered_item)
                 if not destination then
                     destination = supply.find_blocked_drop(origin and origin.network or fallback_network,
                         source_position)

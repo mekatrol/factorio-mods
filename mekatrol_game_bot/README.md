@@ -59,8 +59,8 @@ Commands:
 /upgrade-bot refresh
 ```
 
-The built-in modes are `Yellow -> Red`, `Red -> Blue`, `Containers` (wooden to
-iron, then iron to steel), and
+The built-in modes are `Yellow -> Red`, `Red -> Blue`, `Blue -> Green arms`,
+`Containers` (wooden to iron, then iron to steel), and
 `Place lamps`. In lamp mode the bot follows the player, only works outside
 full daylight (during dusk, night, and dawn), and uses lamps from the player's
 inventory. If none are carried, it collects one from a red passive-provider
@@ -77,6 +77,11 @@ be a table with `target`, `required_item`, `recovered_item`, and optional
 `create_parameters(entity, player)` fields when an
 entity has state that must be preserved. Jobs may also provide an
 `execute(player, entity, mapping)` function for entirely non-standard upgrades.
+
+`Blue -> Green arms` upgrades fast inserters to bulk inserters only when the
+target is within 10 tiles of the player. It takes bulk inserters from the
+player's inventory first, then from red passive-provider chests; other chest
+types and logistic-network sources are not used for this mode.
 
 ## Cleanup bot
 

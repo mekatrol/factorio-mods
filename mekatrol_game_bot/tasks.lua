@@ -59,6 +59,22 @@ return {{
         }
     }
 }, {
+    name = "blue-to-green-inserters",
+    label = "Blue -> Green arms",
+    aliases = {"blue-green-arms", "green-arms", "inserters"},
+    description = "Upgrade blue fast inserters to green bulk inserters within 10 tiles of the player",
+    search_radius = 10,
+    enforce_player_radius = true,
+    player_or_red_container_supply = true,
+    return_to_source = true,
+    mappings = {
+        ["fast-inserter"] = {
+            target = "bulk-inserter",
+            required_item = "bulk-inserter",
+            recovered_item = "fast-inserter"
+        }
+    }
+}, {
     name = "containers",
     label = "Containers",
     aliases = {"chests"},
