@@ -15,12 +15,26 @@ return {
     -- unnecessary while factory state is unchanged.
     scan_interval = 30,
 
-    -- Lamp mode works locally around the player. Existing lamps reserve their
-    -- illuminated neighbourhood so each placement changes the next scan.
+    -- Minimum surface darkness required for lamp work. Factorio darkness ranges
+    -- from 0 (full daylight) to 1 (full darkness), so 0 allows dusk through dawn.
     lamp_darkness_threshold = 0,
+
+    -- Maximum distance, in tiles, from the player at which placement candidates
+    -- are generated. This radius also bounds the nearby electric-pole search.
     lamp_search_radius = 14,
+
+    -- Minimum exclusion radius, in tiles, around every existing lamp. Candidate
+    -- positions inside this radius are treated as already illuminated.
     lamp_light_radius = 8,
+
+    -- Distance, in tiles, between candidate positions in the outward square
+    -- search pattern. Smaller values find more positions but cost more per scan.
     lamp_candidate_spacing = 2,
+
+    -- Lamps are held in the player's main inventory while the helper works.
+    -- Each supply trip takes no more than this many, subject to chest stock and
+    -- the player's available inventory space.
+    lamp_pickup_count = 50,
 
     -- Targets remain local to the player; network supplies can be much farther
     -- away without requiring an expensive surface-wide entity scan.

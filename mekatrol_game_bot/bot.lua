@@ -65,6 +65,26 @@ local function target_candidates(player, value, task)
         name = registry.source_names(task),
         force = player.force
     }
+    do
+        -- A composite scan uses the largest constituent radius, then removes
+        -- entities whose recipe has not been unlocked. In all-upgrades mode it
+        -- also retains stricter constituent-task boundaries such as the
+        -- ten-tile inserter rule.
+        local eligible = {}
+        local player_position = player_anchor.position(player)
+        for _, entity in ipairs(entities) do
+            local mapping = registry.mapping_for(task, entity.name)
+            local owner = mapping and mapping.owner_task
+            local radius = owner and owner.search_radius or task.search_radius or config.search_radius
+            local within_radius = not (task.all_upgrades and owner and owner.enforce_player_radius) or
+                                      movement.distance_squared(player_position, entity.position) <=
+                                          radius ^ constants.DISTANCE_SQUARED_EXPONENT
+            if within_radius and registry.mapping_available(player.force, task, entity.name) then
+                eligible[#eligible + constants.ITEM_TRANSFER_COUNT] = entity
+            end
+        end
+        entities = eligible
+    end
     -- Nearest-first ordering minimizes travel and makes selection deterministic
     -- enough for a player to understand what the bot will work on next.
     table.sort(entities, function(a, b)
@@ -93,7 +113,7 @@ end
 
 local function cargo_total(value)
     -- Capacity counts individual items rather than distinct names, allowing a
-    -- five-item batch to contain any mixture required by belts and splitters.
+    -- full batch to contain any mixture required by every enabled mapping.
     local total = constants.EMPTY_COUNT
     for _, count in pairs(value.cargo) do total = total + count end
     return total
@@ -170,9 +190,10 @@ local function prepare_job(player, value, task)
         return true
     end
 
-    -- A finished track must unload recovered items before locking another line;
-    -- otherwise five occupied slots could strand useful cargo indefinitely.
-    if not value.track and #value.delivery_queue > constants.EMPTY_COUNT then
+    -- A finished concrete track unloads recovered items before locking another
+    -- line; all-upgrades mode instead checks every local target first.
+    if not value.track and not task.all_upgrades and
+            #value.delivery_queue > constants.EMPTY_COUNT then
         local delivery = value.delivery_queue[constants.FIRST_INDEX]
         value.return_destination = delivery.destination
         value.return_item = delivery.item_name
@@ -185,17 +206,41 @@ local function prepare_job(player, value, task)
     if not value.track then
         local candidates = target_candidates(player, value, task)
         local seed = candidates[constants.FIRST_INDEX]
-        if not seed then return false end
-        value.track = track.discover(seed, task)
+        if not seed then
+            -- All-upgrades mode delays unloading while another nearby target
+            -- can consume any mixed replacement cargo already aboard. Once the
+            -- local scan is exhausted, recovered items are returned normally.
+            if #value.delivery_queue > constants.EMPTY_COUNT then
+                local delivery = value.delivery_queue[constants.FIRST_INDEX]
+                value.return_destination = delivery.destination
+                value.return_item = delivery.item_name
+                value.phase = constants.PHASE.RETURN
+                return true
+            end
+            return false
+        end
+        if task.all_upgrades then
+            -- Treat every eligible entity in the local scan as one mixed work
+            -- group. Pickup planning can consequently fill the shared hold with
+            -- as many as cargo_capacity items across every upgrade family.
+            value.track = {
+                entities = candidates,
+                anchor_position = {x = seed.position.x, y = seed.position.y},
+                surface_index = seed.surface.index,
+                force_index = seed.force.index
+            }
+        else
+            value.track = track.discover(seed, task)
+        end
         track.draw(player, value, task)
     end
 
-    local remaining = track.remaining_entities(value.track, task, value.entity.position)
+    local remaining = track.remaining_entities(value.track, task, value.entity.position, player.force)
     if #remaining == constants.EMPTY_COUNT then
         -- Only after every upgradeable member is gone may the scheduler choose a
         -- seed from another physical belt component.
         state.clear_track(value)
-        if #value.delivery_queue > constants.EMPTY_COUNT then
+        if not task.all_upgrades and #value.delivery_queue > constants.EMPTY_COUNT then
             local delivery = value.delivery_queue[constants.FIRST_INDEX]
             value.return_destination = delivery.destination
             value.return_item = delivery.item_name
@@ -289,6 +334,8 @@ local function prepare_job(player, value, task)
     local unallocated_cargo = {}
     for item_name, count in pairs(value.cargo) do unallocated_cargo[item_name] = count end
     local planned_count = constants.EMPTY_COUNT
+    local required_item_blocked_by_capacity = nil
+    local blocked_pickup_count = constants.EMPTY_COUNT
 
     for _, target in ipairs(remaining) do
         local mapping = registry.mapping_for(task, target.name)
@@ -301,15 +348,17 @@ local function prepare_job(player, value, task)
                 -- Prefer vanilla logistic selection, then fall back to an
                 -- ordinary local container exactly as single-item mode did.
                 local source
-                if task.player_or_red_container_supply then
+                -- Composite mappings remember the concrete task that supplied
+                -- them, so special sourcing rules remain task-specific.
+                local mapping_task = mapping.owner_task or task
+                if mapping_task.player_or_red_container_supply then
                     source = supply.find_player_source(player, required_item) or
-                                 supply.find_red_container(player, target, value.entity, required_item,
-                            task.nearby_container_radius or config.nearby_container_radius)
+                                 supply.find_red_container(player, target, value.entity, required_item)
                 else
                     source = supply.find_source(player, target, required_item)
                     if not source then
                         source = supply.find_nearby_container(player, target, value.entity, required_item,
-                            task.nearby_container_radius or config.nearby_container_radius)
+                            mapping_task.nearby_container_radius or config.nearby_container_radius)
                     end
                 end
                 if source then
@@ -319,6 +368,12 @@ local function prepare_job(player, value, task)
                     }
                     planned_count = planned_count + constants.ITEM_TRANSFER_COUNT
                 end
+            else
+                -- Remember that suitable local work is waiting on free cargo
+                -- space. After planning finishes, a surplus batch can be
+                -- offloaded rather than leaving a full bot permanently idle.
+                required_item_blocked_by_capacity = required_item
+                blocked_pickup_count = blocked_pickup_count + constants.ITEM_TRANSFER_COUNT
             end
         end
     end
@@ -328,6 +383,53 @@ local function prepare_job(player, value, task)
         value.supply = pickup.source
         value.phase = constants.PHASE.FETCH
         return true
+    end
+
+    if required_item_blocked_by_capacity then
+        -- Prefer cargo not reserved against any remaining local target. If all
+        -- carried items are reserved, release one item of a different type so
+        -- the currently missing replacement can still enter the shared hold.
+        local surplus_item = nil
+        for item_name, count in pairs(unallocated_cargo) do
+            if count > constants.EMPTY_COUNT then surplus_item = item_name; break end
+        end
+        if not surplus_item then
+            for item_name, count in pairs(value.cargo) do
+                if count > constants.EMPTY_COUNT and item_name ~= required_item_blocked_by_capacity then
+                    surplus_item = item_name
+                    break
+                end
+            end
+        end
+
+        if surplus_item then
+            local destination = supply.find_red_drop_container(player,
+                remaining[constants.FIRST_INDEX], value.entity, surplus_item)
+            if destination then
+                -- Free the whole useful pickup batch in one return trip instead
+                -- of alternating one deposit with one collection. Never exceed
+                -- either surplus stock or the chest's live insertable capacity.
+                local surplus_count = unallocated_cargo[surplus_item] or constants.EMPTY_COUNT
+                if surplus_count <= constants.EMPTY_COUNT then
+                    surplus_count = cargo_count(value, surplus_item)
+                end
+                local deposit_count = math.min(surplus_count, blocked_pickup_count,
+                    destination.insertable_count or constants.ITEM_TRANSFER_COUNT)
+                for _ = constants.ITEM_TRANSFER_COUNT, deposit_count do
+                    -- The item is leaving working cargo, so discard its old
+                    -- provenance before a future pickup creates a new origin.
+                    consume_cargo_origin(value, surplus_item)
+                    value.delivery_queue[#value.delivery_queue + constants.ITEM_TRANSFER_COUNT] = {
+                        item_name = surplus_item,
+                        destination = destination
+                    }
+                end
+                value.return_destination = destination
+                value.return_item = surplus_item
+                value.phase = constants.PHASE.RETURN
+                return true
+            end
+        end
     end
 
     state.clear_target(value)
@@ -387,6 +489,9 @@ function bot.select_task(player, task_name)
     local value = state.get(player.index)
     state.clear_target(value)
     state.clear_track(value)
+    -- Planned pickups belong to the old task and must not leak into the newly
+    -- selected mode. Physical cargo and delivery work remain conserved.
+    value.pickup_queue = {}
     value.task_name, value.next_scan_tick = task.name, constants.NO_TICK_DELAY
     draw_mode_label(player, value)
     print(player, constants.COLOR.SUCCESS, "task selected: " .. task.name)
@@ -405,6 +510,14 @@ function bot.refresh_track(player)
     if not value.track then
         print(player, constants.COLOR.WARNING, "there is no active track to refresh")
         return false
+    end
+    if task and task.all_upgrades then
+        -- Composite work groups are local radius snapshots, so clearing the
+        -- snapshot makes the next scheduler pass rebuild every eligible target.
+        state.clear_track(value)
+        value.next_scan_tick = constants.NO_TICK_DELAY
+        print(player, constants.COLOR.SUCCESS, "all-upgrades targets will be rescanned")
+        return true
     end
     if not task or not track.refresh(player, value, task) then
         print(player, constants.COLOR.WARNING, "the active track no longer has a valid anchor")
@@ -535,7 +648,14 @@ function bot.update(player, tick)
     -- mined entity is gone and a built or rotated entity has final connections.
     if value.track_refresh_requested then
         value.track_refresh_requested = false
-        track.refresh(player, value, task)
+        if task.all_upgrades then
+            -- A composite group is a radius snapshot rather than a connected
+            -- graph, so the next normal scan is the correct way to rebuild it.
+            state.clear_track(value)
+            value.next_scan_tick = tick
+        else
+            track.refresh(player, value, task)
+        end
     end
 
     if value.target and not value.target.valid then state.clear_target(value) end
@@ -596,8 +716,19 @@ function bot.update(player, tick)
             local source_name = value.target.name
             local source_position = {x = value.target.position.x, y = value.target.position.y}
             local mapping = registry.mapping_for(task, source_name)
+            if not registry.mapping_available(player.force, task, source_name) then
+                -- Research can be reversed by commands or scenarios after a
+                -- target was planned. Cancel it without consuming cargo.
+                state.clear_target(value)
+                state.clear_track(value)
+                value.next_scan_tick = tick
+                return
+            end
             local fallback_network = supply.first_network(player, value.target)
-            local success, detail = executor.execute(player, value.target, mapping, task)
+            -- In all-upgrades mode execution and return policy belong to the
+            -- concrete task that contributed this mapping.
+            local mapping_task = mapping.owner_task or task
+            local success, detail = executor.execute(player, value.target, mapping, mapping_task)
             if success then
                 -- Commit the material exchange only after the world replacement
                 -- succeeds: one higher-tier item in, one lower-tier item out.
@@ -605,7 +736,7 @@ function bot.update(player, tick)
                 local origin = consume_cargo_origin(value, mapping.required_item)
                 cargo_add(value, mapping.recovered_item, constants.ITEM_TRANSFER_COUNT)
                 value.upgraded = value.upgraded + constants.ITEM_TRANSFER_COUNT
-                local destination = task.return_to_source and origin or
+                local destination = mapping_task.return_to_source and origin or
                                         supply.find_drop(origin and origin.network or fallback_network,
                                             mapping.recovered_item)
                 if not destination then
@@ -687,7 +818,7 @@ function bot.status(player)
     local remaining_track_entities = task and value.track and
                                          #track.remaining_entities(value.track, task, value.entity and
                                              value.entity.valid and value.entity.position or
-                                                 player_anchor.position(player)) or
+                                                 player_anchor.position(player), player.force) or
                                          constants.EMPTY_COUNT
     print(player, constants.COLOR.INFORMATION,
         string.format(constants.STATUS_FORMAT,

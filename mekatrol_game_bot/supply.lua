@@ -29,22 +29,21 @@ function supply.find_player_source(player, item_name)
     return nil
 end
 
-function supply.find_red_container(player, target, bot_entity, item_name, radius)
-    local entities, seen = {}, {}
-    for _, position in pairs({target.position, bot_entity.position}) do
-        local nearby = target.surface.find_entities_filtered {
-            position = position,
-            radius = radius,
-            name = "logistic-chest-passive-provider",
-            force = player.force
-        }
-        for _, entity in pairs(nearby) do
-            if not seen[entity.unit_number] then
-                seen[entity.unit_number] = true
-                entities[#entities + constants.ITEM_TRANSFER_COUNT] = entity
-            end
-        end
-    end
+function supply.find_red_container(player, target, bot_entity, item_name)
+    -- Entity-name filters throw instead of returning an empty result when a
+    -- prototype is absent. Treat an unavailable passive-provider prototype as
+    -- "no source" so base-game changes or overhaul mods cannot crash on_tick.
+    local chest_name = constants.PASSIVE_PROVIDER_CHEST_NAME
+    if not prototypes.entity[chest_name] then return nil end
+
+    -- Passive providers are an explicit supply policy for this task, not the
+    -- ordinary nearby-container fallback. Search the current surface so a valid
+    -- provider is not silently ignored merely because it is more than the
+    -- generic local-container radius from both the bot and target.
+    local entities = target.surface.find_entities_filtered {
+        name = chest_name,
+        force = player.force
+    }
     local best, best_distance
     for _, entity in pairs(entities) do
         local inventory = chest_inventory(entity)
@@ -52,6 +51,35 @@ function supply.find_red_container(player, target, bot_entity, item_name, radius
             local distance = movement.distance_squared(bot_entity.position, entity.position)
             if not best_distance or distance < best_distance then
                 best = {entity = entity, network = nil, local_container = true}
+                best_distance = distance
+            end
+        end
+    end
+    return best
+end
+
+function supply.find_red_drop_container(player, target, bot_entity, item_name)
+    -- A full upgrade hold may need to offload a surplus item before collecting
+    -- the replacement required by local work. Passive providers are explicitly
+    -- player-managed exchange chests, so select the nearest one with room.
+    local chest_name = constants.PASSIVE_PROVIDER_CHEST_NAME
+    if not prototypes.entity[chest_name] then return nil end
+
+    local best, best_distance
+    for _, entity in pairs(target.surface.find_entities_filtered {
+        name = chest_name,
+        force = player.force
+    }) do
+        local inventory = chest_inventory(entity)
+        local insertable_count = inventory and inventory.get_insertable_count(item_name) or
+                                     constants.EMPTY_COUNT
+        if insertable_count > constants.EMPTY_COUNT then
+            local distance = movement.distance_squared(bot_entity.position, entity.position)
+            if not best_distance or distance < best_distance then
+                -- Report capacity so the scheduler never queues more deposits
+                -- than this exact inventory can currently accept.
+                best = {entity = entity, network = nil, local_container = true,
+                        insertable_count = insertable_count}
                 best_distance = distance
             end
         end

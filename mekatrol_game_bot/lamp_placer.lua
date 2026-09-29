@@ -37,11 +37,12 @@ local function lamp_stack(inventory)
 end
 
 function lamp_placer.find_red_container(player, bot_entity)
+    -- Factorio rejects unknown names in entity filters. A missing logistics
+    -- prototype therefore means lamp supply is unavailable, not a fatal error.
+    if not prototypes.entity[constants.PASSIVE_PROVIDER_CHEST_NAME] then return nil end
     local best, best_distance
     local surface = player_anchor.surface(player)
     for _, chest in pairs(surface.find_entities_filtered {
-        position = player_anchor.position(player),
-        radius = config.nearby_container_radius,
         name = constants.PASSIVE_PROVIDER_CHEST_NAME,
         force = player.force
     }) do
@@ -63,15 +64,32 @@ function lamp_placer.take_from_red_container(player, source)
     local chest_inventory = source.entity.get_inventory(defines.inventory.chest)
     local player_inventory = player.get_main_inventory()
     if not (chest_inventory and chest_inventory.valid and player_inventory) then return false end
-    local stack = {name = source.item_name, quality = source.quality,
-                   count = constants.ITEM_TRANSFER_COUNT}
-    if not player_inventory.can_insert(stack) then return false end
-    if chest_inventory.remove(stack) ~= constants.ITEM_TRANSFER_COUNT then return false end
-    if player_inventory.insert(stack) == constants.ITEM_TRANSFER_COUNT then return true end
-    -- Preserve the item if the player's inventory changed between the capacity
-    -- check and insertion (for example, another script filled its final slot).
-    chest_inventory.insert(stack)
-    return false
+
+    -- Factorio keeps the bot's working lamps in the player's inventory. Limit
+    -- the batch by configuration, available chest stock, and free inventory
+    -- capacity so a partly full inventory can still receive a smaller batch.
+    local item = {name = source.item_name, quality = source.quality}
+    local pickup_limit = math.max(constants.EMPTY_COUNT, math.floor(config.lamp_pickup_count))
+    local count = math.min(
+        pickup_limit,
+        chest_inventory.get_item_count(item),
+        player_inventory.get_insertable_count(item)
+    )
+    if count <= constants.EMPTY_COUNT then return false end
+
+    local transfer = {name = item.name, quality = item.quality, count = count}
+    local removed = chest_inventory.remove(transfer)
+    if removed <= constants.EMPTY_COUNT then return false end
+
+    transfer.count = removed
+    local inserted = player_inventory.insert(transfer)
+    -- Preserve anything that could not be inserted if inventory capacity
+    -- changed between calculating the batch and performing the transfer.
+    if inserted < removed then
+        transfer.count = removed - inserted
+        chest_inventory.insert(transfer)
+    end
+    return inserted > constants.EMPTY_COUNT
 end
 
 local function in_power_area(surface, force, position)

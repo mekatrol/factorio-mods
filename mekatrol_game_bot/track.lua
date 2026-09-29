@@ -1,6 +1,7 @@
 local config = require("config")
 local constants = require("constants")
 local movement = require("movement")
+local registry = require("task_registry")
 local track = {}
 
 local function accepted_names(task)
@@ -154,13 +155,14 @@ function track.refresh(player, value, task)
     return true
 end
 
-function track.remaining_entities(group, task, position)
+function track.remaining_entities(group, task, position, force)
     -- Replacements invalidate their source references. Filtering at use time
     -- naturally removes completed members without mutating the persisted group
     -- while another loop may still be iterating it.
     local remaining = {}
     for _, entity in pairs(group and group.entities or {}) do
-        if entity and entity.valid and task.mappings[entity.name] then
+        if entity and entity.valid and task.mappings[entity.name] and
+                (not force or registry.mapping_available(force, task, entity.name)) then
             remaining[#remaining + constants.ITEM_TRANSFER_COUNT] = entity
         end
     end
@@ -192,7 +194,8 @@ function track.draw(player, value, task)
     -- can connect separated yellow sections, but only source mappings represent
     -- outstanding work and therefore receive an outline.
     for _, entity in pairs(value.track and value.track.entities or {}) do
-        if entity and entity.valid and task and task.mappings[entity.name] then
+        if entity and entity.valid and task and task.mappings[entity.name] and
+                registry.mapping_available(player.force, task, entity.name) then
             local outer = draw_border(player, entity, config.track_highlight_outer_color,
                 constants.TRACK_HIGHLIGHT_OUTER_WIDTH)
             local inner = draw_border(player, entity, config.track_highlight_inner_color,

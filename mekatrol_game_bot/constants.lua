@@ -19,6 +19,9 @@ local constants = {
     SHORT_COMMAND_NAME = "ub",
     STORAGE_KEY = "mekatrol_game_bot",
     DEFAULT_TASK_NAME = "yellow-to-red-belts",
+    -- The composite mode is registered after the concrete upgrade tasks so it
+    -- can safely combine their mappings without duplicating task data.
+    ALL_TASK_NAME = "all-upgrades",
     LAMP_MODE_KIND = "place-lamps",
     PASSIVE_PROVIDER_CHEST_NAME = "passive-provider-chest",
 

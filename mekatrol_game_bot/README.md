@@ -34,8 +34,8 @@ Build, mining, destruction, rotation, robot-build, and script-raised events queu
 an outline rebuild for the next bot tick; no periodic graph polling is used.
 `/ub refresh` forces an immediate rebuild of the current track and its outline.
 
-The bot's cargo capacity is configured in `config.lua` and is currently twenty
-individual items, not twenty item types. It can collect a mixed batch of belts,
+The bot's shared upgrade cargo capacity is configured once in `config.lua` and
+is currently 100 individual items, not 100 item types. It can collect a mixed batch of belts,
 underground belts, and splitters, perform as many upgrades as that batch permits,
 and then return all recovered items before collecting the next batch. When a
 yellow underground-belt pair is still connected, the bot reserves and carries
@@ -54,17 +54,21 @@ Commands:
 /upgrade-bot on
 /upgrade-bot off
 /upgrade-bot task yellow-to-red-belts
+/upgrade-bot task all
 /upgrade-bot tasks
 /upgrade-bot status
 /upgrade-bot refresh
 ```
 
-The built-in modes are `Yellow -> Red`, `Red -> Blue`, `Blue -> Green arms`,
-`Containers` (wooden to iron, then iron to steel), and
+The built-in modes are `All upgrades`, `Yellow -> Red`, `Red -> Blue`,
+`Blue -> Green arms`, `Containers` (wooden to iron, then iron to steel), and
 `Place lamps`. In lamp mode the bot follows the player, only works outside
 full daylight (during dusk, night, and dawn), and uses lamps from the player's
-inventory. If none are carried, it collects one from a red passive-provider
-chest within 64 tiles of the player. The bot flies to the chest and each
+inventory. If none are carried, it collects up to `lamp_pickup_count` lamps
+(50 by default) from a red passive-provider chest anywhere on the current
+surface, choosing the closest one that contains lamps. The batch is limited by
+the lamps in the chest and free space in the player's main inventory, where the
+bot holds them while working. The bot flies to the chest and each
 selected location before placing its lamp, and places at most one lamp per scan in
 a buildable spot covered by an electric pole and outside the lit radius of any
 existing lamp. The next scan includes the newly placed lamp, preventing the bot
@@ -77,11 +81,25 @@ be a table with `target`, `required_item`, `recovered_item`, and optional
 `create_parameters(entity, player)` fields when an
 entity has state that must be preserved. Jobs may also provide an
 `execute(player, entity, mapping)` function for entirely non-standard upgrades.
+The `All upgrades` mode automatically includes every registered mapping, uses
+one 100-item mixed cargo limit, and exhausts locally usable cargo before it
+returns recovered items or plans another supply collection.
+If unrelated cargo fills the hold and prevents required pickups, the bot first
+places a batch of surplus items into the nearest red passive-provider chest,
+limited by the blocked batch size and the chest's available capacity.
+Targets are only highlighted or planned when the owning force has unlocked the
+recipe for the required upgrade item. Research changes are rechecked before the
+replacement is executed.
+
+Lamp-mode settings are grouped together in `config.lua`. Change
+`lamp_pickup_count` there to adjust the maximum number of lamps collected per
+supply trip.
 
 `Blue -> Green arms` upgrades fast inserters to bulk inserters only when the
 target is within 10 tiles of the player. It takes bulk inserters from the
-player's inventory first, then from red passive-provider chests; other chest
-types and logistic-network sources are not used for this mode.
+player's inventory first, then from the nearest stocked red passive-provider
+chest on the current surface; other chest types and logistic-network sources
+are not used for this mode.
 
 ## Cleanup bot
 
