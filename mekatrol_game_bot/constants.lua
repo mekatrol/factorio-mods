@@ -15,6 +15,14 @@ local constants = {
     CLEANUP_CUSTOM_INPUT_KEY_SEQUENCE = "CONTROL + SHIFT + C",
     CLEANUP_COMMAND_NAME = "cleanup-bot",
     CLEANUP_SHORT_COMMAND_NAME = "cb",
+    -- The lamp worker is a separate entity instance, but reuses the existing
+    -- upgrade-bot prototype so control-stage hot reloads cannot reference a
+    -- data-stage prototype that the running Factorio session has not loaded.
+    LAMP_BOT_ENTITY_NAME = "upgrade-bot",
+    LAMP_CUSTOM_INPUT_NAME = "lamp-bot-toggle",
+    LAMP_CUSTOM_INPUT_KEY_SEQUENCE = "CONTROL + SHIFT + L",
+    LAMP_COMMAND_NAME = "lamp-bot",
+    LAMP_SHORT_COMMAND_NAME = "lb",
     PRIMARY_COMMAND_NAME = "upgrade-bot",
     SHORT_COMMAND_NAME = "ub",
     STORAGE_KEY = "mekatrol_game_bot",
@@ -22,7 +30,6 @@ local constants = {
     -- The composite mode is registered after the concrete upgrade tasks so it
     -- can safely combine their mappings without duplicating task data.
     ALL_TASK_NAME = "all-upgrades",
-    LAMP_MODE_KIND = "place-lamps",
     PASSIVE_PROVIDER_CHEST_NAME = "passive-provider-chest",
 
     -- Phase names define the persisted state-machine vocabulary.
@@ -90,6 +97,8 @@ local constants = {
     COMMAND_DESCRIPTION = "Control the upgrade bot",
     CLEANUP_COMMAND_DESCRIPTION = "Control the cleanup bot",
     CLEANUP_COMMAND_USAGE = "[Cleanup Bot] usage: /cb [on|off|toggle|status]",
+    LAMP_COMMAND_DESCRIPTION = "Control the lamp bot",
+    LAMP_COMMAND_USAGE = "[Lamp Bot] usage: /lb [on|off|toggle|status]",
     COMMAND_USAGE = "[Upgrade Bot] usage: /ub [on|off|toggle|task NAME|tasks|status|refresh] (bare /ub changes mode)",
     TASK_LIST_PREFIX = "[Upgrade Bot] tasks: ",
     EMPTY_TEXT = "",

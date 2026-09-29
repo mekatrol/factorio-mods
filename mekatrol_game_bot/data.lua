@@ -16,6 +16,13 @@ data:extend({{
     consuming = "none"
 }})
 
+data:extend({{
+    type = "custom-input",
+    name = constants.LAMP_CUSTOM_INPUT_NAME,
+    key_sequence = constants.LAMP_CUSTOM_INPUT_KEY_SEQUENCE,
+    consuming = "none"
+}})
+
 -- Reusing the base construction robot keeps the helper visually consistent
 -- with Factorio and avoids maintaining copied copyrighted sprite assets.
 local base_robot = data.raw[constants.BASE_ROBOT_ENTITY_NAME][constants.BASE_ROBOT_ENTITY_NAME]

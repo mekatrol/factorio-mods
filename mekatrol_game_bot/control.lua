@@ -1,5 +1,6 @@
 local bot = require("bot")
 local cleanup = require("cleanup_bot")
+local lamp = require("lamp_bot")
 local config = require("config")
 local constants = require("constants")
 local registry = require("task_registry")
@@ -62,6 +63,22 @@ local function register_commands()
     if not commands.commands[constants.CLEANUP_SHORT_COMMAND_NAME] then
         commands.add_command(constants.CLEANUP_SHORT_COMMAND_NAME, constants.CLEANUP_COMMAND_DESCRIPTION, cleanup_command)
     end
+    local function lamp_command(command_data)
+        local player = player_for(command_data)
+        if not (player and player.valid) then return end
+        local action = string.match(command_data.parameter or constants.EMPTY_TEXT, "^(%S+)") or constants.ACTION.STATUS
+        if action == constants.ACTION.ON or action == constants.ACTION.START then lamp.enable(player)
+        elseif action == constants.ACTION.OFF or action == constants.ACTION.STOP then lamp.disable(player)
+        elseif action == constants.ACTION.TOGGLE then lamp.toggle(player)
+        elseif action == constants.ACTION.STATUS then lamp.status(player)
+        else player.print(constants.LAMP_COMMAND_USAGE) end
+    end
+    if not commands.commands[constants.LAMP_COMMAND_NAME] then
+        commands.add_command(constants.LAMP_COMMAND_NAME, constants.LAMP_COMMAND_DESCRIPTION, lamp_command)
+    end
+    if not commands.commands[constants.LAMP_SHORT_COMMAND_NAME] then
+        commands.add_command(constants.LAMP_SHORT_COMMAND_NAME, constants.LAMP_COMMAND_DESCRIPTION, lamp_command)
+    end
 end
 
 script.on_init(function() state.ensure(); register_commands() end)
@@ -86,6 +103,11 @@ end)
 register_custom_input(constants.CLEANUP_CUSTOM_INPUT_NAME, function(event)
     local player = player_for(event)
     if player and player.valid then cleanup.toggle(player) end
+end)
+
+register_custom_input(constants.LAMP_CUSTOM_INPUT_NAME, function(event)
+    local player = player_for(event)
+    if player and player.valid then lamp.toggle(player) end
 end)
 
 local function request_track_refresh(event)
@@ -117,6 +139,12 @@ script.on_event(defines.events.on_player_removed, function(event)
         state.destroy_cleanup(cleanup_value)
         cleanup_players[event.player_index] = nil
     end
+    local lamp_players = storage[constants.STORAGE_KEY].lamp_players
+    local lamp_value = lamp_players[event.player_index]
+    if lamp_value then
+        state.destroy_lamp(lamp_value)
+        lamp_players[event.player_index] = nil
+    end
 end)
 
 script.on_event(defines.events.on_tick, function(event)
@@ -126,5 +154,6 @@ script.on_event(defines.events.on_tick, function(event)
     for _, player in pairs(game.connected_players) do
         bot.update(player, event.tick)
         cleanup.update(player, event.tick)
+        lamp.update(player, event.tick)
     end
 end)

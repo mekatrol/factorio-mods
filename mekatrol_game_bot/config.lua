@@ -87,6 +87,13 @@ return {
         target_reach_distance = 0.7,
         cargo_capacity = 100
     },
+
+    -- The third bot occupies its own vertical formation slot. Its horizontal
+    -- offset changes sign with the player's direction, matching the formation
+    -- behavior used by mekatrol_game_play_mod.
+    lamp = {
+        follow_offset = {x = -2, y = -2.25}
+    },
     
     -- Orange visually distinguishes upgrade work from the role colors used by
     -- the reference gameplay mod's other bots.

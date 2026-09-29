@@ -1,9 +1,10 @@
 # Upgrade Bot
 
-This mod contains two independently controlled helpers. The upgrade bot uses
-`Ctrl+Shift+U` and `/ub`; the cleanup bot uses `Ctrl+Shift+C` and `/cb`. When
-both are following, they use separate formation slots around the player while
-sharing the same scripted movement implementation.
+This mod contains three independently controlled helpers. The upgrade bot uses
+`Ctrl+Shift+U` and `/ub`, the cleanup bot uses `Ctrl+Shift+C` and `/cb`, and the
+lamp bot uses `Ctrl+Shift+L` and `/lb`. When idle, all three use separate
+formation slots and switch to the trailing side when the player changes
+horizontal direction, matching `mekatrol_game_play_mod`.
 
 `Ctrl+Shift+U` toggles the bot. It starts with the `yellow-to-red-belts` task,
 which upgrades transport belts, underground belts, and splitters near the player.
@@ -60,11 +61,18 @@ Commands:
 /upgrade-bot refresh
 ```
 
-The built-in modes are `All upgrades`, `Yellow -> Red`, `Red -> Blue`,
-`Blue -> Green arms`, `Containers` (wooden to iron, then iron to steel), and
-`Place lamps`. In lamp mode the bot follows the player, only works outside
-full daylight (during dusk, night, and dawn), and uses lamps from the player's
-inventory. If none are carried, it collects up to `lamp_pickup_count` lamps
+The built-in upgrade modes are `All upgrades`, `Yellow -> Red`, `Red -> Blue`,
+`Blue -> Green arms`, and `Containers` (wooden to iron, then iron to steel).
+`/ub` cycles upgrade modes; it also remains a short alias when followed by a
+command. New jobs belong in `tasks.lua`; the bot engine does not contain entity
+names.
+
+## Lamp bot
+
+The independently controlled lamp bot follows the player when idle and only
+works outside full daylight (during dusk, night, and dawn). It uses lamps from
+the player's inventory. If none are carried, it collects up to
+`lamp_pickup_count` lamps
 (50 by default) from a red passive-provider chest anywhere on the current
 surface, choosing the closest one that contains lamps. The batch is limited by
 the lamps in the chest and free space in the player's main inventory, where the
@@ -72,10 +80,18 @@ bot holds them while working. The bot flies to the chest and each
 selected location before placing its lamp, and places at most one lamp per scan in
 a buildable spot covered by an electric pole and outside the lit radius of any
 existing lamp. The next scan includes the newly placed lamp, preventing the bot
-from filling the area that lamp has just illuminated. The current mode is displayed underneath
-the bot. `/ub` cycles modes; it also remains a short alias when followed by a
-command. New jobs belong in `tasks.lua`; the bot engine does not
-contain entity names. Each job has a name, optional aliases, and a `mappings`
+from filling the area that lamp has just illuminated. Its current activity is
+displayed underneath the bot.
+
+```text
+/lb
+/lamp-bot on
+/lamp-bot off
+/lamp-bot toggle
+/lamp-bot status
+```
+
+Each upgrade job has a name, optional aliases, and a `mappings`
 table of source prototype names to target prototype names. A mapping may instead
 be a table with `target`, `required_item`, `recovered_item`, and optional
 `create_parameters(entity, player)` fields when an
@@ -95,7 +111,7 @@ Targets are only highlighted or planned when the owning force has unlocked the
 recipe for the required upgrade item. Research changes are rechecked before the
 replacement is executed.
 
-Lamp-mode settings are grouped together in `config.lua`. Change
+Lamp-bot settings are grouped together in `config.lua`. Change
 `lamp_pickup_count` there to adjust the maximum number of lamps collected per
 supply trip.
 

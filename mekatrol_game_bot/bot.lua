@@ -1,7 +1,6 @@
 local config = require("config")
 local constants = require("constants")
 local executor = require("upgrade_executor")
-local lamp_placer = require("lamp_placer")
 local movement = require("movement")
 local player_anchor = require("player_anchor")
 local registry = require("task_registry")
@@ -674,49 +673,6 @@ function bot.update(player, tick)
         state.clear_target(value)
         state.clear_track(value)
         value.next_scan_tick = tick
-    end
-
-    if task.kind == constants.LAMP_MODE_KIND then
-        if value.lamp_supply and not (value.lamp_supply.entity and value.lamp_supply.entity.valid) then
-            value.lamp_supply = nil
-        end
-
-        if not value.lamp_target and not value.lamp_supply and tick >= value.next_scan_tick then
-            value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
-            value.lamp_target = lamp_placer.find_target(player)
-            if not value.lamp_target and not lamp_placer.has_carried_lamp(player) and
-                    player_anchor.surface(player).darkness > config.lamp_darkness_threshold then
-                value.lamp_supply = lamp_placer.find_red_container(player, value.entity)
-            end
-        end
-
-        if value.lamp_supply then
-            if movement.distance_squared(value.entity.position, value.lamp_supply.entity.position) <=
-                    config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
-                local collected = lamp_placer.take_from_red_container(player, value.lamp_supply)
-                value.lamp_supply = nil
-                value.next_scan_tick = collected and tick or
-                                           tick + (task.scan_interval or config.scan_interval)
-            else
-                movement.towards(value.entity, value.lamp_supply.entity.position)
-            end
-        elseif value.lamp_target then
-            -- Lamp placement is a world mutation, so the helper must visibly
-            -- reach the selected tile just as it does for upgrade targets.
-            if movement.distance_squared(value.entity.position, value.lamp_target) <=
-                    config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
-                lamp_placer.try_place_at(player, value.lamp_target)
-                value.lamp_target = nil
-                -- Wait for the next scan so the newly placed lamp participates
-                -- in illumination exclusion before another site is selected.
-                value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
-            else
-                movement.towards(value.entity, value.lamp_target)
-            end
-        else
-            follow_player(player, value)
-        end
-        return
     end
 
     -- Event handlers defer rebuilding until the next normal bot tick. By then a

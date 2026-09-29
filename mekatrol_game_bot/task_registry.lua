@@ -8,8 +8,7 @@ local function validate(definition)
     if type(definition) ~= "table" or type(definition.name) ~= "string" then
         error("Upgrade task requires a name")
     end
-    if definition.kind ~= constants.LAMP_MODE_KIND and
-            (type(definition.mappings) ~= "table" or next(definition.mappings) == nil) then
+    if type(definition.mappings) ~= "table" or next(definition.mappings) == nil then
         error("Upgrade task '" .. definition.name .. "' requires mappings")
     end
 end
@@ -88,7 +87,8 @@ end
 local function register_all_upgrades()
     -- Build the all-upgrades mode from registered task data. This keeps future
     -- upgrade families automatically available in the composite mode while
-    -- excluding non-upgrade modes such as autonomous lamp placement.
+    -- Upgrade modes are combined here; independent helper behavior belongs in
+    -- its own bot rather than in the upgrade task registry.
     local combined = {
         name = constants.ALL_TASK_NAME,
         label = "All upgrades",
@@ -100,7 +100,7 @@ local function register_all_upgrades()
 
     for _, task_name in ipairs(registry.ordered_names) do
         local task = registry.tasks[task_name]
-        if task.kind ~= constants.LAMP_MODE_KIND and not task.all_upgrades then
+        if not task.all_upgrades then
             for source_name, raw_mapping in pairs(task.mappings) do
                 -- Copy mapping fields instead of modifying the concrete task.
                 -- The owner reference preserves its radius, supply, return and

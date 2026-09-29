@@ -8,6 +8,7 @@ function state.ensure()
     storage[constants.STORAGE_KEY] = storage[constants.STORAGE_KEY] or {players = {}}
     storage[constants.STORAGE_KEY].players = storage[constants.STORAGE_KEY].players or {}
     storage[constants.STORAGE_KEY].cleanup_players = storage[constants.STORAGE_KEY].cleanup_players or {}
+    storage[constants.STORAGE_KEY].lamp_players = storage[constants.STORAGE_KEY].lamp_players or {}
 end
 
 function state.get(player_index)
@@ -29,7 +30,7 @@ function state.get(player_index)
                  cargo_origins = {},
                  last_player_position = nil, side_offset_x = config.follow_offset.x,
                  upgraded = constants.EMPTY_COUNT, failures = constants.EMPTY_COUNT, highlight = nil,
-                 mode_label = nil, lamp_target = nil, lamp_supply = nil}
+                 mode_label = nil}
         storage[constants.STORAGE_KEY].players[player_index] = value
     end
     value.cargo = value.cargo or {}
@@ -41,7 +42,38 @@ function state.get(player_index)
     value.pickup_queue = value.pickup_queue or {}
     value.delivery_queue = value.delivery_queue or {}
     value.cargo_origins = value.cargo_origins or {}
+    -- Saves that had the old lamp mode selected now activate the independent
+    -- lamp helper and return the upgrade helper to its normal default task.
+    if value.task_name == "place-lamps" then
+        value.task_name = config.default_task
+        state.get_lamp(player_index).enabled = true
+    end
     return value
+end
+
+function state.get_lamp(player_index)
+    state.ensure()
+    local players = storage[constants.STORAGE_KEY].lamp_players
+    local value = players[player_index]
+    if not value then
+        value = {enabled = false, entity = nil, mode = "follow", target = nil,
+                 supply = nil, next_scan_tick = constants.NO_TICK_DELAY,
+                 last_player_position = nil, side_offset_x = config.lamp.follow_offset.x,
+                 status_label = nil}
+        players[player_index] = value
+    end
+    value.mode = value.mode or "follow"
+    value.side_offset_x = value.side_offset_x or config.lamp.follow_offset.x
+    value.next_scan_tick = value.next_scan_tick or constants.NO_TICK_DELAY
+    return value
+end
+
+function state.destroy_lamp(value)
+    if value.status_label and value.status_label.valid then value.status_label.destroy() end
+    value.status_label = nil
+    if value.entity and value.entity.valid then value.entity.destroy() end
+    value.entity = nil
+    value.enabled = false
 end
 
 function state.get_cleanup(player_index)
@@ -101,8 +133,6 @@ function state.clear_target(value)
     -- Clear every reference associated with one transaction. Leaving a stale
     -- source or destination could make the next task move to the wrong entity.
     value.target = nil
-    value.lamp_target = nil
-    value.lamp_supply = nil
     value.supply = nil
     value.job_network = nil
     value.source_container = nil
