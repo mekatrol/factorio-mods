@@ -190,6 +190,14 @@ local function prepare_job(player, value, task)
         return true
     end
 
+    if task.all_upgrades and value.track then
+        -- All-upgrades work is intentionally local to the player's current
+        -- position. Rebuild its radius snapshot whenever the bot chooses a new
+        -- job so moving to another factory area cannot leave it locked onto an
+        -- old group of valid-but-distant targets indefinitely.
+        state.clear_track(value)
+    end
+
     -- A finished concrete track unloads recovered items before locking another
     -- line; all-upgrades mode instead checks every local target first.
     if not value.track and not task.all_upgrades and
@@ -662,9 +670,13 @@ function bot.update(player, tick)
     if value.supply and (not value.supply.entity or not value.supply.entity.valid or
             (value.supply.network and not value.supply.network.valid)) then
         if value.phase == constants.PHASE.FETCH and #value.pickup_queue > constants.EMPTY_COUNT then
-            table.remove(value.pickup_queue, constants.FIRST_INDEX)
+            -- Every queued entry may reference the same vanished source. Drop
+            -- the stale plan as a batch so selection can immediately consider
+            -- another provider, including one much farther across the surface.
+            value.pickup_queue = {}
         end
         state.clear_target(value)
+        value.next_scan_tick = tick
     end
     if value.return_destination and (not value.return_destination.entity or
             not value.return_destination.entity.valid or
@@ -700,10 +712,14 @@ function bot.update(player, tick)
                     value.next_scan_tick = tick
                 end
             else
-                table.remove(value.pickup_queue, constants.FIRST_INDEX)
+                -- The chosen chest may have supplied several earlier entries
+                -- and become empty mid-batch. Replan all outstanding pickups;
+                -- retaining them would retry that empty chest one item at a
+                -- time instead of selecting another stocked provider.
+                value.pickup_queue = {}
                 value.supply = nil
                 value.phase = constants.PHASE.FOLLOW
-                value.next_scan_tick = tick + config.scan_interval
+                value.next_scan_tick = tick
             end
         else
             movement.towards(value.entity, value.supply.entity.position)
