@@ -56,42 +56,95 @@ local function create(player, value)
 end
 
 local function target_candidates(player, value, task)
-    -- Automatic discovery remains local to the player. Supply lookup is allowed
-    -- to span a connected network, but scanning an entire surface every tick is
-    -- both surprising and expensive on mature factories.
-    local entities = player_anchor.surface(player).find_entities_filtered {
-        position = player_anchor.position(player),
-        radius = task.search_radius or config.search_radius,
-        name = registry.source_names(task),
-        force = player.force
-    }
-    do
-        -- A composite scan uses the largest constituent radius, then removes
-        -- entities whose recipe has not been unlocked. In all-upgrades mode it
-        -- also retains stricter constituent-task boundaries such as the
-        -- ten-tile inserter rule.
-        local eligible = {}
-        local player_position = player_anchor.position(player)
+    local scan = value.target_scan
+    local radius = task.search_radius or config.search_radius
+    if scan and movement.distance_squared(player_anchor.position(player), scan.origin) >=
+            config.all_upgrades_refresh_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
+        -- Do not spend the rest of a multi-tick scan walking cells around an
+        -- area the player has already left.
+        scan = nil
+        value.target_scan = nil
+    end
+    if not scan then
+        local position = player_anchor.position(player)
+        scan = {
+            origin = {x = position.x, y = position.y},
+            offset_x = -radius,
+            offset_y = -radius,
+            radius = radius,
+            entities = {},
+            seen = {},
+            names = registry.source_names(task)
+        }
+        value.target_scan = scan
+    end
+
+    local cell_size = config.target_scan_cell_size
+    for _ = constants.ITEM_TRANSFER_COUNT, config.target_scan_cells_per_tick do
+        local left = scan.origin.x + scan.offset_x
+        local top = scan.origin.y + scan.offset_y
+        local entities = player_anchor.surface(player).find_entities_filtered {
+            area = {{left, top}, {left + cell_size, top + cell_size}},
+            name = scan.names,
+            force = player.force
+        }
         for _, entity in ipairs(entities) do
+            local identity = entity.unit_number
             local mapping = registry.mapping_for(task, entity.name)
             local owner = mapping and mapping.owner_task
-            local radius = owner and owner.search_radius or task.search_radius or config.search_radius
-            local within_radius = not (task.all_upgrades and owner and owner.enforce_player_radius) or
-                                      movement.distance_squared(player_position, entity.position) <=
-                                          radius ^ constants.DISTANCE_SQUARED_EXPONENT
-            if within_radius and registry.mapping_available(player.force, task, entity.name) then
-                eligible[#eligible + constants.ITEM_TRANSFER_COUNT] = entity
+            local entity_radius = owner and owner.search_radius or radius
+            local within_scan_radius = movement.distance_squared(scan.origin, entity.position) <=
+                                           radius ^ constants.DISTANCE_SQUARED_EXPONENT
+            local within_owner_radius = not (task.all_upgrades and owner and owner.enforce_player_radius) or
+                                            movement.distance_squared(scan.origin, entity.position) <=
+                                                entity_radius ^ constants.DISTANCE_SQUARED_EXPONENT
+            if (not identity or not scan.seen[identity]) and within_scan_radius and within_owner_radius and
+                    registry.mapping_available(player.force, task, entity.name) then
+                if identity then scan.seen[identity] = true end
+                if task.all_upgrades then
+                    local distance = movement.distance_squared(scan.origin, entity.position)
+                    if #scan.entities < config.all_upgrades_batch_size then
+                        scan.entities[#scan.entities + constants.ITEM_TRANSFER_COUNT] = entity
+                    else
+                        -- Retain only a bounded nearest batch. Finding the
+                        -- farthest member costs at most the configured small
+                        -- batch size, independent of factory size.
+                        local farthest_index = constants.FIRST_INDEX
+                        local farthest_distance = movement.distance_squared(scan.origin,
+                            scan.entities[farthest_index].position)
+                        for index = constants.FIRST_INDEX + constants.ITEM_TRANSFER_COUNT, #scan.entities do
+                            local candidate_distance = movement.distance_squared(scan.origin,
+                                scan.entities[index].position)
+                            if candidate_distance > farthest_distance then
+                                farthest_index = index
+                                farthest_distance = candidate_distance
+                            end
+                        end
+                        if distance < farthest_distance then scan.entities[farthest_index] = entity end
+                    end
+                else
+                    local nearest = scan.entities[constants.FIRST_INDEX]
+                    if not nearest or movement.distance_squared(value.entity.position, entity.position) <
+                            movement.distance_squared(value.entity.position, nearest.position) then
+                        scan.entities[constants.FIRST_INDEX] = entity
+                    end
+                end
             end
         end
-        entities = eligible
+
+        scan.offset_x = scan.offset_x + cell_size
+        if scan.offset_x >= radius then
+            scan.offset_x = -radius
+            scan.offset_y = scan.offset_y + cell_size
+        end
+        if scan.offset_y >= radius then
+            local result = scan.entities
+            local origin = scan.origin
+            value.target_scan = nil
+            return result, false, origin
+        end
     end
-    -- Nearest-first ordering minimizes travel and makes selection deterministic
-    -- enough for a player to understand what the bot will work on next.
-    table.sort(entities, function(a, b)
-        return movement.distance_squared(value.entity.position, a.position) <
-                   movement.distance_squared(value.entity.position, b.position)
-    end)
-    return entities
+    return nil, true
 end
 
 local function highlight(player, value)
@@ -190,11 +243,13 @@ local function prepare_job(player, value, task)
         return true
     end
 
-    if task.all_upgrades and value.track then
-        -- All-upgrades work is intentionally local to the player's current
-        -- position. Rebuild its radius snapshot whenever the bot chooses a new
-        -- job so moving to another factory area cannot leave it locked onto an
-        -- old group of valid-but-distant targets indefinitely.
+    if task.all_upgrades and value.track and
+            (not value.track.snapshot_position or
+                movement.distance_squared(player_anchor.position(player), value.track.snapshot_position) >=
+                    config.all_upgrades_refresh_distance ^ constants.DISTANCE_SQUARED_EXPONENT) then
+        -- Keep one snapshot while the player remains in the same factory area.
+        -- Rebuilding it after each item caused a full scan, sort and outline
+        -- rebuild on successive ticks, which visibly stalled large factories.
         state.clear_track(value)
     end
 
@@ -212,7 +267,16 @@ local function prepare_job(player, value, task)
     -- Lock a connected group before considering supplies. A temporarily starved
     -- track therefore waits instead of letting the bot start another line.
     if not value.track then
-        local candidates = target_candidates(player, value, task)
+        local candidates, scan_in_progress, scan_origin = target_candidates(player, value, task)
+        if scan_in_progress then return false, true end
+        if task.all_upgrades and scan_origin and
+                movement.distance_squared(player_anchor.position(player), scan_origin) >=
+                    config.all_upgrades_refresh_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
+            -- The player crossed into another area while the incremental scan
+            -- was running. Discard its small result and begin near the current
+            -- position on the next tick rather than chasing stale targets.
+            return false, true
+        end
         local seed = candidates[constants.FIRST_INDEX]
         if not seed then
             -- All-upgrades mode delays unloading while another nearby target
@@ -231,9 +295,11 @@ local function prepare_job(player, value, task)
             -- Treat every eligible entity in the local scan as one mixed work
             -- group. Pickup planning can consequently fill the shared hold with
             -- as many as cargo_capacity items across every upgrade family.
+            local snapshot_position = scan_origin or player_anchor.position(player)
             value.track = {
                 entities = candidates,
                 anchor_position = {x = seed.position.x, y = seed.position.y},
+                snapshot_position = {x = snapshot_position.x, y = snapshot_position.y},
                 surface_index = seed.surface.index,
                 force_index = seed.force.index
             }
@@ -243,7 +309,8 @@ local function prepare_job(player, value, task)
         track.draw(player, value, task)
     end
 
-    local remaining = track.remaining_entities(value.track, task, value.entity.position, player.force)
+    local remaining = track.remaining_entities(value.track, task, value.entity.position, player.force,
+        not task.all_upgrades)
     if #remaining == constants.EMPTY_COUNT then
         -- Only after every upgradeable member is gone may the scheduler choose a
         -- seed from another physical belt component.
@@ -688,8 +755,9 @@ function bot.update(player, tick)
         value.phase = constants.PHASE.FOLLOW
     end
     if value.phase == constants.PHASE.FOLLOW and not value.target and tick >= value.next_scan_tick then
-        value.next_scan_tick = tick + (task.scan_interval or config.scan_interval)
-        prepare_job(player, value, task)
+        local _, scan_in_progress = prepare_job(player, value, task)
+        value.next_scan_tick = tick + (scan_in_progress and constants.ITEM_TRANSFER_COUNT or
+                                           (task.scan_interval or config.scan_interval))
     end
 
     if value.phase == constants.PHASE.FETCH and value.supply then

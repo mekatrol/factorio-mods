@@ -155,7 +155,7 @@ function track.refresh(player, value, task)
     return true
 end
 
-function track.remaining_entities(group, task, position, force)
+function track.remaining_entities(group, task, position, force, sort_by_distance)
     -- Replacements invalidate their source references. Filtering at use time
     -- naturally removes completed members without mutating the persisted group
     -- while another loop may still be iterating it.
@@ -166,9 +166,14 @@ function track.remaining_entities(group, task, position, force)
             remaining[#remaining + constants.ITEM_TRANSFER_COUNT] = entity
         end
     end
-    table.sort(remaining, function(a, b)
-        return movement.distance_squared(position, a.position) < movement.distance_squared(position, b.position)
-    end)
+    -- Composite snapshots are already nearest-first when built. Preserve that
+    -- order as completed references are filtered out instead of sorting the
+    -- entire remaining factory after every single upgrade.
+    if sort_by_distance ~= false then
+        table.sort(remaining, function(a, b)
+            return movement.distance_squared(position, a.position) < movement.distance_squared(position, b.position)
+        end)
+    end
     return remaining
 end
 
@@ -186,6 +191,11 @@ local function draw_border(player, entity, color, width)
 end
 
 function track.draw(player, value, task)
+    -- A composite snapshot can contain hundreds of unrelated entities. Drawing
+    -- two objects for every member, then destroying and recreating all of them
+    -- after each replacement, creates a large single-tick workload. The active
+    -- target still receives its normal highlight in bot.lua.
+    if task and task.all_upgrades then return end
     track.clear_visual(value)
     value.track_highlights = {}
 
