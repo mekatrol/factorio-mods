@@ -39,9 +39,8 @@ return {
     -- Targets remain local to the player; network supplies can be much farther
     -- away without requiring an expensive surface-wide entity scan.
     search_radius = 32,
-    -- Composite target snapshots are refreshed only after the player has moved
-    -- far enough to expose a meaningfully different work area. This prevents a
-    -- full area query from being repeated after every individual upgrade.
+    -- Restart an in-progress area scan after the player has moved far enough
+    -- that its eventual nearest result would describe the old work area.
     all_upgrades_refresh_distance = 8,
     
     -- Area discovery is divided into square cells and advances by only this
@@ -50,10 +49,6 @@ return {
     target_scan_cell_size = 4,
     target_scan_cells_per_tick = 1,
     
-    -- Composite jobs intentionally operate on a small nearest-target batch.
-    -- Supply planning and validity filtering are therefore bounded even when a
-    -- scan crosses thousands of belts in a dense factory.
-    all_upgrades_batch_size = 16,
     -- A small anchor search reconnects a saved track to the replacement entity
     -- occupying its original seed position after fast replacement.
     track_anchor_search_radius = 2,

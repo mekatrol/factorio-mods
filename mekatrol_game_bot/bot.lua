@@ -109,33 +109,10 @@ local function target_candidates(player, value, task)
                 if (not identity or not scan.seen[identity]) and within_scan_radius and within_owner_radius and
                         registry.mapping_available(player.force, task, entity.name) then
                     if identity then scan.seen[identity] = true end
-                    if task.all_upgrades then
-                        local distance = movement.distance_squared(scan.origin, entity.position)
-                        if #scan.entities < config.all_upgrades_batch_size then
-                            scan.entities[#scan.entities + constants.ITEM_TRANSFER_COUNT] = entity
-                        else
-                            -- Retain only a bounded nearest batch. Finding the
-                            -- farthest member costs at most the configured small
-                            -- batch size, independent of factory size.
-                            local farthest_index = constants.FIRST_INDEX
-                            local farthest_distance = movement.distance_squared(scan.origin,
-                                scan.entities[farthest_index].position)
-                            for index = constants.FIRST_INDEX + constants.ITEM_TRANSFER_COUNT, #scan.entities do
-                                local candidate_distance = movement.distance_squared(scan.origin,
-                                    scan.entities[index].position)
-                                if candidate_distance > farthest_distance then
-                                    farthest_index = index
-                                    farthest_distance = candidate_distance
-                                end
-                            end
-                            if distance < farthest_distance then scan.entities[farthest_index] = entity end
-                        end
-                    else
-                        local nearest = scan.entities[constants.FIRST_INDEX]
-                        if not nearest or movement.distance_squared(value.entity.position, entity.position) <
-                                movement.distance_squared(value.entity.position, nearest.position) then
-                            scan.entities[constants.FIRST_INDEX] = entity
-                        end
+                    local nearest = scan.entities[constants.FIRST_INDEX]
+                    if not nearest or movement.distance_squared(value.entity.position, entity.position) <
+                            movement.distance_squared(value.entity.position, nearest.position) then
+                        scan.entities[constants.FIRST_INDEX] = entity
                     end
                 end
             end
@@ -271,16 +248,6 @@ local function prepare_job(player, value, task)
         return true
     end
 
-    if task.all_upgrades and value.track and
-            (not value.track.snapshot_position or
-                movement.distance_squared(player_anchor.position(player), value.track.snapshot_position) >=
-                    config.all_upgrades_refresh_distance ^ constants.DISTANCE_SQUARED_EXPONENT) then
-        -- Keep one snapshot while the player remains in the same factory area.
-        -- Rebuilding it after each item caused a full scan, sort and outline
-        -- rebuild on successive ticks, which visibly stalled large factories.
-        state.clear_track(value)
-    end
-
     -- A finished concrete track unloads recovered items before locking another
     -- line; all-upgrades mode instead checks every local target first.
     if not value.track and not task.all_upgrades and
@@ -319,26 +286,13 @@ local function prepare_job(player, value, task)
             end
             return false
         end
-        if task.all_upgrades then
-            -- Treat every eligible entity in the local scan as one mixed work
-            -- group. Pickup planning can consequently fill the shared hold with
-            -- as many as cargo_capacity items across every upgrade family.
-            local snapshot_position = scan_origin or player_anchor.position(player)
-            value.track = {
-                entities = candidates,
-                anchor_position = {x = seed.position.x, y = seed.position.y},
-                snapshot_position = {x = snapshot_position.x, y = snapshot_position.y},
-                surface_index = seed.surface.index,
-                force_index = seed.force.index
-            }
-        else
-            value.track = track.discover(seed, task)
-        end
+        -- Composite mode also locks onto one physical belt network. For its
+        -- non-belt tasks discover() deliberately returns only the seed entity.
+        value.track = track.discover(seed, task)
         track.draw(player, value, task)
     end
 
-    local remaining = track.remaining_entities(value.track, task, value.entity.position, player.force,
-        not task.all_upgrades)
+    local remaining = track.remaining_entities(value.track, task, value.entity.position, player.force, true)
     if #remaining == constants.EMPTY_COUNT then
         -- Only after every upgradeable member is gone may the scheduler choose a
         -- seed from another physical belt component.
@@ -616,14 +570,6 @@ function bot.refresh_track(player)
         print(player, constants.COLOR.WARNING, "there is no active track to refresh")
         return false
     end
-    if task and task.all_upgrades then
-        -- Composite work groups are local radius snapshots, so clearing the
-        -- snapshot makes the next scheduler pass rebuild every eligible target.
-        state.clear_track(value)
-        value.next_scan_tick = constants.NO_TICK_DELAY
-        print(player, constants.COLOR.SUCCESS, "all-upgrades targets will be rescanned")
-        return true
-    end
     if not task or not track.refresh(player, value, task) then
         print(player, constants.COLOR.WARNING, "the active track no longer has a valid anchor")
         return false
@@ -696,6 +642,17 @@ function bot.update(player, tick)
         return
     end
 
+    -- Saves made before 1.7.2 may contain one composite radius snapshot with
+    -- targets from several disconnected lines. Convert it in place to the
+    -- component containing its original anchor and discard only stale pickup
+    -- plans; physical cargo and queued returns remain conserved.
+    if task.all_upgrades and value.track and value.track.snapshot_position then
+        state.clear_target(value)
+        value.pickup_queue = {}
+        track.refresh(player, value, task)
+        value.next_scan_tick = tick
+    end
+
     -- Strictly local tasks recheck at execution time. The player may have moved
     -- since discovery while the bot was fetching a replacement item.
     if task.enforce_player_radius and value.phase == constants.PHASE.UPGRADE and
@@ -711,14 +668,7 @@ function bot.update(player, tick)
     -- mined entity is gone and a built or rotated entity has final connections.
     if value.track_refresh_requested then
         value.track_refresh_requested = false
-        if task.all_upgrades then
-            -- A composite group is a radius snapshot rather than a connected
-            -- graph, so the next normal scan is the correct way to rebuild it.
-            state.clear_track(value)
-            value.next_scan_tick = tick
-        else
-            track.refresh(player, value, task)
-        end
+        track.refresh(player, value, task)
     end
 
     if value.target and not value.target.valid then state.clear_target(value) end
@@ -845,6 +795,10 @@ function bot.update(player, tick)
                 -- so redraw against the locked group to remove only completed
                 -- entities while retaining unmatched underground endpoints.
                 track.draw(player, value, task)
+                -- A replacement in composite mode can be the source of its
+                -- next tier (yellow -> red -> blue). Rebuild from the locked
+                -- anchor so the same network is exhausted before another one.
+                if task.all_upgrades then track.refresh(player, value, task) end
             else
                 value.failures = value.failures + constants.ITEM_TRANSFER_COUNT
                 value.paired_underground_target = nil

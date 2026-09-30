@@ -53,10 +53,15 @@ end
 
 function track.discover(seed, task)
     if not (seed and seed.valid) then return nil end
+    local grouping = task.grouping
+    if task.all_upgrades then
+        local mapping = registry.mapping_for(task, seed.name)
+        grouping = mapping and mapping.owner_task and mapping.owner_task.grouping or nil
+    end
     -- Tasks that do not opt into belt grouping remain valid extension points:
     -- their work group is simply the selected entity rather than assuming that
     -- every future upgrade prototype exposes belt-specific API properties.
-    if task.grouping ~= constants.GROUP_STRATEGY.BELT_NETWORK then
+    if grouping ~= constants.GROUP_STRATEGY.BELT_NETWORK then
         return {
             entities = {seed},
             anchor_position = {x = seed.position.x, y = seed.position.y},

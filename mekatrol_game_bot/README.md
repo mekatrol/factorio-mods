@@ -97,13 +97,12 @@ be a table with `target`, `required_item`, `recovered_item`, and optional
 `create_parameters(entity, player)` fields when an
 entity has state that must be preserved. Jobs may also provide an
 `execute(player, entity, mapping)` function for entirely non-standard upgrades.
-The `All upgrades` mode automatically includes every registered mapping, uses
-one 100-item mixed cargo limit, and exhausts locally usable cargo before it
-returns recovered items or plans another supply collection.
-Its target snapshot is rebuilt around the player's current position after the
-player moves into another factory area. Discovery advances through small map
-cells over successive ticks and retains a small nearest-target work batch,
-avoiding complete-radius scanning or unbounded planning in one update.
+The `All upgrades` mode automatically includes every registered mapping and
+locks onto one connected belt network at a time. Non-belt upgrades are handled
+one entity at a time. It uses one 100-item mixed cargo limit and exhausts locally
+usable cargo before it returns recovered items or plans another supply collection.
+Discovery advances through small map cells over successive ticks to find the
+nearest next target without doing an unbounded planning pass in one update.
 If unrelated cargo fills the hold and prevents required pickups, the bot first
 places a batch of surplus items into the nearest red passive-provider chest,
 limited by the blocked batch size and the chest's available capacity.
