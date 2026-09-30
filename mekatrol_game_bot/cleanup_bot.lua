@@ -3,6 +3,7 @@ local constants = require("constants")
 local movement = require("movement")
 local player_anchor = require("player_anchor")
 local state = require("state")
+local target_line = require("target_line")
 
 local cleanup = {}
 local conf = config.cleanup
@@ -42,16 +43,6 @@ local function draw_status(player, value)
     }
 end
 
-local function draw_target(value)
-    clear_object(value, "target_line")
-    if value.mode ~= "pickup" or not value.target or not (value.entity and value.entity.valid) then return end
-    value.target_line = rendering.draw_line {
-        color = {r = 1, g = 0.2, b = 0.2, a = 0.7}, width = 1,
-        from = value.entity, to = value.target, surface = value.entity.surface,
-        draw_on_ground = true, only_in_alt_mode = false
-    }
-end
-
 local function create(player, value)
     local offset = conf.follow_offset
     local position = player_anchor.position(player)
@@ -79,7 +70,10 @@ local function follow(player, value)
     local target = {x = player_position.x + value.side_offset_x,
                     y = player_position.y + conf.follow_offset.y}
     if movement.distance_squared(value.entity.position, target) > config.follow_distance ^ 2 then
+        target_line.draw(player, value, target)
         movement.towards(value.entity, target)
+    else
+        target_line.clear(value)
     end
 end
 
@@ -217,6 +211,7 @@ function cleanup.update(player)
     if item and item.valid then
         value.mode = "pickup"
         value.target = {x = item.position.x, y = item.position.y}
+        target_line.draw(player, value, value.target)
         movement.towards(value.entity, value.target)
     elseif carried > 0 then
         local target = destination(player, value)
@@ -233,6 +228,7 @@ function cleanup.update(player)
         elseif target_valid then
             value.mode = "returning"
             value.target = {x = target_position.x, y = target_position.y}
+            target_line.draw(player, value, value.target)
             movement.towards(value.entity, value.target)
         else
             value.mode, value.target = "no-container", nil
@@ -251,7 +247,6 @@ function cleanup.update(player)
     end
 
     draw_status(player, value)
-    draw_target(value)
 end
 
 return cleanup

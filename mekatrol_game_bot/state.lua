@@ -26,7 +26,7 @@ function state.get_track(player_index)
                  track_refresh_requested = false, pickup_queue = {}, delivery_queue = {},
                  blocked_destination = nil, blocked_tag = nil, blocked_highlight = nil, cargo_origins = {},
                  last_player_position = nil, side_offset_x = config.track.follow_offset.x,
-                 upgraded = 0, failures = 0, highlight = nil, mode_label = nil}
+                 upgraded = 0, failures = 0, highlight = nil, mode_label = nil, target_line = nil}
         players[player_index] = value
     end
     value.cargo = value.cargo or {}
@@ -57,7 +57,7 @@ function state.get(player_index)
                  cargo_origins = {},
                  last_player_position = nil, side_offset_x = config.follow_offset.x,
                  upgraded = constants.EMPTY_COUNT, failures = constants.EMPTY_COUNT, highlight = nil,
-                 mode_label = nil}
+                 mode_label = nil, target_line = nil}
         storage[constants.STORAGE_KEY].players[player_index] = value
     end
     value.cargo = value.cargo or {}
@@ -96,7 +96,7 @@ function state.get_lamp(player_index)
         value = {enabled = false, entity = nil, mode = "follow", target = nil,
                  supply = nil, next_scan_tick = constants.NO_TICK_DELAY,
                  last_player_position = nil, side_offset_x = config.lamp.follow_offset.x,
-                 status_label = nil}
+                 status_label = nil, target_line = nil}
         players[player_index] = value
     end
     value.mode = value.mode or "follow"
@@ -108,6 +108,8 @@ end
 function state.destroy_lamp(value)
     if value.status_label and value.status_label.valid then value.status_label.destroy() end
     value.status_label = nil
+    if value.target_line and value.target_line.valid then value.target_line.destroy() end
+    value.target_line = nil
     if value.entity and value.entity.valid then value.entity.destroy() end
     value.entity = nil
     value.enabled = false
@@ -190,6 +192,8 @@ function state.destroy(value)
     state.clear_blocked_destination(value)
     if value.mode_label and value.mode_label.valid then value.mode_label.destroy() end
     value.mode_label = nil
+    if value.target_line and value.target_line.valid then value.target_line.destroy() end
+    value.target_line = nil
     if value.entity and value.entity.valid then value.entity.destroy() end
     value.entity = nil
     value.enabled = false

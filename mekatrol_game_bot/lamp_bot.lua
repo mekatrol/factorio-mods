@@ -4,6 +4,7 @@ local lamp_placer = require("lamp_placer")
 local movement = require("movement")
 local player_anchor = require("player_anchor")
 local state = require("state")
+local target_line = require("target_line")
 
 local lamp_bot = {}
 local conf = config.lamp
@@ -69,7 +70,10 @@ local function follow(player, value)
     -- The dead band avoids tiny movements after the bot reaches its slot.
     if movement.distance_squared(value.entity.position, target) >
             config.follow_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
+        target_line.draw(player, value, target)
         movement.towards(value.entity, target)
+    else
+        target_line.clear(value)
     end
 end
 
@@ -123,6 +127,7 @@ function lamp_bot.update(player, tick)
 
     if value.supply then
         value.mode = "fetching"
+        target_line.draw(player, value, value.supply.entity)
         if movement.distance_squared(value.entity.position, value.supply.entity.position) <=
                 config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
             local collected = lamp_placer.take_from_red_container(player, value.supply)
@@ -133,6 +138,7 @@ function lamp_bot.update(player, tick)
         end
     elseif value.target then
         value.mode = "placing"
+        target_line.draw(player, value, value.target)
         -- Placement happens only after visible arrival at the selected tile.
         if movement.distance_squared(value.entity.position, value.target) <=
                 config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then

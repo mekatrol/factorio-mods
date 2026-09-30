@@ -5,6 +5,7 @@ local movement = require("movement")
 local player_anchor = require("player_anchor")
 local registry = require("track_task_registry")
 local state = require("state")
+local target_line = require("target_line")
 local supply = require("supply")
 local track = require("track")
 local bot = {}
@@ -230,7 +231,10 @@ local function follow_player(player, value)
     -- formation position.
     if movement.distance_squared(value.entity.position, position) >
             config.follow_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
+        target_line.draw(player, value, position)
         movement.towards(value.entity, position)
+    else
+        target_line.clear(value)
     end
 end
 
@@ -722,6 +726,7 @@ function bot.update(player, tick)
     end
 
     if value.phase == constants.PHASE.FETCH and value.supply then
+        target_line.draw(player, value, value.supply.entity)
         local pickup = value.pickup_queue[constants.FIRST_INDEX]
         local required_item = pickup and pickup.item_name
         if movement.distance_squared(value.entity.position, value.supply.entity.position) <=
@@ -754,6 +759,7 @@ function bot.update(player, tick)
             movement.towards(value.entity, value.supply.entity.position)
         end
     elseif value.phase == constants.PHASE.UPGRADE and value.target then
+        target_line.draw(player, value, value.target)
         if movement.distance_squared(value.entity.position, value.target.position) <=
                 config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
             -- Capture mapping and source identity before fast replacement makes
@@ -830,6 +836,7 @@ function bot.update(player, tick)
             movement.towards(value.entity, value.target.position)
         end
     elseif value.phase == constants.PHASE.RETURN and value.return_destination and value.return_item then
+        target_line.draw(player, value, value.return_destination.entity)
         if movement.distance_squared(value.entity.position, value.return_destination.entity.position) <=
                 config.work_distance ^ constants.DISTANCE_SQUARED_EXPONENT then
             -- Deposit only after arrival. A failed insertion leaves the item in
