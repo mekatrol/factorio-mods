@@ -3,17 +3,18 @@ local executor = {}
 -- This is the default replacement strategy. A future task may provide an
 -- `execute(player, entity, mapping)` function to replace this behavior.
 function executor.execute(player, entity, mapping, task)
+    local target_name = mapping and mapping.target
+
+    -- Validate before invoking either execution strategy. Custom task handlers
+    -- must never receive an entity that was destroyed after it was scheduled.
+    if not (entity and entity.valid) then return false, "invalid source entity" end
     -- A task-owned executor is an escape hatch for upgrades that cannot be
     -- represented as a normal fast replacement. The scheduler remains generic.
     if task.execute then
         return task.execute(player, entity, mapping)
     end
-    local target_name = mapping and mapping.target
-
-    -- Both LuaEntity references and prototype availability may change after a
-    -- mod update. Refuse the transaction before consuming the bot's cargo.
-    if not (entity and entity.valid and prototypes.entity[target_name]) then
-        return false, "invalid source or target prototype"
+    if not (target_name and prototypes.entity[target_name]) then
+        return false, "invalid target prototype"
     end
 
     -- Fast replacement preserves connections and operational state far more
@@ -41,7 +42,7 @@ function executor.execute(player, entity, mapping, task)
     -- Creating the replacement is the commit point. Cargo is adjusted by the
     -- caller only after this call reports success.
     local replacement = entity.surface.create_entity(parameters)
-    if replacement then return true, replacement end
+    if replacement and replacement.valid then return true, replacement end
     return false, "fast replacement failed"
 end
 

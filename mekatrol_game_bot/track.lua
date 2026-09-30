@@ -52,6 +52,7 @@ local function connected_entities(entity)
 end
 
 function track.discover(seed, task)
+    if not (seed and seed.valid) then return nil end
     -- Tasks that do not opt into belt grouping remain valid extension points:
     -- their work group is simply the selected entity rather than assuming that
     -- every future upgrade prototype exposes belt-specific API properties.
@@ -156,6 +157,7 @@ function track.refresh(player, value, task)
 end
 
 function track.remaining_entities(group, task, position, force, sort_by_distance)
+    if not (group and task and position) then return {} end
     -- Replacements invalidate their source references. Filtering at use time
     -- naturally removes completed members without mutating the persisted group
     -- while another loop may still be iterating it.

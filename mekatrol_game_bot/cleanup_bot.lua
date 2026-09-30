@@ -44,7 +44,7 @@ end
 
 local function draw_target(value)
     clear_object(value, "target_line")
-    if value.mode ~= "pickup" or not value.target then return end
+    if value.mode ~= "pickup" or not value.target or not (value.entity and value.entity.valid) then return end
     value.target_line = rendering.draw_line {
         color = {r = 1, g = 0.2, b = 0.2, a = 0.7}, width = 1,
         from = value.entity, to = value.target, surface = value.entity.surface,
@@ -60,8 +60,8 @@ local function create(player, value)
         position = {x = position.x + offset.x, y = position.y + offset.y},
         force = player.force, raise_built = true
     }
-    if value.entity then value.entity.destructible = true end
-    return value.entity ~= nil
+    if value.entity and value.entity.valid then value.entity.destructible = true end
+    return value.entity ~= nil and value.entity.valid
 end
 
 local function follow(player, value)
@@ -155,8 +155,10 @@ local function destination(player, value)
 end
 
 local function deposit(player, value, target)
+    if target ~= player and not (target and target.valid) then return false end
     local inventory = target == player and player.get_main_inventory() or
                           target.get_inventory(defines.inventory.chest)
+    if not (inventory and inventory.valid) then return false end
     for name, count in pairs(value.cargo) do
         local matching = matching_container(player, value, name)
         if count > 0 and ((target == player and not matching) or target == matching) then
@@ -165,6 +167,7 @@ local function deposit(player, value, target)
             if inserted > 0 then value.unplaceable[name] = nil end
         end
     end
+    return true
 end
 
 function cleanup.enable(player)
@@ -217,13 +220,17 @@ function cleanup.update(player)
         movement.towards(value.entity, value.target)
     elseif carried > 0 then
         local target = destination(player, value)
+        local target_valid = target == player or (target and target.valid)
         local target_position = target == player and player_anchor.position(player) or
-                                    (target and target.position)
-        if target and target.valid and movement.distance_squared(value.entity.position, target_position) <=
+                                    (target_valid and target.position)
+        if target_valid and movement.distance_squared(value.entity.position, target_position) <=
                 conf.work_distance ^ 2 then
-            deposit(player, value, target)
-            value.mode, value.target = "follow", nil
-        elseif target and target.valid then
+            if deposit(player, value, target) then
+                value.mode, value.target = "follow", nil
+            else
+                value.mode, value.target = "no-container", nil
+            end
+        elseif target_valid then
             value.mode = "returning"
             value.target = {x = target_position.x, y = target_position.y}
             movement.towards(value.entity, value.target)

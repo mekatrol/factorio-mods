@@ -47,11 +47,11 @@ local function create(player, value)
     }
     -- Destructibility makes the helper obey the same environmental risks as the
     -- reference bots rather than acting as an invulnerable utility cursor.
-    if value.entity then
+    if value.entity and value.entity.valid then
         value.entity.destructible = true
         draw_mode_label(player, value)
     end
-    return value.entity ~= nil
+    return value.entity ~= nil and value.entity.valid
 end
 
 local function target_candidates(player, value, task)
@@ -96,44 +96,46 @@ local function target_candidates(player, value, task)
             force = player.force
         }
         for _, entity in ipairs(entities) do
-            local identity = entity.unit_number
-            local mapping = registry.mapping_for(task, entity.name)
-            local owner = mapping and mapping.owner_task
-            local entity_radius = owner and owner.search_radius or radius
-            local within_scan_radius = movement.distance_squared(scan.origin, entity.position) <=
-                                           radius ^ constants.DISTANCE_SQUARED_EXPONENT
-            local within_owner_radius = not (task.all_upgrades and owner and owner.enforce_player_radius) or
-                                            movement.distance_squared(scan.origin, entity.position) <=
-                                                entity_radius ^ constants.DISTANCE_SQUARED_EXPONENT
-            if (not identity or not scan.seen[identity]) and within_scan_radius and within_owner_radius and
-                    registry.mapping_available(player.force, task, entity.name) then
-                if identity then scan.seen[identity] = true end
-                if task.all_upgrades then
-                    local distance = movement.distance_squared(scan.origin, entity.position)
-                    if #scan.entities < config.all_upgrades_batch_size then
-                        scan.entities[#scan.entities + constants.ITEM_TRANSFER_COUNT] = entity
-                    else
-                        -- Retain only a bounded nearest batch. Finding the
-                        -- farthest member costs at most the configured small
-                        -- batch size, independent of factory size.
-                        local farthest_index = constants.FIRST_INDEX
-                        local farthest_distance = movement.distance_squared(scan.origin,
-                            scan.entities[farthest_index].position)
-                        for index = constants.FIRST_INDEX + constants.ITEM_TRANSFER_COUNT, #scan.entities do
-                            local candidate_distance = movement.distance_squared(scan.origin,
-                                scan.entities[index].position)
-                            if candidate_distance > farthest_distance then
-                                farthest_index = index
-                                farthest_distance = candidate_distance
+            if entity.valid then
+                local identity = entity.unit_number
+                local mapping = registry.mapping_for(task, entity.name)
+                local owner = mapping and mapping.owner_task
+                local entity_radius = owner and owner.search_radius or radius
+                local within_scan_radius = movement.distance_squared(scan.origin, entity.position) <=
+                                               radius ^ constants.DISTANCE_SQUARED_EXPONENT
+                local within_owner_radius = not (task.all_upgrades and owner and owner.enforce_player_radius) or
+                                                movement.distance_squared(scan.origin, entity.position) <=
+                                                    entity_radius ^ constants.DISTANCE_SQUARED_EXPONENT
+                if (not identity or not scan.seen[identity]) and within_scan_radius and within_owner_radius and
+                        registry.mapping_available(player.force, task, entity.name) then
+                    if identity then scan.seen[identity] = true end
+                    if task.all_upgrades then
+                        local distance = movement.distance_squared(scan.origin, entity.position)
+                        if #scan.entities < config.all_upgrades_batch_size then
+                            scan.entities[#scan.entities + constants.ITEM_TRANSFER_COUNT] = entity
+                        else
+                            -- Retain only a bounded nearest batch. Finding the
+                            -- farthest member costs at most the configured small
+                            -- batch size, independent of factory size.
+                            local farthest_index = constants.FIRST_INDEX
+                            local farthest_distance = movement.distance_squared(scan.origin,
+                                scan.entities[farthest_index].position)
+                            for index = constants.FIRST_INDEX + constants.ITEM_TRANSFER_COUNT, #scan.entities do
+                                local candidate_distance = movement.distance_squared(scan.origin,
+                                    scan.entities[index].position)
+                                if candidate_distance > farthest_distance then
+                                    farthest_index = index
+                                    farthest_distance = candidate_distance
+                                end
                             end
+                            if distance < farthest_distance then scan.entities[farthest_index] = entity end
                         end
-                        if distance < farthest_distance then scan.entities[farthest_index] = entity end
-                    end
-                else
-                    local nearest = scan.entities[constants.FIRST_INDEX]
-                    if not nearest or movement.distance_squared(value.entity.position, entity.position) <
-                            movement.distance_squared(value.entity.position, nearest.position) then
-                        scan.entities[constants.FIRST_INDEX] = entity
+                    else
+                        local nearest = scan.entities[constants.FIRST_INDEX]
+                        if not nearest or movement.distance_squared(value.entity.position, entity.position) <
+                                movement.distance_squared(value.entity.position, nearest.position) then
+                            scan.entities[constants.FIRST_INDEX] = entity
+                        end
                     end
                 end
             end
@@ -158,12 +160,15 @@ local function highlight(player, value)
     -- Replace the previous render object rather than accumulating rectangles as
     -- targets change, which would leak visuals into long-running saves.
     if value.highlight and value.highlight.valid then value.highlight.destroy() end
+    value.highlight = nil
+    if not (value.target and value.target.valid) then return false end
     value.highlight = rendering.draw_rectangle {
         color = config.highlight_color, width = constants.HIGHLIGHT_LINE_WIDTH, filled = false,
         left_top = value.target.bounding_box.left_top,
         right_bottom = value.target.bounding_box.right_bottom,
         surface = value.target.surface, draw_on_ground = true, players = {player.index}
     }
+    return true
 end
 
 local function cargo_count(value, item_name)
@@ -244,6 +249,22 @@ local function follow_player(player, value)
 end
 
 local function prepare_job(player, value, task)
+    -- Queued plans can outlive their chest or logistic network. They are also
+    -- promoted after update's active-reference checks, so validate them here
+    -- before the state machine can dereference them later in this same tick.
+    while #value.pickup_queue > constants.EMPTY_COUNT do
+        local source = value.pickup_queue[constants.FIRST_INDEX].source
+        if source and source.entity and source.entity.valid and
+                (not source.network or source.network.valid) then break end
+        table.remove(value.pickup_queue, constants.FIRST_INDEX)
+    end
+    while #value.delivery_queue > constants.EMPTY_COUNT do
+        local destination = value.delivery_queue[constants.FIRST_INDEX].destination
+        if destination and destination.entity and destination.entity.valid and
+                (not destination.network or destination.network.valid) then break end
+        table.remove(value.delivery_queue, constants.FIRST_INDEX)
+    end
+
     if #value.pickup_queue > constants.EMPTY_COUNT then
         value.supply = value.pickup_queue[constants.FIRST_INDEX].source
         value.phase = constants.PHASE.FETCH
@@ -520,6 +541,7 @@ end
 
 local function show_blocked_destination(player, value, destination, item_name)
     state.clear_blocked_destination(value)
+    if not (destination and destination.entity and destination.entity.valid) then return false end
     value.blocked_destination = {destination = destination, item_name = item_name}
     value.blocked_highlight = rendering.draw_rectangle {
         color = config.blocked_container_color,
@@ -537,6 +559,7 @@ local function show_blocked_destination(player, value, destination, item_name)
         icon = {type = "item", name = item_name},
         text = constants.BLOCKED_CONTAINER_TAG_TEXT
     })
+    return true
 end
 
 function bot.enable(player)
@@ -647,7 +670,8 @@ function bot.update(player, tick)
     -- upgrades. A non-mutating capacity probe resumes the return automatically.
     if value.blocked_destination then
         local blocked = value.blocked_destination
-        if not (blocked.destination and blocked.destination.entity and blocked.destination.entity.valid) then
+        if not (blocked.destination and blocked.destination.entity and blocked.destination.entity.valid) or
+                (blocked.destination.network and not blocked.destination.network.valid) then
             -- A destroyed destination cannot ever become writable. Keep the
             -- physical cargo, discard only the obsolete delivery instruction.
             state.clear_blocked_destination(value)
@@ -712,6 +736,9 @@ function bot.update(player, tick)
     if value.return_destination and (not value.return_destination.entity or
             not value.return_destination.entity.valid or
             (value.return_destination.network and not value.return_destination.network.valid)) then
+        if #value.delivery_queue > constants.EMPTY_COUNT then
+            table.remove(value.delivery_queue, constants.FIRST_INDEX)
+        end
         value.return_destination = nil
         value.return_item = nil
         -- Keep undelivered cargo when a destination disappears; silently
@@ -791,7 +818,8 @@ function bot.update(player, tick)
                     destination = supply.find_blocked_drop(origin and origin.network or fallback_network,
                         source_position)
                 end
-                if not destination and origin and origin.local_container and origin.entity.valid then
+                if not destination and origin and origin.local_container and origin.entity and
+                        origin.entity.valid then
                     destination = origin
                 end
                 if not destination and origin and origin.entity and origin.entity.valid then
@@ -845,7 +873,12 @@ function bot.update(player, tick)
                 value.return_destination = nil
                 value.return_item = nil
                 value.phase = constants.PHASE.FOLLOW
-                show_blocked_destination(player, value, destination, item_name)
+                if not show_blocked_destination(player, value, destination, item_name) then
+                    -- The destination may have been destroyed after it was
+                    -- queued. Retain the cargo and discard the stale delivery.
+                    table.remove(value.delivery_queue, constants.FIRST_INDEX)
+                    value.next_scan_tick = tick
+                end
             end
         else
             movement.towards(value.entity, value.return_destination.entity.position)

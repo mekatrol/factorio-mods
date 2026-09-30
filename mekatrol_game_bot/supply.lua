@@ -2,6 +2,10 @@ local movement = require("movement")
 local constants = require("constants")
 local supply = {}
 
+local function valid_entity(entity)
+    return entity and entity.valid
+end
+
 local function chest_inventory(entity)
     -- Centralizing inventory access ensures every pickup and return performs the
     -- same validity checks against entities that may be mined between ticks.
@@ -30,6 +34,7 @@ function supply.find_player_source(player, item_name)
 end
 
 function supply.find_red_container(player, target, bot_entity, item_name)
+    if not (valid_entity(target) and valid_entity(bot_entity)) then return nil end
     -- Entity-name filters throw instead of returning an empty result when a
     -- prototype is absent. Treat an unavailable passive-provider prototype as
     -- "no source" so base-game changes or overhaul mods cannot crash on_tick.
@@ -59,6 +64,7 @@ function supply.find_red_container(player, target, bot_entity, item_name)
 end
 
 function supply.find_red_drop_container(player, target, bot_entity, item_name)
+    if not (valid_entity(target) and valid_entity(bot_entity)) then return nil end
     -- A full upgrade hold may need to offload a surplus item before collecting
     -- the replacement required by local work. Passive providers are explicitly
     -- player-managed exchange chests, so select the nearest one with room.
@@ -90,12 +96,14 @@ end
 function supply.networks_for(player, target)
     -- Construction-area lookup mirrors vanilla construction eligibility. It
     -- can return multiple networks where disconnected green areas overlap.
+    if not valid_entity(target) then return {} end
     return target.surface.find_logistic_networks_by_construction_area(target.position, player.force)
 end
 
 -- Use Factorio's logistic-network selector so active providers, storage,
 -- buffers, and passive providers follow the engine's normal source priority.
 function supply.find_source(player, target, item_name)
+    if not valid_entity(target) then return nil end
     local networks = supply.networks_for(player, target)
     local best, best_distance
     for _, network in pairs(networks) do
@@ -128,6 +136,7 @@ end
 -- target lies outside that network's construction area; otherwise visible
 -- replacement stock can leave the bot following with an empty cargo hold.
 function supply.find_nearby_container(player, target, bot_entity, item_name, radius)
+    if not (valid_entity(target) and valid_entity(bot_entity)) then return nil end
     local entities = {}
     local seen = {}
     -- A player may lead the following bot to a supply chest after the track has
@@ -165,6 +174,7 @@ function supply.find_nearby_container(player, target, bot_entity, item_name, rad
 end
 
 function supply.find_nearby_drop_container(player, target, item_name, radius)
+    if not valid_entity(target) then return nil end
     -- Recovery for cargo created before delivery provenance existed uses an
     -- ordinary nearby chest with room. Logistic containers continue to use the
     -- network's storage selector so requester/provider semantics are respected.

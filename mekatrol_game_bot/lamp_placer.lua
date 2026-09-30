@@ -100,8 +100,9 @@ local function in_power_area(surface, force, position)
         force = force
     }
     for _, pole in ipairs(poles) do
-        local reach = pole.prototype.get_supply_area_distance(pole.quality) or constants.EMPTY_COUNT
-        if pole.electric_network_id and math.abs(pole.position.x - position.x) <= reach and
+        local reach = pole.valid and pole.prototype.get_supply_area_distance(pole.quality) or
+                          constants.EMPTY_COUNT
+        if pole.valid and pole.electric_network_id and math.abs(pole.position.x - position.x) <= reach and
                 math.abs(pole.position.y - position.y) <= reach then
             return true
         end

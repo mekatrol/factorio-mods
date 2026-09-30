@@ -45,8 +45,8 @@ local function create(player, value)
         force = player.force,
         raise_built = true
     }
-    if value.entity then value.entity.destructible = true end
-    return value.entity ~= nil
+    if value.entity and value.entity.valid then value.entity.destructible = true end
+    return value.entity ~= nil and value.entity.valid
 end
 
 local function follow(player, value)
