@@ -58,22 +58,37 @@ local function connected_entities(entity)
     return connected
 end
 
-function track.discover(seed, task)
+function track.discover(seed, task, candidates)
     if not (seed and seed.valid) then return nil end
     local grouping = task.grouping
     if task.all_upgrades then
         local mapping = registry_for(task).mapping_for(task, seed.name)
         grouping = mapping and mapping.owner_task and mapping.owner_task.grouping or nil
     end
-    -- Tasks that do not opt into belt grouping remain valid extension points:
-    -- their work group is simply the selected entity rather than assuming that
-    -- every future upgrade prototype exposes belt-specific API properties.
+    -- Composite independent work is a local batch rather than a one-entity
+    -- group. This lets the scheduler reserve cargo and collect supplies for all
+    -- nearby inserters/containers at once. Belt-owned candidates are excluded
+    -- because each physical belt network must remain a separate locked job.
     if grouping ~= constants.GROUP_STRATEGY.BELT_NETWORK then
+        local entities = {seed}
+        if task.all_upgrades and candidates then
+            entities = {}
+            for _, candidate in ipairs(candidates) do
+                if candidate and candidate.valid then
+                    local candidate_mapping = registry_for(task).mapping_for(task, candidate.name)
+                    local owner = candidate_mapping and candidate_mapping.owner_task
+                    if not owner or owner.grouping ~= constants.GROUP_STRATEGY.BELT_NETWORK then
+                        entities[#entities + constants.ITEM_TRANSFER_COUNT] = candidate
+                    end
+                end
+            end
+        end
         return {
-            entities = {seed},
+            entities = entities,
             anchor_position = {x = seed.position.x, y = seed.position.y},
             surface_index = seed.surface.index,
-            force_index = seed.force.index
+            force_index = seed.force.index,
+            independent_batch = task.all_upgrades or nil
         }
     end
 

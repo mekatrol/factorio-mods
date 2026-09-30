@@ -110,7 +110,18 @@ local function target_candidates(player, value, task)
                         registry.mapping_available(player.force, task, entity.name) then
                     if identity then scan.seen[identity] = true end
                     local nearest = scan.entities[constants.FIRST_INDEX]
-                    if not nearest or movement.distance_squared(value.entity.position, entity.position) <
+                    if not nearest then
+                        scan.entities[constants.FIRST_INDEX] = entity
+                    elseif task.all_upgrades and movement.distance_squared(value.entity.position, entity.position) <
+                            movement.distance_squared(value.entity.position, nearest.position) then
+                        -- Composite mode needs the complete local candidate set
+                        -- for batch planning, but keeps the nearest entity first
+                        -- so it still decides which kind of work to start with.
+                        scan.entities[#scan.entities + constants.ITEM_TRANSFER_COUNT] = nearest
+                        scan.entities[constants.FIRST_INDEX] = entity
+                    elseif task.all_upgrades then
+                        scan.entities[#scan.entities + constants.ITEM_TRANSFER_COUNT] = entity
+                    elseif movement.distance_squared(value.entity.position, entity.position) <
                             movement.distance_squared(value.entity.position, nearest.position) then
                         scan.entities[constants.FIRST_INDEX] = entity
                     end
@@ -286,9 +297,10 @@ local function prepare_job(player, value, task)
             end
             return false
         end
-        -- Composite mode also locks onto one physical belt network. For its
-        -- non-belt tasks discover() deliberately returns only the seed entity.
-        value.track = track.discover(seed, task)
+        -- Composite mode locks belt work onto one physical network, while
+        -- independent entities share one local batch so supplies are collected
+        -- for many inserters/containers in a single trip.
+        value.track = track.discover(seed, task, candidates)
         track.draw(player, value, task)
     end
 
@@ -798,7 +810,9 @@ function bot.update(player, tick)
                 -- A replacement in composite mode can be the source of its
                 -- next tier (yellow -> red -> blue). Rebuild from the locked
                 -- anchor so the same network is exhausted before another one.
-                if task.all_upgrades then track.refresh(player, value, task) end
+                if task.all_upgrades and not (value.track and value.track.independent_batch) then
+                    track.refresh(player, value, task)
+                end
             else
                 value.failures = value.failures + constants.ITEM_TRANSFER_COUNT
                 value.paired_underground_target = nil
