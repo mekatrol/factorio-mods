@@ -89,6 +89,12 @@ return {
     lamp = {
         follow_offset = {x = -2, y = -2.25}
     },
+
+    -- The fourth helper has its own formation slot and progression policy.
+    track = {
+        follow_offset = {x = -2, y = 2.25},
+        default_task = constants.TRACK_DEFAULT_TASK_NAME
+    },
     
     -- Orange visually distinguishes upgrade work from the role colors used by
     -- the reference gameplay mod's other bots.

@@ -9,6 +9,33 @@ function state.ensure()
     storage[constants.STORAGE_KEY].players = storage[constants.STORAGE_KEY].players or {}
     storage[constants.STORAGE_KEY].cleanup_players = storage[constants.STORAGE_KEY].cleanup_players or {}
     storage[constants.STORAGE_KEY].lamp_players = storage[constants.STORAGE_KEY].lamp_players or {}
+    storage[constants.STORAGE_KEY].track_players = storage[constants.STORAGE_KEY].track_players or {}
+end
+
+function state.get_track(player_index)
+    state.ensure()
+    local players = storage[constants.STORAGE_KEY].track_players
+    local value = players[player_index]
+    if not value then
+        -- This mirrors the mature upgrade engine's state, but is deliberately
+        -- isolated so both helpers can work concurrently without sharing cargo.
+        value = {enabled = false, task_name = config.track.default_task, entity = nil, target = nil,
+                 supply = nil, phase = constants.PHASE.FOLLOW, cargo = {}, next_scan_tick = 0,
+                 job_network = nil, return_destination = nil, return_item = nil, source_container = nil,
+                 track = nil, track_highlights = {}, target_scan = nil, paired_underground_target = nil,
+                 track_refresh_requested = false, pickup_queue = {}, delivery_queue = {},
+                 blocked_destination = nil, blocked_tag = nil, blocked_highlight = nil, cargo_origins = {},
+                 last_player_position = nil, side_offset_x = config.track.follow_offset.x,
+                 upgraded = 0, failures = 0, highlight = nil, mode_label = nil}
+        players[player_index] = value
+    end
+    value.cargo = value.cargo or {}
+    value.track_highlights = value.track_highlights or {}
+    value.pickup_queue = value.pickup_queue or {}
+    value.delivery_queue = value.delivery_queue or {}
+    value.cargo_origins = value.cargo_origins or {}
+    value.side_offset_x = value.side_offset_x or config.track.follow_offset.x
+    return value
 end
 
 function state.get(player_index)
@@ -47,6 +74,16 @@ function state.get(player_index)
     if value.task_name == "place-lamps" then
         value.task_name = config.default_task
         state.get_lamp(player_index).enabled = true
+    end
+    -- Belt modes from pre-1.8 saves migrate to the new independent helper.
+    if value.task_name == "yellow-to-red-belts" or value.task_name == "red-to-blue-belts" then
+        local track_value = state.get_track(player_index)
+        track_value.task_name = value.task_name == "red-to-blue-belts" and
+                                    "red-to-blue-tracks" or constants.TRACK_DEFAULT_TASK_NAME
+        -- Entity creation belongs to the controller, so migration records the
+        -- stage but leaves activation to the player's new track-bot toggle.
+        track_value.enabled = false
+        value.task_name = config.default_task
     end
     return value
 end

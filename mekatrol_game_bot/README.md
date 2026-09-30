@@ -1,13 +1,20 @@
 # Upgrade Bot
 
-This mod contains three independently controlled helpers. The upgrade bot uses
+This mod contains four independently controlled helpers. The general upgrade bot uses
 `Ctrl+Shift+U` and `/ub`, the cleanup bot uses `Ctrl+Shift+C` and `/cb`, and the
-lamp bot uses `Ctrl+Shift+L` and `/lb`. When idle, all three use separate
+lamp bot uses `Ctrl+Shift+L` and `/lb`. The progressive track bot uses
+`Ctrl+Shift+T` and `/tb`. When idle, all four use separate
 formation slots and switch to the trailing side when the player changes
 horizontal direction, matching `mekatrol_game_play_mod`.
 
-`Ctrl+Shift+U` toggles the bot. It starts with the `yellow-to-red-belts` task,
-which upgrades transport belts, underground belts, and splitters near the player.
+The track bot upgrades connected transport belts, underground belts, and
+splitters near the player in strict yellow -> red -> blue -> green order. It
+does not enter a stage until the prior colour is complete in the active area,
+and it waits when the next colour's recipe has not been researched. Green means
+the optional turbo tier; without those prototypes the final stage remains idle.
+
+`Ctrl+Shift+U` toggles the general upgrade bot. Track work is intentionally not
+part of its task list.
 It does not create replacement items. For targets inside a player-force
 roboport construction area, the bot first asks that logistic network for the
 required item using Factorio's provider/storage/buffer source selection. It
@@ -54,18 +61,27 @@ Commands:
 /ub                         (cycle upgrade mode)
 /upgrade-bot on
 /upgrade-bot off
-/upgrade-bot task yellow-to-red-belts
 /upgrade-bot task all
 /upgrade-bot tasks
 /upgrade-bot status
 /upgrade-bot refresh
 ```
 
-The built-in upgrade modes are `All upgrades`, `Yellow -> Red`, `Red -> Blue`,
-`Blue -> Green arms`, and `Containers` (wooden to iron, then iron to steel).
+The built-in general upgrade modes are `All upgrades`, `Blue -> Green arms`,
+and `Containers` (wooden to iron, then iron to steel).
 `/ub` cycles upgrade modes; it also remains a short alias when followed by a
 command. New jobs belong in `tasks.lua`; the bot engine does not contain entity
 names.
+
+The progressive track helper deliberately has no manual task selector:
+
+```text
+/tb
+/track-upgrade-bot on
+/track-upgrade-bot off
+/track-upgrade-bot status
+/track-upgrade-bot refresh
+```
 
 ## Lamp bot
 
@@ -97,9 +113,9 @@ be a table with `target`, `required_item`, `recovered_item`, and optional
 `create_parameters(entity, player)` fields when an
 entity has state that must be preserved. Jobs may also provide an
 `execute(player, entity, mapping)` function for entirely non-standard upgrades.
-The `All upgrades` mode automatically includes every registered mapping and
-locks onto one connected belt network at a time. Non-belt upgrades are handled
-one entity at a time. It uses one 100-item mixed cargo limit and exhausts locally
+The `All upgrades` mode automatically includes every registered general mapping.
+The track helper locks onto one connected belt network at a time. Other upgrades
+are handled one entity at a time. Each helper uses its own 100-item mixed cargo limit and exhausts locally
 usable cargo before it returns recovered items or plans another supply collection.
 Discovery advances through small map cells over successive ticks to find the
 nearest next target without doing an unbounded planning pass in one update.

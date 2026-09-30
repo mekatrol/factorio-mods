@@ -2,7 +2,14 @@ local config = require("config")
 local constants = require("constants")
 local movement = require("movement")
 local registry = require("task_registry")
+local track_registry = require("track_task_registry")
 local track = {}
+
+local function registry_for(task)
+    -- Both helpers share graph discovery, while research checks remain owned by
+    -- the registry that supplied the task definition.
+    return task and task.progressive_tracks and track_registry or registry
+end
 
 local function accepted_names(task)
     -- Traversal must cross both source and already-upgraded prototypes. Without
@@ -55,7 +62,7 @@ function track.discover(seed, task)
     if not (seed and seed.valid) then return nil end
     local grouping = task.grouping
     if task.all_upgrades then
-        local mapping = registry.mapping_for(task, seed.name)
+        local mapping = registry_for(task).mapping_for(task, seed.name)
         grouping = mapping and mapping.owner_task and mapping.owner_task.grouping or nil
     end
     -- Tasks that do not opt into belt grouping remain valid extension points:
@@ -169,7 +176,7 @@ function track.remaining_entities(group, task, position, force, sort_by_distance
     local remaining = {}
     for _, entity in pairs(group and group.entities or {}) do
         if entity and entity.valid and task.mappings[entity.name] and
-                (not force or registry.mapping_available(force, task, entity.name)) then
+                (not force or registry_for(task).mapping_available(force, task, entity.name)) then
             remaining[#remaining + constants.ITEM_TRANSFER_COUNT] = entity
         end
     end
@@ -212,7 +219,7 @@ function track.draw(player, value, task)
     -- outstanding work and therefore receive an outline.
     for _, entity in pairs(value.track and value.track.entities or {}) do
         if entity and entity.valid and task and task.mappings[entity.name] and
-                registry.mapping_available(player.force, task, entity.name) then
+                registry_for(task).mapping_available(player.force, task, entity.name) then
             local outer = draw_border(player, entity, config.track_highlight_outer_color,
                 constants.TRACK_HIGHLIGHT_OUTER_WIDTH)
             local inner = draw_border(player, entity, config.track_highlight_inner_color,

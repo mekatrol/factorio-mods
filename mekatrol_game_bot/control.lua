@@ -1,6 +1,7 @@
 local bot = require("bot")
 local cleanup = require("cleanup_bot")
 local lamp = require("lamp_bot")
+local track_bot = require("track_upgrade_bot")
 local config = require("config")
 local constants = require("constants")
 local registry = require("task_registry")
@@ -79,6 +80,24 @@ local function register_commands()
     if not commands.commands[constants.LAMP_SHORT_COMMAND_NAME] then
         commands.add_command(constants.LAMP_SHORT_COMMAND_NAME, constants.LAMP_COMMAND_DESCRIPTION, lamp_command)
     end
+    local function track_command(command_data)
+        local player = player_for(command_data)
+        if not (player and player.valid) then return end
+        local action = string.match(command_data.parameter or constants.EMPTY_TEXT, "^(%S+)") or constants.ACTION.STATUS
+        if action == constants.ACTION.ON or action == constants.ACTION.START then track_bot.enable(player)
+        elseif action == constants.ACTION.OFF or action == constants.ACTION.STOP then track_bot.disable(player)
+        elseif action == constants.ACTION.TOGGLE then track_bot.toggle(player)
+        elseif action == constants.ACTION.STATUS then track_bot.status(player)
+        elseif action == constants.ACTION.REFRESH then track_bot.refresh_track(player)
+        else player.print(constants.TRACK_COMMAND_USAGE) end
+    end
+    -- No task selector is exposed: stage order belongs to the bot controller.
+    if not commands.commands[constants.TRACK_COMMAND_NAME] then
+        commands.add_command(constants.TRACK_COMMAND_NAME, constants.TRACK_COMMAND_DESCRIPTION, track_command)
+    end
+    if not commands.commands[constants.TRACK_SHORT_COMMAND_NAME] then
+        commands.add_command(constants.TRACK_SHORT_COMMAND_NAME, constants.TRACK_COMMAND_DESCRIPTION, track_command)
+    end
 end
 
 script.on_init(function() state.ensure(); register_commands() end)
@@ -110,10 +129,16 @@ register_custom_input(constants.LAMP_CUSTOM_INPUT_NAME, function(event)
     if player and player.valid then lamp.toggle(player) end
 end)
 
+register_custom_input(constants.TRACK_CUSTOM_INPUT_NAME, function(event)
+    local player = player_for(event)
+    if player and player.valid then track_bot.toggle(player) end
+end)
+
 local function request_track_refresh(event)
     -- Mutation events can fire before the engine finishes every connection
     -- update. The bot therefore records intent here and rebuilds next tick.
     bot.request_track_refresh(event.entity or event.created_entity or event.destination)
+    track_bot.request_track_refresh(event.entity or event.created_entity or event.destination)
 end
 
 -- These events cover player, robot, combat, and script-driven changes without
@@ -145,6 +170,12 @@ script.on_event(defines.events.on_player_removed, function(event)
         state.destroy_lamp(lamp_value)
         lamp_players[event.player_index] = nil
     end
+    local track_players = storage[constants.STORAGE_KEY].track_players
+    local track_value = track_players[event.player_index]
+    if track_value then
+        state.destroy(track_value)
+        track_players[event.player_index] = nil
+    end
 end)
 
 script.on_event(defines.events.on_tick, function(event)
@@ -155,5 +186,6 @@ script.on_event(defines.events.on_tick, function(event)
         bot.update(player, event.tick)
         cleanup.update(player, event.tick)
         lamp.update(player, event.tick)
+        track_bot.update(player, event.tick)
     end
 end)

@@ -26,7 +26,15 @@ local constants = {
     PRIMARY_COMMAND_NAME = "upgrade-bot",
     SHORT_COMMAND_NAME = "ub",
     STORAGE_KEY = "mekatrol_game_bot",
-    DEFAULT_TASK_NAME = "yellow-to-red-belts",
+    DEFAULT_TASK_NAME = "containers",
+    -- The track helper has independent controls and persistent state because
+    -- rail/belt progression must never be mixed with general factory upgrades.
+    TRACK_BOT_ENTITY_NAME = "upgrade-bot",
+    TRACK_CUSTOM_INPUT_NAME = "track-upgrade-bot-toggle",
+    TRACK_CUSTOM_INPUT_KEY_SEQUENCE = "CONTROL + SHIFT + T",
+    TRACK_COMMAND_NAME = "track-upgrade-bot",
+    TRACK_SHORT_COMMAND_NAME = "tb",
+    TRACK_DEFAULT_TASK_NAME = "yellow-to-red-tracks",
     -- The composite mode is registered after the concrete upgrade tasks so it
     -- can safely combine their mappings without duplicating task data.
     ALL_TASK_NAME = "all-upgrades",
@@ -99,6 +107,8 @@ local constants = {
     CLEANUP_COMMAND_USAGE = "[Cleanup Bot] usage: /cb [on|off|toggle|status]",
     LAMP_COMMAND_DESCRIPTION = "Control the lamp bot",
     LAMP_COMMAND_USAGE = "[Lamp Bot] usage: /lb [on|off|toggle|status]",
+    TRACK_COMMAND_DESCRIPTION = "Control the progressive track upgrade bot",
+    TRACK_COMMAND_USAGE = "[Track Bot] usage: /tb [on|off|toggle|status|refresh]",
     COMMAND_USAGE = "[Upgrade Bot] usage: /ub [on|off|toggle|task NAME|tasks|status|refresh] (bare /ub changes mode)",
     TASK_LIST_PREFIX = "[Upgrade Bot] tasks: ",
     EMPTY_TEXT = "",

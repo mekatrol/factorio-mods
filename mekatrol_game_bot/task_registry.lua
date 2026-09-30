@@ -126,7 +126,10 @@ end
 
 -- Built-in tasks use the same public registration path that future modules can
 -- use, preventing two subtly different task formats from developing.
-for _, definition in ipairs(require("tasks")) do registry.register(definition) end
+for _, definition in ipairs(require("tasks")) do
+    -- Belt-network jobs are owned by the independent progressive track bot.
+    if definition.grouping ~= constants.GROUP_STRATEGY.BELT_NETWORK then registry.register(definition) end
+end
 register_all_upgrades()
 
 return registry
