@@ -76,6 +76,14 @@ local function target_candidates(player, value, task)
             names = registry.source_names(task)
         }
         value.target_scan = scan
+    else
+        -- Incremental scans retain candidates across ticks. A candidate can be
+        -- mined or destroyed before the next cell is processed, and reading
+        -- position from that invalid LuaEntity raises a non-recoverable error.
+        for index = #scan.entities, constants.FIRST_INDEX, -constants.ITEM_TRANSFER_COUNT do
+            local entity = scan.entities[index]
+            if not (entity and entity.valid) then table.remove(scan.entities, index) end
+        end
     end
 
     local cell_size = config.target_scan_cell_size
