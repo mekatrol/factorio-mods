@@ -2,7 +2,7 @@
 -- Changes take effect after restarting Factorio.
 return {
   cannon = {
-    maximum_range = 150,
+    maximum_range = 112, -- Approximate radius of a normal radar's 7x7-chunk live coverage.
     minimum_range = 12,
     cooldown_ticks = 180, -- 60 ticks = 1 second at normal game speed.
     rotation_speed = 0.0015,

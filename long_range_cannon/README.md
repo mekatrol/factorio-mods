@@ -1,6 +1,6 @@
 # Long-Range Cannon
 
-Adds a heavy, fully rotating defensive cannon with a maximum range of 150 tiles.
+Adds a heavy, fully rotating defensive cannon with a maximum range of 112 tiles, matching the approximate live-coverage radius of a normal radar.
 
 ## Recipes
 

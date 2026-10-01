@@ -102,13 +102,15 @@ local round = {
   ammo_category = ammo_category,
   ammo_type = {
     category = ammo_category,
-    target_type = "position",
+    target_type = "entity",
     action = {
       type = "direct",
       action_delivery = {
         type = "projectile",
         projectile = "long-range-cannon-projectile",
         starting_speed = config.round.projectile_starting_speed,
+        direction_deviation = 0,
+        range_deviation = 0,
         max_range = config.cannon.maximum_range,
         min_range = config.cannon.minimum_range
       }
@@ -139,6 +141,11 @@ projectile.collision_box = {{0, 0}, {0, 0}}
 projectile.hit_collision_mask = {layers = {}}
 projectile.piercing_damage = 0
 projectile.force_condition = "not-same"
+-- The base tank shell may use straight-line flight. This turret fires at a
+-- specific entity, so retain that entity as a homing target until impact and
+-- apply the action at the entity's centre rather than a collision-box edge.
+projectile.direction_only = false
+projectile.hit_at_collision_position = false
 projectile.acceleration = config.round.projectile_acceleration
 projectile.max_speed = config.round.projectile_maximum_speed
 projectile.action = {
