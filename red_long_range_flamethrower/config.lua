@@ -19,6 +19,7 @@ local config = {
   combat = {
     maximum_range = 60,
     minimum_range = 25,
+    turn_range = 1,
     prepare_range = 65,
     fluid_consumption = 0.2
   },

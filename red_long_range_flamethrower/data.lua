@@ -31,6 +31,7 @@ turret.minable.result = config.prototype_name
 turret.next_upgrade = nil
 turret.attack_parameters.range = config.combat.maximum_range
 turret.attack_parameters.min_range = config.combat.minimum_range
+turret.attack_parameters.turn_range = config.combat.turn_range
 turret.attack_parameters.fluid_consumption = config.combat.fluid_consumption
 turret.prepare_range = config.combat.prepare_range
 tint_runtime_layers(turret)

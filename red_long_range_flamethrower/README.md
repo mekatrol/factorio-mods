@@ -3,6 +3,7 @@
 Adds a red variant of the vanilla flamethrower turret.
 
 - Maximum range: 60 tiles (vanilla: 30)
+- Firing arc: 360 degrees
 - Minimum range: 6 tiles (unchanged)
 - Fluid consumption: 0.2 (unchanged)
 - Recipe: 1 standard flamethrower turret and 2 engine units
