@@ -56,7 +56,17 @@ local turret_animation = {
   }
 }
 
-cannon.base_picture = nil
+cannon.base_picture = {
+  layers = {
+    {
+      filename = "__long_range_cannon__/graphics/entity/long-range-cannon-base.png",
+      priority = "high",
+      width = 256,
+      height = 256,
+      scale = 0.5
+    }
+  }
+}
 cannon.folded_animation = table.deepcopy(turret_animation)
 cannon.preparing_animation = table.deepcopy(turret_animation)
 cannon.prepared_animation = table.deepcopy(turret_animation)

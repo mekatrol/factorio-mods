@@ -1,5 +1,6 @@
 param(
-  [Parameter(Mandatory = $true)][string]$CannonSource,
+  [Parameter(Mandatory = $true)][string]$GunSource,
+  [Parameter(Mandatory = $true)][string]$BaseSource,
   [Parameter(Mandatory = $true)][string]$RoundSource
 )
 
@@ -43,12 +44,12 @@ function New-PivotedCannonBitmap([string]$Path, [int]$Size, [int]$Padding) {
     # The generated source includes a long barrel and asymmetric transparent
     # padding. These coordinates identify the centre of the circular mounting
     # ring, which is the turret's actual rotation axis.
-    $sourcePivotX = $source.Width * (626.0 / 1536.0)
-    $sourcePivotY = $source.Height * (808.0 / 1536.0)
+    $sourcePivotX = $source.Width * (626.0 / 1254.0)
+    $sourcePivotY = $source.Height * (808.0 / 1254.0)
 
     # The most distant visible pixel is the muzzle, about 804 source pixels
     # from the pivot. Scale by that radius so every rotation fits in one frame.
-    $sourceRadius = $source.Height * (804.0 / 1536.0)
+    $sourceRadius = $source.Height * (804.0 / 1254.0)
     $scale = (($Size / 2) - $Padding) / $sourceRadius
     $width = [int][Math]::Round($source.Width * $scale)
     $height = [int][Math]::Round($source.Height * $scale)
@@ -73,7 +74,8 @@ function New-PivotedCannonBitmap([string]$Path, [int]$Size, [int]$Padding) {
   }
 }
 
-$cannon = New-PivotedCannonBitmap $CannonSource 256 5
+$cannon = New-PivotedCannonBitmap $GunSource 256 5
+$base = New-FittedBitmap $BaseSource 256 5
 $sheet = New-Object System.Drawing.Bitmap(2048, 2048, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
 $sheetGraphics = [System.Drawing.Graphics]::FromImage($sheet)
 try {
@@ -92,18 +94,20 @@ try {
     $sheetGraphics.Restore($state)
   }
   $sheet.Save((Join-Path $entityRoot "long-range-cannon-sheet.png"), [System.Drawing.Imaging.ImageFormat]::Png)
+  $base.Save((Join-Path $entityRoot "long-range-cannon-base.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 } finally {
   $sheetGraphics.Dispose()
   $sheet.Dispose()
 }
 
-$cannonIcon = New-FittedBitmap $CannonSource 64 2
+$cannonIcon = New-FittedBitmap $BaseSource 64 2
 $roundIcon = New-FittedBitmap $RoundSource 64 3
 try {
   $cannonIcon.Save((Join-Path $iconRoot "long-range-cannon.png"), [System.Drawing.Imaging.ImageFormat]::Png)
   $roundIcon.Save((Join-Path $iconRoot "long-range-cannon-round.png"), [System.Drawing.Imaging.ImageFormat]::Png)
 } finally {
   $cannon.Dispose()
+  $base.Dispose()
   $cannonIcon.Dispose()
   $roundIcon.Dispose()
 }
