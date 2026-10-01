@@ -44,12 +44,14 @@ function New-PivotedCannonBitmap([string]$Path, [int]$Size, [int]$Padding) {
     # The generated source includes a long barrel and asymmetric transparent
     # padding. These coordinates identify the centre of the circular mounting
     # ring, which is the turret's actual rotation axis.
+    # The source is 1254 x 1536. Normalise each measured coordinate against
+    # its own axis; using the width for Y makes the mounting point orbit.
     $sourcePivotX = $source.Width * (626.0 / 1254.0)
-    $sourcePivotY = $source.Height * (808.0 / 1254.0)
+    $sourcePivotY = $source.Height * (808.0 / 1536.0)
 
     # The most distant visible pixel is the muzzle, about 804 source pixels
     # from the pivot. Scale by that radius so every rotation fits in one frame.
-    $sourceRadius = $source.Height * (804.0 / 1254.0)
+    $sourceRadius = $source.Height * (804.0 / 1536.0)
     $scale = (($Size / 2) - $Padding) / $sourceRadius
     $width = [int][Math]::Round($source.Width * $scale)
     $height = [int][Math]::Round($source.Height * $scale)
