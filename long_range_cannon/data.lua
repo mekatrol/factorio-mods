@@ -3,6 +3,7 @@ local config = require("config")
 local cannon_name = "long-range-cannon"
 local round_name = "long-range-cannon-round"
 local ammo_category = "long-range-cannon-shell"
+local stationary_target_mask = "long-range-cannon-stationary-target"
 
 local cannon = table.deepcopy(data.raw["ammo-turret"]["gun-turret"])
 cannon.name = cannon_name
@@ -23,6 +24,7 @@ cannon.rotation_speed = config.cannon.rotation_speed
 cannon.preparing_speed = 0.04
 cannon.folding_speed = 0.04
 cannon.call_for_help_radius = config.cannon.maximum_range
+cannon.attack_target_mask = {stationary_target_mask}
 cannon.attack_parameters = {
   type = "projectile",
   ammo_category = ammo_category,
@@ -96,8 +98,7 @@ local round = {
         projectile = "long-range-cannon-projectile",
         starting_speed = config.round.projectile_starting_speed,
         max_range = config.cannon.maximum_range,
-        min_range = config.cannon.minimum_range,
-        source_effects = {{type = "create-explosion", entity_name = "artillery-cannon-muzzle-flash"}}
+        min_range = config.cannon.minimum_range
       }
     }
   },
@@ -119,10 +120,18 @@ local round_recipe = {
 
 local projectile = table.deepcopy(data.raw.projectile["cannon-projectile"])
 projectile.name = "long-range-cannon-projectile"
+-- This is a ballistic shell, not a tank round. An empty collision box and hit
+-- mask let it pass over the shooter's own factory and all intervening objects;
+-- its action is executed only when it reaches the selected target.
+projectile.collision_box = {{0, 0}, {0, 0}}
+projectile.hit_collision_mask = {layers = {}}
+projectile.piercing_damage = 0
+projectile.force_condition = "not-same"
 projectile.acceleration = config.round.projectile_acceleration
 projectile.max_speed = config.round.projectile_maximum_speed
 projectile.action = {
   type = "direct",
+  force = "enemy",
   action_delivery = {
     type = "instant",
     target_effects = {
@@ -145,6 +154,7 @@ projectile.action = {
 }
 
 data:extend({
+  {type = "trigger-target-type", name = stationary_target_mask},
   {type = "ammo-category", name = ammo_category},
   cannon,
   cannon_item,

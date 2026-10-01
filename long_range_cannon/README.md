@@ -9,5 +9,6 @@ Adds a heavy, fully rotating defensive cannon with a maximum range of 150 tiles.
 
 Both recipes unlock with Military 3. The cannon fires one round every three seconds, has a 12-tile minimum range, and deals explosive damage in a 3-tile blast radius.
 The blast is restricted to enemy forces and will not damage allied buildings or players.
+The cannon automatically targets only stationary enemy spawners and worm-style turrets; it ignores mobile biters and spitters. Shells pass harmlessly over intervening structures and apply all impact effects only where the projectile lands.
 
 Balance values and recipe ingredients can be changed in `config.lua`. Restart Factorio after editing the file.
