@@ -12,3 +12,11 @@ The blast is restricted to enemy forces and will not damage allied buildings or 
 The cannon automatically targets only stationary enemy spawners and worm-style turrets in chunks that are currently visible to its force; it ignores enemies hidden by fog of war as well as mobile biters and spitters. It enforces the closest eligible target every game tick. Shells pass harmlessly over intervening structures and apply all impact effects only where the projectile lands.
 
 Balance values and recipe ingredients can be changed in `config.lua`. Restart Factorio after editing the file.
+
+## Generate sprite sheet
+```powershell
+.\build_graphics.ps1 `
+  -GunSource ".\graphics\entity\long-range-cannon-sprite.png" `
+  -BaseSource ".\graphics\entity\long-range-cannon-base.png" `
+  -RoundSource ".\graphics\icons\long-range-cannon-round.png"
+```
