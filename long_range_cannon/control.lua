@@ -41,13 +41,25 @@ end
 
 local function update_cannon(cannon)
   local target = nearest_visible_stationary_enemy(cannon)
+
+  -- Keep the native turret AI from choosing a different target while the
+  -- scripted target is being changed.  In particular, the engine does not
+  -- apply fog-of-war when acquiring ordinary automatic-turret targets.
+  cannon.active = false
+  cannon.ignore_unprioritised_targets = true
+
   if target then
-    cannon.active = true
+    -- The priority entry is an additional guard against the native AI
+    -- replacing our target during its update.  shooting_target selects the
+    -- exact entity; the priority list restricts automatic acquisition to the
+    -- same prototype if the engine needs to reacquire it.
+    cannon.set_priority_target(1, target)
     cannon.shooting_target = target
+    cannon.active = true
   else
-    -- A turret target cannot be cleared through the runtime API. Deactivating
-    -- it prevents the engine from firing at a target hidden by fog of war.
-    cannon.active = false
+    cannon.set_priority_target(1, nil)
+    -- A shooting target cannot be cleared through the runtime API, so leaving
+    -- the cannon inactive is what prevents a stale fog-of-war shot.
   end
 end
 
@@ -63,6 +75,8 @@ local function disable_new_cannon(event)
   local entity = event.created_entity or event.entity or event.destination
   if entity and entity.valid and entity.name == cannon_name then
     entity.active = false
+    entity.ignore_unprioritised_targets = true
+    entity.set_priority_target(1, nil)
   end
 end
 
