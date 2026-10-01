@@ -85,7 +85,8 @@ return {
 
     cliff = {
         follow_offset = {x = -2, y = 3.75},
-        work_distance = 1.5
+        work_distance = 1.5,
+        projectile_speed = 0.3
     },
 
     -- The third bot occupies its own vertical formation slot. Its horizontal

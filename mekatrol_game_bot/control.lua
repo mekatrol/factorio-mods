@@ -120,7 +120,25 @@ local function register_commands()
 end
 
 script.on_init(function() state.ensure(); register_commands() end)
-script.on_configuration_changed(function() state.ensure(); register_commands() end)
+script.on_configuration_changed(function(event)
+    state.ensure()
+    register_commands()
+    local change = event.mod_changes and event.mod_changes[script.mod_name]
+    if change and change.old_version == "1.9.4" then
+        -- 1.9.4 could lose the state reference when an explosion destroyed
+        -- several queued cliffs. Remove only its distinctive orange rectangles.
+        for _, object in pairs(rendering.get_all_objects(script.mod_name)) do
+            if object.type == "rectangle" and object.width == 3 then
+                local color = object.color
+                if math.abs(color.r - 1) < 0.001 and math.abs(color.g - 0.35) < 0.001 and
+                        math.abs(color.b - 0.05) < 0.001 then
+                    object.destroy()
+                end
+            end
+        end
+        for _, player in pairs(game.players) do cliff.redraw_markers(player) end
+    end
+end)
 script.on_load(register_commands)
 
 local function register_custom_input(name, handler)
@@ -230,6 +248,12 @@ script.on_event(defines.events.on_player_removed, function(event)
 end)
 
 script.on_event(defines.events.on_tick, function(event)
+    state.ensure()
+    local root = storage[constants.STORAGE_KEY]
+    if not root.cliff_marker_cleanup_1_9_6 then
+        cliff.cleanup_legacy_markers()
+        root.cliff_marker_cleanup_1_9_6 = true
+    end
     -- A shared cadence avoids registering per-player tick handlers and allows
     -- tuning CPU cost from one configuration value.
     if event.tick % config.update_interval ~= constants.EMPTY_COUNT then return end

@@ -12,7 +12,8 @@ Press `Ctrl+Alt+D`, use the cliff-explosives toolbar button, or run `/db mark`
 to take the cliff destruction planner,
 then drag it over cliffs to queue them. Reverse-drag removes cliffs from the
 queue. Marking a cliff automatically enables the bot, and `/db clear` clears
-the queue. The bot visibly flies to each marked cliff before destroying it.
+the queue. The bot visibly flies to each marked cliff and launches Factorio's
+normal cliff-explosives projectile, including its explosion and terrain effects.
 
 The track bot upgrades connected transport belts, underground belts, and
 splitters near the player in strict yellow -> red -> blue -> green order. It

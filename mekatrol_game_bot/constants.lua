@@ -23,6 +23,7 @@ local constants = {
     CLIFF_MARK_KEY_SEQUENCE = "CONTROL + ALT + D",
     CLIFF_SELECTOR_NAME = "cliff-bot-selector",
     CLIFF_SHORTCUT_NAME = "cliff-bot-planner-shortcut",
+    CLIFF_EXPLOSIVE_PROJECTILE_NAME = "cliff-explosives",
     CLIFF_COMMAND_NAME = "cliff-bot",
     CLIFF_SHORT_COMMAND_NAME = "db",
     -- The lamp worker is a separate entity instance, but reuses the existing

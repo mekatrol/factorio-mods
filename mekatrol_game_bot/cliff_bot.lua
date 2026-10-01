@@ -72,7 +72,11 @@ local function remove_marker(value, entity)
         elseif type(record) == "table" and record.target and record.target.valid and
                 record.render and record.render.valid then
             kept[#kept + 1] = record
-        elseif type(record) ~= "table" and record.valid then
+        elseif type(record) == "table" then
+            -- A nearby cliff may have been removed by the projectile's radius.
+            -- Its invalid target must not prevent destruction of the rectangle.
+            if record.render and record.render.valid then record.render.destroy() end
+        elseif record.valid then
             record.destroy()
         end
     end
@@ -92,11 +96,22 @@ local function prune(value)
         if type(record) == "table" and record.target and record.target.valid and
                 record.render and record.render.valid then
             markers[#markers + 1] = record
-        elseif type(record) ~= "table" and record.valid then
+        elseif type(record) == "table" then
+            if record.render and record.render.valid then record.render.destroy() end
+        elseif record.valid then
             record.destroy()
         end
     end
     value.markers = markers
+end
+
+local function dequeue(value, target)
+    local kept = {}
+    for _, entity in ipairs(value.queue) do
+        if entity ~= target and entity.valid then kept[#kept + 1] = entity end
+    end
+    value.queue = kept
+    remove_marker(value, target)
 end
 
 function cliff_bot.enable(player)
@@ -142,6 +157,40 @@ local function cliffs_in_area(player, entities, area)
     return entities or {}
 end
 
+local function draw_marker(player, entity)
+    return {target = entity, render = rendering.draw_rectangle {
+        color = {r = 1, g = 0.35, b = 0.05, a = 0.9}, width = 3,
+        filled = false, left_top = entity.bounding_box.left_top,
+        right_bottom = entity.bounding_box.right_bottom,
+        surface = entity.surface, draw_on_ground = false,
+        only_in_alt_mode = false, players = {player.index}
+    }}
+end
+
+function cliff_bot.redraw_markers(player)
+    local value = state.get_cliff(player.index)
+    for _, record in pairs(value.markers) do
+        local marker = type(record) == "table" and record.render or record
+        if marker and marker.valid then marker.destroy() end
+    end
+    value.markers = {}
+    for _, entity in ipairs(value.queue) do
+        if entity and entity.valid then value.markers[#value.markers + 1] = draw_marker(player, entity) end
+    end
+end
+
+function cliff_bot.cleanup_legacy_markers()
+    -- Cliff markers are the only rectangles from this mod drawn above ground
+    -- at width 3. This also finds orphaned objects whose state references were
+    -- lost by 1.9.4, without disturbing upgrade/track highlights.
+    for _, object in pairs(rendering.get_all_objects(script.mod_name)) do
+        if object.type == "rectangle" and object.width == 3 and not object.draw_on_ground then
+            object.destroy()
+        end
+    end
+    for _, player in pairs(game.players) do cliff_bot.redraw_markers(player) end
+end
+
 function cliff_bot.mark(player, entities, area)
     local value, added = state.get_cliff(player.index), 0
     prune(value)
@@ -153,15 +202,7 @@ function cliff_bot.mark(player, entities, area)
             end
             if not exists then
                 value.queue[#value.queue + 1] = entity
-                value.markers[#value.markers + 1] = {target = entity,
-                    render = rendering.draw_rectangle {
-                    color = {r = 1, g = 0.35, b = 0.05, a = 0.9}, width = 3,
-                    filled = false,
-                    left_top = entity.bounding_box.left_top,
-                    right_bottom = entity.bounding_box.right_bottom,
-                    surface = entity.surface, draw_on_ground = false,
-                    only_in_alt_mode = false, players = {player.index}
-                }}
+                value.markers[#value.markers + 1] = draw_marker(player, entity)
                 added = added + 1
             end
         end
@@ -223,10 +264,19 @@ function cliff_bot.update(player)
         target_line.draw(player, value, value.target)
         if movement.distance_squared(value.entity.position, value.target.position) <= conf.work_distance ^ 2 then
             local target = value.target
-            remove_marker(value, target)
-            value.target = nil
-            target.destroy {raise_destroy = true}
-            prune(value)
+            -- Use the vanilla projectile so normal explosion, sound, scorch,
+            -- decorative clearing, and destroy-cliffs effects all run.
+            local projectile = target.surface.create_entity {
+                name = constants.CLIFF_EXPLOSIVE_PROJECTILE_NAME,
+                position = value.entity.position,
+                target = target.position,
+                speed = conf.projectile_speed,
+                force = player.force
+            }
+            if projectile then
+                dequeue(value, target)
+                value.target = nil
+            end
         else
             movement.towards(value.entity, value.target.position)
         end
