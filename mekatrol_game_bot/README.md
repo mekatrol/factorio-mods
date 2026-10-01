@@ -1,11 +1,18 @@
 # Upgrade Bot
 
-This mod contains four independently controlled helpers. The general upgrade bot uses
+This mod contains five independently controlled helpers. The general upgrade bot uses
 `Ctrl+Shift+U` and `/ub`, the cleanup bot uses `Ctrl+Shift+C` and `/cb`, and the
 lamp bot uses `Ctrl+Shift+L` and `/lb`. The progressive track bot uses
-`Ctrl+Shift+T` and `/tb`. When idle, all four use separate
+`Ctrl+Shift+T` and `/tb`. The cliff bot uses `Ctrl+Shift+D` and `/db`. When idle,
+all five use separate
 formation slots and switch to the trailing side when the player changes
 horizontal direction, matching `mekatrol_game_play_mod`.
+
+Press `Ctrl+Alt+D`, use the cliff-explosives toolbar button, or run `/db mark`
+to take the cliff destruction planner,
+then drag it over cliffs to queue them. Reverse-drag removes cliffs from the
+queue. Marking a cliff automatically enables the bot, and `/db clear` clears
+the queue. The bot visibly flies to each marked cliff before destroying it.
 
 The track bot upgrades connected transport belts, underground belts, and
 splitters near the player in strict yellow -> red -> blue -> green order. It

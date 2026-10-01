@@ -10,6 +10,34 @@ function state.ensure()
     storage[constants.STORAGE_KEY].cleanup_players = storage[constants.STORAGE_KEY].cleanup_players or {}
     storage[constants.STORAGE_KEY].lamp_players = storage[constants.STORAGE_KEY].lamp_players or {}
     storage[constants.STORAGE_KEY].track_players = storage[constants.STORAGE_KEY].track_players or {}
+    storage[constants.STORAGE_KEY].cliff_players = storage[constants.STORAGE_KEY].cliff_players or {}
+end
+
+function state.get_cliff(player_index)
+    state.ensure()
+    local players = storage[constants.STORAGE_KEY].cliff_players
+    local value = players[player_index]
+    if not value then
+        value = {enabled = false, entity = nil, mode = "follow", queue = {}, markers = {},
+                 target = nil, last_player_position = nil,
+                 side_offset_x = config.cliff.follow_offset.x, status_label = nil, target_line = nil}
+        players[player_index] = value
+    end
+    value.queue = value.queue or {}
+    value.markers = value.markers or {}
+    value.side_offset_x = value.side_offset_x or config.cliff.follow_offset.x
+    return value
+end
+
+function state.destroy_cliff(value)
+    for _, field in ipairs({"status_label", "target_line"}) do
+        local object = value[field]
+        if object and object.valid then object.destroy() end
+        value[field] = nil
+    end
+    if value.entity and value.entity.valid then value.entity.destroy() end
+    value.entity = nil
+    value.enabled = false
 end
 
 function state.get_track(player_index)

@@ -15,6 +15,16 @@ local constants = {
     CLEANUP_CUSTOM_INPUT_KEY_SEQUENCE = "CONTROL + SHIFT + C",
     CLEANUP_COMMAND_NAME = "cleanup-bot",
     CLEANUP_SHORT_COMMAND_NAME = "cb",
+    CLIFF_BOT_ENTITY_NAME = "cliff-bot",
+    CLIFF_BOT_TOGGLE_INPUT_NAME = "cliff-bot-toggle",
+    CLIFF_BOT_TOGGLE_KEY_SEQUENCE = "CONTROL + SHIFT + D",
+    CLIFF_MARK_INPUT_NAME = "cliff-bot-mark",
+    -- Ctrl+Shift+X is swallowed by Factorio's built-in Ctrl+X cut tool.
+    CLIFF_MARK_KEY_SEQUENCE = "CONTROL + ALT + D",
+    CLIFF_SELECTOR_NAME = "cliff-bot-selector",
+    CLIFF_SHORTCUT_NAME = "cliff-bot-planner-shortcut",
+    CLIFF_COMMAND_NAME = "cliff-bot",
+    CLIFF_SHORT_COMMAND_NAME = "db",
     -- The lamp worker is a separate entity instance, but reuses the existing
     -- upgrade-bot prototype so control-stage hot reloads cannot reference a
     -- data-stage prototype that the running Factorio session has not loaded.
@@ -106,6 +116,8 @@ local constants = {
     COMMAND_DESCRIPTION = "Control the upgrade bot",
     CLEANUP_COMMAND_DESCRIPTION = "Control the cleanup bot",
     CLEANUP_COMMAND_USAGE = "[Cleanup Bot] usage: /cb [on|off|toggle|status]",
+    CLIFF_COMMAND_DESCRIPTION = "Control the cliff destruction bot",
+    CLIFF_COMMAND_USAGE = "[Cliff Bot] usage: /db [on|off|toggle|mark|clear|status]",
     LAMP_COMMAND_DESCRIPTION = "Control the lamp bot",
     LAMP_COMMAND_USAGE = "[Lamp Bot] usage: /lb [on|off|toggle|status]",
     TRACK_COMMAND_DESCRIPTION = "Control the progressive track upgrade bot",

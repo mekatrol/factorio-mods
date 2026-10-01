@@ -31,6 +31,48 @@ data:extend({{
     consuming = "none"
 }})
 
+data:extend({
+    {
+        type = "custom-input", name = constants.CLIFF_BOT_TOGGLE_INPUT_NAME,
+        key_sequence = constants.CLIFF_BOT_TOGGLE_KEY_SEQUENCE, consuming = "none"
+    },
+    {
+        type = "custom-input", name = constants.CLIFF_MARK_INPUT_NAME,
+        key_sequence = constants.CLIFF_MARK_KEY_SEQUENCE, consuming = "none"
+    },
+    {
+        type = "selection-tool", name = constants.CLIFF_SELECTOR_NAME,
+        localised_name = {"item-name.cliff-bot-selector"},
+        localised_description = {"item-description.cliff-bot-selector"},
+        icon = "__base__/graphics/icons/cliff-explosives.png", icon_size = 64,
+        flags = {"only-in-cursor", "not-stackable", "spawnable"}, subgroup = "tool",
+        order = "c[automated-construction]-z[cliff-bot]", stack_size = 1,
+        -- Cliffs are deliberately non-selectable in the base game. "nothing"
+        -- still raises the area-selection event, and control.lua then searches
+        -- that exact rectangle for cliff entities.
+        select = {border_color = {0.95, 0.45, 0.1}, mode = {"nothing"},
+                  cursor_box_type = "entity"},
+        alt_select = {border_color = {0.8, 0.1, 0.1}, mode = {"nothing"},
+                      cursor_box_type = "entity"}
+    }
+})
+
+-- A toolbar button avoids keyboard conflicts and makes it visually clear that
+-- this is the orange cliff planner rather than Factorio's white Cut tool.
+data:extend({{
+    type = "shortcut",
+    name = constants.CLIFF_SHORTCUT_NAME,
+    order = "b[blueprints]-z[cliff-bot]",
+    action = "spawn-item",
+    item_to_spawn = constants.CLIFF_SELECTOR_NAME,
+    localised_name = {"item-name.cliff-bot-selector"},
+    associated_control_input = constants.CLIFF_MARK_INPUT_NAME,
+    icon = "__base__/graphics/icons/cliff-explosives.png",
+    icon_size = 64,
+    small_icon = "__base__/graphics/icons/cliff-explosives.png",
+    small_icon_size = 64
+}})
+
 -- Reusing the base construction robot keeps the helper visually consistent
 -- with Factorio and avoids maintaining copied copyrighted sprite assets.
 local base_robot = data.raw[constants.BASE_ROBOT_ENTITY_NAME][constants.BASE_ROBOT_ENTITY_NAME]
@@ -59,6 +101,24 @@ data:extend({{
         filename = "__base__/graphics/entity/construction-robot/construction-robot.png",
         width = constants.FALLBACK_SPRITE_SIZE,
         height = constants.FALLBACK_SPRITE_SIZE
+    }
+}})
+
+data:extend({{
+    type = "simple-entity-with-owner",
+    name = constants.CLIFF_BOT_ENTITY_NAME,
+    localised_name = {"entity-name.cliff-bot"},
+    icon = base_robot.icon, icon_size = base_robot.icon_size,
+    icon_mipmaps = base_robot.icon_mipmaps,
+    flags = {"placeable-off-grid", "not-on-map", "not-blueprintable", "not-deconstructable",
+             "not-selectable-in-game"},
+    collision_box = {{-constants.BOT_COLLISION_HALF_SIZE, -constants.BOT_COLLISION_HALF_SIZE},
+                     {constants.BOT_COLLISION_HALF_SIZE, constants.BOT_COLLISION_HALF_SIZE}},
+    collision_mask = {layers = {}}, selection_box = nil, render_layer = "object",
+    max_health = constants.BOT_MAX_HEALTH,
+    picture = base_robot.idle or {
+        filename = "__base__/graphics/entity/construction-robot/construction-robot.png",
+        width = constants.FALLBACK_SPRITE_SIZE, height = constants.FALLBACK_SPRITE_SIZE
     }
 }})
 

@@ -1,5 +1,6 @@
 local bot = require("bot")
 local cleanup = require("cleanup_bot")
+local cliff = require("cliff_bot")
 local lamp = require("lamp_bot")
 local track_bot = require("track_upgrade_bot")
 local config = require("config")
@@ -63,6 +64,24 @@ local function register_commands()
     end
     if not commands.commands[constants.CLEANUP_SHORT_COMMAND_NAME] then
         commands.add_command(constants.CLEANUP_SHORT_COMMAND_NAME, constants.CLEANUP_COMMAND_DESCRIPTION, cleanup_command)
+    end
+    local function cliff_command(command_data)
+        local player = player_for(command_data)
+        if not (player and player.valid) then return end
+        local action = string.match(command_data.parameter or constants.EMPTY_TEXT, "^(%S+)") or constants.ACTION.STATUS
+        if action == constants.ACTION.ON or action == constants.ACTION.START then cliff.enable(player)
+        elseif action == constants.ACTION.OFF or action == constants.ACTION.STOP then cliff.disable(player)
+        elseif action == constants.ACTION.TOGGLE then cliff.toggle(player)
+        elseif action == "mark" then cliff.give_selector(player)
+        elseif action == "clear" then cliff.clear(player)
+        elseif action == constants.ACTION.STATUS then cliff.status(player)
+        else player.print(constants.CLIFF_COMMAND_USAGE) end
+    end
+    if not commands.commands[constants.CLIFF_COMMAND_NAME] then
+        commands.add_command(constants.CLIFF_COMMAND_NAME, constants.CLIFF_COMMAND_DESCRIPTION, cliff_command)
+    end
+    if not commands.commands[constants.CLIFF_SHORT_COMMAND_NAME] then
+        commands.add_command(constants.CLIFF_SHORT_COMMAND_NAME, constants.CLIFF_COMMAND_DESCRIPTION, cliff_command)
     end
     local function lamp_command(command_data)
         local player = player_for(command_data)
@@ -134,6 +153,28 @@ register_custom_input(constants.TRACK_CUSTOM_INPUT_NAME, function(event)
     if player and player.valid then track_bot.toggle(player) end
 end)
 
+register_custom_input(constants.CLIFF_BOT_TOGGLE_INPUT_NAME, function(event)
+    local player = player_for(event)
+    if player and player.valid then cliff.toggle(player) end
+end)
+
+register_custom_input(constants.CLIFF_MARK_INPUT_NAME, function(event)
+    local player = player_for(event)
+    if player and player.valid then cliff.give_selector(player) end
+end)
+
+script.on_event(defines.events.on_player_selected_area, function(event)
+    if event.item ~= constants.CLIFF_SELECTOR_NAME then return end
+    local player = player_for(event)
+    if player and player.valid then cliff.mark(player, event.entities, event.area) end
+end)
+
+script.on_event(defines.events.on_player_alt_selected_area, function(event)
+    if event.item ~= constants.CLIFF_SELECTOR_NAME then return end
+    local player = player_for(event)
+    if player and player.valid then cliff.unmark(player, event.entities, event.area) end
+end)
+
 local function request_track_refresh(event)
     -- Mutation events can fire before the engine finishes every connection
     -- update. The bot therefore records intent here and rebuilds next tick.
@@ -176,6 +217,16 @@ script.on_event(defines.events.on_player_removed, function(event)
         state.destroy(track_value)
         track_players[event.player_index] = nil
     end
+    local cliff_players = storage[constants.STORAGE_KEY].cliff_players
+    local cliff_value = cliff_players[event.player_index]
+    if cliff_value then
+        for _, marker in pairs(cliff_value.markers or {}) do
+            local object = type(marker) == "table" and marker.render or marker
+            if object and object.valid then object.destroy() end
+        end
+        state.destroy_cliff(cliff_value)
+        cliff_players[event.player_index] = nil
+    end
 end)
 
 script.on_event(defines.events.on_tick, function(event)
@@ -187,5 +238,6 @@ script.on_event(defines.events.on_tick, function(event)
         cleanup.update(player, event.tick)
         lamp.update(player, event.tick)
         track_bot.update(player, event.tick)
+        cliff.update(player, event.tick)
     end
 end)

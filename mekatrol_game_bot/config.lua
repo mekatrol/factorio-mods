@@ -83,6 +83,11 @@ return {
         cargo_capacity = 100
     },
 
+    cliff = {
+        follow_offset = {x = -2, y = 3.75},
+        work_distance = 1.5
+    },
+
     -- The third bot occupies its own vertical formation slot. Its horizontal
     -- offset changes sign with the player's direction, matching the formation
     -- behavior used by mekatrol_game_play_mod.
