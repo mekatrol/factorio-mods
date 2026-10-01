@@ -30,7 +30,9 @@ cannon.attack_parameters = {
   ammo_category = ammo_category,
   cooldown = config.cannon.cooldown_ticks,
   projectile_creation_distance = 3.2,
-  projectile_center = {0, -0.8},
+  -- With no projectile_creation_parameters, this is also the visual rotation
+  -- axis. Keep it at the exact centre of the circular cannon base.
+  projectile_center = {0, 0},
   range = config.cannon.maximum_range,
   min_range = config.cannon.minimum_range,
   sound = {
