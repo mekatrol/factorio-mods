@@ -77,6 +77,7 @@ local constants = {
         LOGISTIC_CONTAINER = "logistic-container",
         UNDERGROUND_BELT = "underground-belt",
         ELECTRIC_POLE = "electric-pole",
+        ENTITY_GHOST = "entity-ghost",
         LAMP = "lamp"
     },
 

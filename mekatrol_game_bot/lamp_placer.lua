@@ -118,6 +118,13 @@ local function already_lit(surface, position)
     } > constants.EMPTY_COUNT
 end
 
+local function has_pending_blueprint(surface, position)
+    return #surface.find_entities_filtered {
+        position = position,
+        type = constants.ENTITY_TYPE.ENTITY_GHOST
+    } > constants.EMPTY_COUNT
+end
+
 local function candidates(origin)
     local result = {}
     local radius = config.lamp_search_radius
@@ -139,6 +146,7 @@ end
 local function placeable(player, entity_name, position)
     local surface = player_anchor.surface(player)
     return not already_lit(surface, position) and
+               not has_pending_blueprint(surface, position) and
                in_power_area(surface, player.force, position) and
                surface.can_place_entity {
                    name = entity_name,
