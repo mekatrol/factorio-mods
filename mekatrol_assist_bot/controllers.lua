@@ -213,6 +213,40 @@ local function replace(e, name)
     return e.surface.create_entity(p) ~= nil
 end
 
+-- Repair durability is a persistent pool: packs are consumed only when the
+-- pool cannot cover a bounded repair action, so partial packs survive save/load.
+local function repair_entity(rs, anchor, e)
+    if not (e and e.valid and e.health and e.prototype.max_health) then
+        return true
+    end
+    local need = math.min(e.prototype.max_health - e.health, config.tasks.repair.health_per_action)
+    if need <= 0 then
+        return true
+    end
+    rs.repair_health_pool = rs.repair_health_pool or 0
+    if rs.repair_health_pool < need then
+        local packs = math.ceil((need - rs.repair_health_pool) / config.supply.repair_pack_durability)
+        local got = supply.take(rs, anchor.player, e, rs.entity or e, "repair-pack", packs)
+        if got == nil then
+            return false
+        end
+        rs.repair_health_pool = rs.repair_health_pool + got * config.supply.repair_pack_durability
+        if got == 0 then
+            if not rs.out_of_repair_packs_warned then
+                anchor.player.print("[MAB] repair bot is out of repair packs")
+                rs.out_of_repair_packs_warned = true
+            end
+            return true
+        end
+        rs.out_of_repair_packs_warned = nil
+    end
+    local repaired = math.min(need, rs.repair_health_pool)
+    e.health = math.min(e.prototype.max_health, e.health + repaired)
+    rs.repair_health_pool = rs.repair_health_pool - repaired
+    visuals.health(discovery.identity(e), e)
+    return e.health >= e.prototype.max_health * config.tasks.repair.threshold
+end
+
 local function act(role, rs, anchor, e)
     if not e or not e.valid then
         return true
@@ -272,25 +306,7 @@ local function act(role, rs, anchor, e)
         return true
     end
     if role == "repair" then
-        local max = e.prototype.max_health or e.health;
-        local need = max - e.health;
-        if need <= 0 then
-            return true
-        end
-        rs.repair_health_pool = rs.repair_health_pool or 0
-        if rs.repair_health_pool < need then
-            local packs = math.ceil((need - rs.repair_health_pool) / config.supply.repair_pack_durability);
-            local got = supply.take(rs, anchor.player, e, rs.entity or e, "repair-pack", packs);
-            if got == nil then
-                return false
-            end
-            rs.repair_health_pool = rs.repair_health_pool + got * config.supply.repair_pack_durability
-        end
-        local repaired = math.min(need, rs.repair_health_pool);
-        e.health = e.health + repaired;
-        rs.repair_health_pool = rs.repair_health_pool - repaired;
-        visuals.health(discovery.identity(e), e);
-        return true
+        return repair_entity(rs, anchor, e)
     end
     if role == "cleanup" then
         local stack = e.stack;
@@ -488,6 +504,17 @@ local function act(role, rs, anchor, e)
     return true
 end
 function M.step(role, rs, anchor, bot)
+    if role == "repair" and bot.health and bot.prototype.max_health and
+        bot.health < bot.prototype.max_health * config.tasks.repair.self_repair_threshold then
+        repair_entity(rs, anchor, bot)
+        return "working"
+    end
+    if rs.target and not rs.target.valid then
+        rs.target = nil
+        rs.target_visualized = nil
+        rs.path_job = nil
+        rs.best_distance = nil
+    end
     if not rs.scan and not rs.target and
         (role == "repair" or role == "logistics" or role == "surveyor" or role == "builder") then
         local candidate, exhausted = discovery.next_for(rs);
@@ -504,7 +531,7 @@ function M.step(role, rs, anchor, bot)
         begin(role, rs, anchor);
         return "idle"
     end
-    if not rs.scan.done then
+    if rs.scan and not rs.scan.done then
         local _, found = scanner.step(rs.scan)
         for _, e in ipairs(found) do
             if role == "mapper" then
@@ -583,18 +610,41 @@ function M.step(role, rs, anchor, bot)
     if role == "repair" then
         if not rs.path_job then
             rs.path_job =
-                pathfinding.start(anchor.surface, bot.position, rs.target.position, config.tasks.repair.radius);
+                pathfinding.start(anchor.surface, bot.position, rs.target.position, config.tasks.repair.radius,
+                    math.max(1, math.floor(config.tasks.repair.interaction_distance)));
             return "moving"
         end
         if not rs.path_job.done then
             pathfinding.step(rs.path_job);
             return "moving"
         end
+        if rs.path_job.failed then
+            rs.target = nil
+            rs.target_visualized = nil
+            rs.path_job = nil
+            rs.best_distance = nil
+            rs.scan = nil
+            return "idle"
+        end
         if rs.path_job.path and rs.path_job.cursor >= 1 then
             if movement.step(bot, rs.path_job.path[rs.path_job.cursor]) then
                 rs.path_job.cursor = rs.path_job.cursor - 1
             end
             return "moving"
+        end
+        if movement.distance2(bot.position, rs.target.position) <= config.tasks.repair.interaction_distance ^ 2 then
+            if not act(role, rs, anchor, rs.target) then
+                return "working"
+            end
+            if rs.target.valid and valid_target(role, rs.target, rs, anchor) then
+                return "working"
+            end
+            rs.target = nil;
+            rs.target_visualized = nil;
+            rs.path_job = nil;
+            rs.best_distance = nil;
+            rs.scan = nil
+            return "working"
         end
     end
     if not movement.step(bot, rs.target.position) then

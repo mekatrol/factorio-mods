@@ -1,7 +1,7 @@
 -- Public configuration for both Factorio stages. Keep this file free of runtime globals.
 return {
     -- Persistent-state/configuration schema. Positive integer.
-    schema_version = 4,
+    schema_version = 5,
     controls = {
         -- Factorio key sequences. These defaults may be rebound in Controls > Mods.
         all = "CONTROL + SHIFT + A",
@@ -113,6 +113,9 @@ return {
         repair = {
             radius = 64,
             threshold = 0.999,
+            self_repair_threshold = 0.9, -- Health ratio [0,1]; repair the bot before seeking another target.
+            health_per_action = 25, -- Maximum health points restored by one scheduled work unit; finite >0.
+            interaction_distance = 1.5, -- Inclusive tile distance from the target at which repair may begin; >0.
             ignored_names = {}
         } -- Health ratio is [0,1]; names are exact prototypes.
     },

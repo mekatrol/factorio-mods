@@ -15,9 +15,16 @@ end
 
 function M.run()
     local root = state.root();
-    if (root.schema_version or 1) < config.schema_version then
+    local previous_schema = root.schema_version or 1
+    if previous_schema < config.schema_version then
         root.scheduler = root.scheduler or {};
         root.destroyed_sites = root.destroyed_sites or {};
+        if previous_schema < 5 then
+            for pi, legacy in pairs((storage.mekatrol_repair_mod and storage.mekatrol_repair_mod.players) or {}) do
+                local dst = state.player(pi).roles.repair
+                dst.repair_health_pool = tonumber(legacy.repair_health_pool) or dst.repair_health_pool or 0
+            end
+        end
         root.schema_version = config.schema_version
     end
     if root.import_complete or not config.compatibility.import_legacy_state then
@@ -68,6 +75,7 @@ function M.run()
             else
                 copy_enabled(state.player(pi), v, "repair")
             end
+            dst.repair_health_pool = tonumber(v.repair_health_pool) or dst.repair_health_pool or 0
         end
     end
     if old or map or gp or repair then

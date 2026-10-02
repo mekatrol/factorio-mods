@@ -34,7 +34,9 @@ local function push(heap, node)
     end
 end
 
-function M.start(surface, from, to, max_radius)
+---Starts a save-safe path search. `goal_distance` permits interaction beside an
+---occupied target tile, which is essential when the target itself is a wall.
+function M.start(surface, from, to, max_radius, goal_distance)
     local a, b = tile(from), tile(to);
     local k = key(a)
     return {
@@ -42,6 +44,7 @@ function M.start(surface, from, to, max_radius)
         start = a,
         goal = b,
         max_radius = max_radius or 96,
+        goal_distance = goal_distance or 0,
         open = {{
             p = a,
             g = 0,
@@ -117,7 +120,7 @@ function M.step(job)
         job.failed = true;
         return true
     end
-    if key(node.p) == key(job.goal) then
+    if h(node.p, job.goal) <= job.goal_distance then
         job.path = {};
         job.reconstruct_key = key(node.p);
         job.phase = "reconstruct";

@@ -12,6 +12,26 @@ local visuals = require("visuals")
 local movement = require("movement")
 local M = {}
 
+-- Rendering handles are deliberately non-persistent. Rebuild one destroyed-site
+-- marker per background work unit after load or configuration change.
+local function destroyed_visual_job(root)
+    local job = root.destroyed_visual_job
+    if not job then
+        return false
+    end
+    local key, site = next(root.destroyed_sites, job.cursor)
+    job.cursor = key
+    if key == nil then
+        root.destroyed_visual_job = nil
+        return false
+    end
+    local surface = game.surfaces[site.surface_index]
+    if surface then
+        visuals.destroyed_site(key, surface, site.position)
+    end
+    return true
+end
+
 local function selection_job(root)
     local job = root.selection_jobs and root.selection_jobs[1];
     if not job then
@@ -48,6 +68,8 @@ function M.tick(event)
             elseif discovery.step_clear(root) then
                 did_background = true
             elseif migrations.step() then
+                did_background = true
+            elseif destroyed_visual_job(root) then
                 did_background = true
             elseif selection_job(root) then
                 did_background = true

@@ -31,6 +31,14 @@ missing technology. Research reversal recalls affected bots. All role searches,
 selection rectangles, pruning, and target planning resume from persistent cell
 cursors under one global per-tick budget.
 
+Repair work is split into `tasks.repair.health_per_action` health-point steps.
+Each consumed repair pack contributes exactly
+`supply.repair_pack_durability` points to a persistent pool, including the
+remainder after a target is healed. The bot self-repairs below
+`self_repair_threshold`, consumes shared discoveries progressively, and uses
+bounded A* to approach targets within `interaction_distance`. Destroyed entity
+sites remain highlighted until an entity is rebuilt at that site.
+
 ## Controls
 
 | Action | Default |
@@ -99,7 +107,7 @@ query more expensive.
 
 ## Compatibility and state
 
-The only persistent root is `storage.mekatrol_assist_bot` (schema 4). It contains
+The only persistent root is `storage.mekatrol_assist_bot` (schema 5). It contains
 per-player role state, resumable jobs, discoveries, groups, and marked cliffs.
 Rendering objects are not persisted. On first configuration migration the mod
 imports recognizable state from `mekatrol_game_bot`,
@@ -135,4 +143,5 @@ bots, and scans a 4,096-resource field. Never turn this on in a real save. Phase
 1 baselines are in `PHASE1_BASELINE.md`; Phase 2 architecture evidence is in
 `PHASE2_ARCHITECTURE.md`; Phase 3 visual and formation evidence is in
 `PHASE3_VISUALS_FORMATION.md`; Phase 4 mapping evidence is in
-`PHASE4_MAPPING_DISCOVERY.md`. Normal configuration keeps `debug=false`.
+`PHASE4_MAPPING_DISCOVERY.md`; Phase 5 repair evidence is in
+`PHASE5_REPAIR.md`. Normal configuration keeps `debug=false`.

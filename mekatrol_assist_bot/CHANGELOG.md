@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased — Phase 4 verification
+## Unreleased — Phase 5 verification
+
+- Completed bounded repair actions, exact persistent repair-pack durability
+  pooling, self-repair, discovery-fed damage selection, and resumable A* travel.
+- Added destroyed-site lifecycle visuals and legacy repair-pool migration; health
+  limits are derived from runtime prototypes.
 
 - Added deterministic outward mapper exploration, indexed shared discovery,
   connected resource survey polygons, incremental clearing, and copy-only

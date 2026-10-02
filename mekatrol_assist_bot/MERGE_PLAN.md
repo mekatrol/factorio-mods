@@ -340,10 +340,10 @@ should retain the temporary plan as required operational documentation.
 
 ## Implementation phases
 
-Phase status as of 2026-10-02: Phases 1 through 4 are complete and verified
-against Factorio 2.0.77. Phases 5-7 may contain partial implementation, but none
+Phase status as of 2026-10-02: Phases 1 through 5 are complete and verified
+against Factorio 2.0.77. Phases 6-7 may contain partial implementation, but none
 is marked complete until its phase-level behavior and applicable acceptance
-checks have been verified. The current stopping point is the end of Phase 4.
+checks have been verified. The current stopping point is the end of Phase 5.
 
 ### Phase 1: Baseline and acceptance fixtures (complete)
 
@@ -394,14 +394,16 @@ Evidence and reproduction details are recorded in `PHASE3_VISUALS_FORMATION.md`.
 
 Evidence and reproduction details are recorded in `PHASE4_MAPPING_DISCOVERY.md`.
 
-### Phase 5: Repair bot
+### Phase 5: Repair bot (complete)
 
-- Port repair-pack pooling, chest sourcing, damage discovery, destroyed-site
+- [x] Port repair-pack pooling, chest sourcing, damage discovery, destroyed-site
   tracking, self-repair, A* wall avoidance, and useful visuals.
-- Replace the gameplay repair placeholder with this controller.
-- Prefer prototype-derived max health where the runtime API supports it; keep
+- [x] Replace the gameplay repair placeholder with this controller.
+- [x] Prefer prototype-derived max health where the runtime API supports it; keep
   documented overrides only for genuine exceptions. Remove diagnostic file
   writes from normal play or guard them behind a debug config flag.
+
+Evidence and reproduction details are recorded in `PHASE5_REPAIR.md`.
 
 ### Phase 6: Gameplay logistics and builder
 

@@ -21,7 +21,8 @@ command.register()
 local function initialize()
     tests.run();
     technology.validate();
-    state.root();
+    local root = state.root();
+    root.destroyed_visual_job = {cursor = nil}
     discovery.ensure_events();
     runtime_tests.seed();
     migrations.run()
