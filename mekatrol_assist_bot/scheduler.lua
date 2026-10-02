@@ -45,6 +45,8 @@ function M.tick(event)
         if background < config.scheduler.background_work_per_tick then
             if visuals.step_clear(root) then
                 did_background = true
+            elseif discovery.step_clear(root) then
+                did_background = true
             elseif migrations.step() then
                 did_background = true
             elseif selection_job(root) then
@@ -93,7 +95,9 @@ function M.tick(event)
         end
     end
     
-    discovery.prune(config.scanning.prune_per_step)
+    if event.tick % config.scanning.prune_interval == 0 then
+        discovery.prune(config.scanning.prune_per_step)
+    end
 end
 
 return M

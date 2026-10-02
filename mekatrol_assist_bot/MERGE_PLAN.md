@@ -340,11 +340,10 @@ should retain the temporary plan as required operational documentation.
 
 ## Implementation phases
 
-Phase status as of 2026-10-02: Phases 1 through 3 are complete and verified
-against Factorio 2.0.77. Phases 4-7 may contain partial implementation, but none
+Phase status as of 2026-10-02: Phases 1 through 4 are complete and verified
+against Factorio 2.0.77. Phases 5-7 may contain partial implementation, but none
 is marked complete until its phase-level behavior and applicable acceptance
-checks have been verified. Per the requested stopping point, work stops at the
-end of Phase 3.
+checks have been verified. The current stopping point is the end of Phase 4.
 
 ### Phase 1: Baseline and acceptance fixtures (complete)
 
@@ -382,16 +381,18 @@ Evidence and reproduction details are recorded in `PHASE2_ARCHITECTURE.md`.
 
 Evidence and reproduction details are recorded in `PHASE3_VISUALS_FORMATION.md`.
 
-### Phase 4: Mapping, discovery, and survey
+### Phase 4: Mapping, discovery, and survey (complete)
 
-- Port gameplay `entity_index`, search, entity groups, polygon, and survey
+- [x] Port gameplay `entity_index`, search, entity groups, polygon, and survey
   modules behind `discovery.lua` and `entity_scanner.lua`.
-- Merge standalone static-entity mapping, map clearing, visuals, generated
+- [x] Merge standalone static-entity mapping, map clearing, visuals, generated
   events, and snapshot API.
-- Preserve a compatibility remote interface named `mapping_bot_mod` for at
+- [x] Preserve a compatibility remote interface named `mapping_bot_mod` for at
   least one release, but have it read the assist bot's discovery state.
-- Convert repair integration from cross-mod event wiring to the internal
+- [x] Convert repair integration from cross-mod event wiring to the internal
   discovery subscription.
+
+Evidence and reproduction details are recorded in `PHASE4_MAPPING_DISCOVERY.md`.
 
 ### Phase 5: Repair bot
 

@@ -1,7 +1,7 @@
 -- Public configuration for both Factorio stages. Keep this file free of runtime globals.
 return {
     -- Persistent-state/configuration schema. Positive integer.
-    schema_version = 3,
+    schema_version = 4,
     controls = {
         -- Factorio key sequences. These defaults may be rebound in Controls > Mods.
         all = "CONTROL + SHIFT + A",
@@ -53,6 +53,7 @@ return {
         radius = 96,
         mapper_radius = 64, -- Inclusive tile distances, finite >0.
         cells_per_step = 1,
+        prune_interval = 30, -- Ticks between bounded stale-record pruning passes; integer >=1.
         prune_per_step = 16,
         entities_per_cell = 512 -- Work counts, integers >=1; dense cells yield capped batches.
     },
@@ -103,7 +104,6 @@ return {
         },
         surveyor = {
             radius = 128,
-            group_cell_size = 64,
             boundary_max_steps = 4096
         }, -- Inclusive radius/grouping width >0; trace cap integer >=1.
         lamp = {

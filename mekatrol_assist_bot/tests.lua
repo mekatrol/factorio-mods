@@ -52,6 +52,8 @@ function M.run()
     eq(discovery.store(order, records, "u:42", {name = "updated"}), false, "duplicate identity is updated")
     eq(#order, 1, "duplicate identity is not appended")
     eq(records["u:42"].name, "updated", "duplicate identity refreshes its record")
+    local contained_edge = polygon.contains(square, {x = 0.5, y = 1})
+    eq(contained_edge, true, "survey polygon membership remains deterministic")
     local parsed = command.parse("u task combined");
     eq(parsed.role_name, "upgrade", "command parser expands role alias")
     eq(parsed.action, "task", "command parser extracts action")

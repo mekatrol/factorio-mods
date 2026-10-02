@@ -17,8 +17,8 @@ enabled roles and mapping data once, without retaining old bot entities.
 | cliff | Destroys only cliffs marked with the planner, consuming cliff explosives. | Cliff explosives |
 | logistics | Collects ground items and mines recoverable neutral entities to the player. | Logistic robotics |
 | cleanup | Collects loose item entities into player inventory. | Logistic robotics |
-| mapper | Incrementally maps nearby static entities into the shared discovery index. | Electronics |
-| surveyor | Indexes resources and builds name-keyed discovery groups. | Electronics |
+| mapper | Progressively scans an outward deterministic cell spiral and maps static entities into the shared discovery index. | Electronics |
+| surveyor | Traces resource boundaries and builds connected, polygon-backed discovery groups. | Electronics |
 
 Supply-consuming roles prefer player inventory and then incrementally search
 nearby player-owned containers. Bots fly to the selected source, remember its
@@ -99,7 +99,7 @@ query more expensive.
 
 ## Compatibility and state
 
-The only persistent root is `storage.mekatrol_assist_bot` (schema 3). It contains
+The only persistent root is `storage.mekatrol_assist_bot` (schema 4). It contains
 per-player role state, resumable jobs, discoveries, groups, and marked cliffs.
 Rendering objects are not persisted. On first configuration migration the mod
 imports recognizable state from `mekatrol_game_bot`,
@@ -111,13 +111,16 @@ The remote interface `mapping_bot_mod` is retained for one compatibility cycle:
 ```lua
 remote.call("mapping_bot_mod", "get_mapped_entities")
 remote.call("mapping_bot_mod", "get_mapped_entities_page", cursor, limit)
+remote.call("mapping_bot_mod", "get_mapped_entities_by_name_page", name, cursor, limit)
 remote.call("mapping_bot_mod", "clear_mapped_entities")
 remote.call("mapping_bot_mod", "get_entity_mapped_event")
 remote.call("mapping_bot_mod", "get_map_cleared_event")
 ```
 
 Snapshots contain up to `compatibility.snapshot_limit` copied metadata records
-and positions, not mutable internal tables or entity references. Save/load,
+and positions, not mutable internal tables or entity references. Mapping and
+clear events retain the legacy accessors; clearing swaps the live index
+immediately and releases old records and renderings incrementally. Save/load,
 configuration changes, invalid entities, player
 removal, and research reversal are handled at their lifecycle boundaries.
 
@@ -131,4 +134,5 @@ validates required Factorio 2.0 prototypes and role families, profiles ten role
 bots, and scans a 4,096-resource field. Never turn this on in a real save. Phase
 1 baselines are in `PHASE1_BASELINE.md`; Phase 2 architecture evidence is in
 `PHASE2_ARCHITECTURE.md`; Phase 3 visual and formation evidence is in
-`PHASE3_VISUALS_FORMATION.md`. Normal configuration keeps `debug=false`.
+`PHASE3_VISUALS_FORMATION.md`; Phase 4 mapping evidence is in
+`PHASE4_MAPPING_DISCOVERY.md`. Normal configuration keeps `debug=false`.

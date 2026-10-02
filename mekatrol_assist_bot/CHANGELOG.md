@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased — Phase 3 verification
+## Unreleased — Phase 4 verification
+
+- Added deterministic outward mapper exploration, indexed shared discovery,
+  connected resource survey polygons, incremental clearing, and copy-only
+  paged mapping compatibility snapshots.
 
 - Completed and verified construction/logistic animation-family prototypes,
   runtime idle/moving/working visual switching, deterministic centered columns,

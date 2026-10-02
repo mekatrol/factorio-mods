@@ -8,6 +8,7 @@ local track = require("track")
 local pathfinding = require("pathfinding")
 local visuals = require("visuals")
 local survey = require("survey")
+local polygon = require("polygon")
 local state = require("state")
 local M = {}
 
@@ -89,10 +90,30 @@ local radii = {
     surveyor = "surveyor"
 }
 
-local function survey_key(e)
-    local s = config.tasks.surveyor.group_cell_size;
-    return e.surface.index .. ":" .. e.name .. ":" .. math.floor(e.position.x / s) .. ":" ..
-               math.floor(e.position.y / s)
+local function mapper_area(rs, anchor)
+    if rs.mapper_surface ~= anchor.surface.index then
+        rs.mapper_surface = anchor.surface.index
+        rs.mapper_origin = {x = anchor.position.x, y = anchor.position.y}
+        rs.mapper_leg, rs.mapper_leg_progress, rs.mapper_leg_length = 0, 0, 1
+        rs.mapper_x, rs.mapper_y, rs.mapper_direction = 0, 0, 1
+    end
+    local s = config.scanning.cell_size
+    local x = math.floor(rs.mapper_origin.x / s) + rs.mapper_x
+    local y = math.floor(rs.mapper_origin.y / s) + rs.mapper_y
+    local area = {{x * s, y * s}, {(x + 1) * s, (y + 1) * s}}
+    local dx = ({1, 0, -1, 0})[rs.mapper_direction]
+    local dy = ({0, 1, 0, -1})[rs.mapper_direction]
+    rs.mapper_x, rs.mapper_y = rs.mapper_x + dx, rs.mapper_y + dy
+    rs.mapper_leg_progress = rs.mapper_leg_progress + 1
+    if rs.mapper_leg_progress >= rs.mapper_leg_length then
+        rs.mapper_leg_progress = 0
+        rs.mapper_direction = rs.mapper_direction % 4 + 1
+        rs.mapper_leg = rs.mapper_leg + 1
+        if rs.mapper_leg % 2 == 0 then
+            rs.mapper_leg_length = rs.mapper_leg_length + 1
+        end
+    end
+    return area
 end
 
 local function begin(role, rs, anchor)
@@ -107,7 +128,11 @@ local function begin(role, rs, anchor)
     if f.force == "player" then
         f.force = anchor.force
     end
-    rs.scan = scanner.start(anchor.surface, anchor.position, radius, f);
+    if role == "mapper" then
+        rs.scan = scanner.start_area(anchor.surface, mapper_area(rs, anchor), f)
+    else
+        rs.scan = scanner.start(anchor.surface, anchor.position, radius, f)
+    end
     rs.phase = "scan"
 end
 
@@ -160,8 +185,7 @@ local function valid_target(role, e, rs, anchor)
     end
     if role == "surveyor" then
         local d = state.root().discovery;
-        local g = d.groups[survey_key(e)];
-        return not (g and g.entities[discovery.identity(e)])
+        return not (d.grouped and d.grouped[discovery.identity(e)])
     end
     if role == "logistics" then
         return e.type == "item-entity" or (e.minable and e.force.name == "neutral")
@@ -200,7 +224,8 @@ local function act(role, rs, anchor, e)
     if role == "surveyor" then
         discovery.add(e);
         local d = state.root().discovery;
-        local k = survey_key(e)
+        local job = rs.survey_job
+        local k = e.surface.index .. ":" .. e.name .. ":" .. job.start_x .. ":" .. job.start_y
         local g = d.groups[k] or {
             name = e.name,
             surface_index = e.surface.index,
@@ -212,13 +237,17 @@ local function act(role, rs, anchor, e)
                 bottom = e.position.y
             }
         }
-        g.entities[discovery.identity(e)] = true;
+        for id in pairs(job.entities or {}) do
+            g.entities[id] = true
+            d.grouped = d.grouped or {}
+            d.grouped[id] = k
+        end
         local b = g.bounds;
         b.left = math.min(b.left, e.position.x);
         b.right = math.max(b.right, e.position.x);
         b.top = math.min(b.top, e.position.y);
         b.bottom = math.max(b.bottom, e.position.y)
-        g.polygon = (rs.survey_job and #rs.survey_job.points >= 3) and rs.survey_job.points or {{
+        g.polygon = (job and #job.points >= 3) and job.points or {{
             x = b.left - 0.5,
             y = b.top - 0.5
         }, {
@@ -231,9 +260,9 @@ local function act(role, rs, anchor, e)
             x = b.left - 0.5,
             y = b.bottom + 0.5
         }}
-        if rs.survey_job and #rs.survey_job.points >= 3 then
-            g.area = rs.survey_job.area or 0;
-            g.perimeter = rs.survey_job.perimeter or 0
+        if job and #job.points >= 3 then
+            g.area = job.area or 0;
+            g.perimeter = job.perimeter or 0
         else
             local w, h = b.right - b.left + 1, b.bottom - b.top + 1;
             g.area = w * h;
@@ -578,6 +607,29 @@ function M.step(role, rs, anchor, bot)
         end
         if not rs.survey_job.done then
             survey.step(rs.survey_job);
+            return "working"
+        end
+        if not rs.survey_job.collect_scan then
+            local left, right, top, bottom = rs.target.position.x, rs.target.position.x,
+                rs.target.position.y, rs.target.position.y
+            for _, point in ipairs(rs.survey_job.points) do
+                left, right = math.min(left, point.x), math.max(right, point.x)
+                top, bottom = math.min(top, point.y), math.max(bottom, point.y)
+            end
+            rs.survey_job.entities = {}
+            rs.survey_job.collect_scan = scanner.start_area(anchor.surface,
+                {{left - 1, top - 1}, {right + 1, bottom + 1}}, {name = rs.target.name, type = "resource"})
+            return "working"
+        end
+        if not rs.survey_job.collect_scan.done then
+            local _, found = scanner.step(rs.survey_job.collect_scan)
+            for _, found_entity in ipairs(found) do
+                if polygon.contains(rs.survey_job.points, found_entity.position) then
+                    local id = discovery.identity(found_entity)
+                    rs.survey_job.entities[id] = true
+                    discovery.add(found_entity)
+                end
+            end
             return "working"
         end
     end

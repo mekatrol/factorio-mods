@@ -57,6 +57,7 @@ function M.run(c, known)
         num("scanning." .. s, c.scanning[s], 0.000001)
     end
     num("scanning.cells_per_step", c.scanning.cells_per_step, 1, nil, true);
+    num("scanning.prune_interval", c.scanning.prune_interval, 1, nil, true);
     num("scanning.prune_per_step", c.scanning.prune_per_step, 1, nil, true);
     num("scanning.entities_per_cell", c.scanning.entities_per_cell, 1, nil, true)
     num("movement.step", c.movement.step, 0.000001);
@@ -83,7 +84,6 @@ function M.run(c, known)
     num("tasks.lamp.darkness", c.tasks.lamp.darkness, 0, 1);
     num("tasks.repair.threshold", c.tasks.repair.threshold, 0, 1)
     num("tasks.cliff.projectile_speed", c.tasks.cliff.projectile_speed, 0.000001)
-    num("tasks.surveyor.group_cell_size", c.tasks.surveyor.group_cell_size, 0.000001)
     num("tasks.surveyor.boundary_max_steps", c.tasks.surveyor.boundary_max_steps, 1, nil, true)
     for color, value in pairs(c.visuals.colors) do
         for channel, n in pairs(value) do

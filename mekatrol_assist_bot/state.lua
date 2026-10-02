@@ -9,7 +9,9 @@ function M.root()
         discovery = {
             records = {},
             order = {},
-            groups = {}
+            by_name = {},
+            groups = {},
+            grouped = {}
         },
         cliffs = {},
         destroyed_sites = {},
@@ -19,6 +21,16 @@ function M.root()
     }
     local r = storage.mekatrol_assist_bot;
     r.destroyed_sites = r.destroyed_sites or {};
+    r.discovery.by_name = r.discovery.by_name or {}
+    r.discovery.grouped = r.discovery.grouped or {}
+    if not r.discovery.index_version then
+        for id, record in pairs(r.discovery.records) do
+            local bucket = r.discovery.by_name[record.name] or {}
+            bucket[id] = true
+            r.discovery.by_name[record.name] = bucket
+        end
+        r.discovery.index_version = 1
+    end
     return r
 end
 
