@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased — Phase 2 verification
+
+- Completed and verified the shared assist-bot architecture: versioned state,
+  legacy import, role registry, scheduler, manager, scanner, visuals, unified
+  commands, and the common general/track upgrade controller.
+
 ## 1.0.0
 
 - Consolidated ten independently toggleable roles behind one state root,

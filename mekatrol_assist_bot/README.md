@@ -125,8 +125,9 @@ removal, and research reversal are handled at their lifecycle boundaries.
 
 `tests.lua` checks configuration, command parsing, formation symmetry, entity
 identity/deduplication, polygons, aliases, task registration, and technology
-gates during initialization. Setting `debug=true` runs the destructive Phase 1
+gates during initialization. Setting `debug=true` runs the destructive Phase 2
 headless fixture in a disposable save: it validates required Factorio 2.0
 prototypes, profiles ten role bots, and scans a 4,096-resource field. Never turn
-this on in a real save. Results and reproduction details are recorded in
-`PHASE1_BASELINE.md`; normal configuration keeps `debug=false`.
+this on in a real save. Phase 1 baselines are in `PHASE1_BASELINE.md`; Phase 2
+architecture and integration evidence are in `PHASE2_ARCHITECTURE.md`. Normal
+configuration keeps `debug=false`.

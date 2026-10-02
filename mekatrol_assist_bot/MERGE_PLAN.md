@@ -340,11 +340,11 @@ should retain the temporary plan as required operational documentation.
 
 ## Implementation phases
 
-Phase status as of 2026-10-02: Phase 1 is complete and verified against
-Factorio 2.0.77. Phases 2-7 may contain partial implementation, but none is
+Phase status as of 2026-10-02: Phases 1 and 2 are complete and verified against
+Factorio 2.0.77. Phases 3-7 may contain partial implementation, but none is
 marked complete until its phase-level behavior and applicable acceptance checks
 have been verified. Per the requested stopping point, work stops at the end of
-Phase 1.
+Phase 2.
 
 ### Phase 1: Baseline and acceptance fixtures (complete)
 
@@ -359,16 +359,18 @@ Phase 1.
 
 Evidence and reproduction details are recorded in `PHASE1_BASELINE.md`.
 
-### Phase 2: New assist-bot architecture
+### Phase 2: New assist-bot architecture (complete)
 
-- Build the new mod in `mekatrol_assist_bot`; port selected code rather than
+- [x] Build the new mod in `mekatrol_assist_bot`; port selected code rather than
   continuing development inside a legacy source directory.
-- Establish a versioned role registry and import migrations for existing
+- [x] Establish a versioned role registry and import migrations for existing
   `mekatrol_game_bot`, gameplay, mapping, and repair save state.
-- Add configuration validation, scheduler, bot manager, formation service,
+- [x] Add configuration validation, scheduler, bot manager, formation service,
   scanner, shared visuals, and unified command parser.
-- Extract the duplicated general/track upgrade state machine.
-- Preserve existing target behavior before porting another mod.
+- [x] Extract the duplicated general/track upgrade state machine.
+- [x] Preserve existing target behavior before porting another mod.
+
+Evidence and reproduction details are recorded in `PHASE2_ARCHITECTURE.md`.
 
 ### Phase 3: Visual prototypes and formation
 

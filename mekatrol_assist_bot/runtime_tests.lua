@@ -74,7 +74,7 @@ local function run_headless_baseline()
     assert(field_entities >= 4096, "MAB large-field scan missed resource entities")
     log("[MAB baseline] 4096-resource bounded scan, " .. field_steps .. " work units (next line)")
     log(field_profiler)
-    log("[MAB test] Phase 1 fixture passed on Factorio " .. script.active_mods.base)
+    log("[MAB test] Phase 2 fixture passed on Factorio " .. script.active_mods.base)
 end
 
 function M.seed()
@@ -82,7 +82,18 @@ function M.seed()
         return
     end
     do
-        state.root().phase1_headless_fixture = true
+        local fixture_index = 9001
+        state.root().phase2_headless_fixture = fixture_index
+        storage.mekatrol_game_bot = {
+            players = {[fixture_index] = {enabled = true, task_name = "combined"}},
+            track_players = {[fixture_index] = {enabled = true, task_name = "track"}},
+            cleanup_players = {},
+            lamp_players = {},
+            cliff_players = {}
+        }
+        storage.mekatrol_game_play_bot = {[fixture_index] = {bot_enabled = true}}
+        storage.mapping_bot_mod = {players = {[fixture_index] = {mapping_bot_enabled = true}}}
+        storage.mekatrol_repair_mod = {players = {[fixture_index] = {repair_bot_enabled = true}}}
         return
     end
     -- The multiplayer integration fixture below is retained for a later phase,
@@ -128,7 +139,18 @@ function M.run()
         return
     end
     validate_catalogue()
-    if state.root().phase1_headless_fixture then
+    local fixture_index = state.root().phase2_headless_fixture
+    if fixture_index then
+        local fixture = state.player(fixture_index)
+        assert(state.root().import_complete, "MAB legacy migration did not complete")
+        assert(fixture.roles.upgrade.enabled and fixture.roles.upgrade.task == "combined",
+            "MAB game-bot upgrade state was not imported")
+        assert(fixture.roles.track.enabled and fixture.roles.track.task == "track",
+            "MAB game-bot track state was not imported")
+        assert(fixture.roles.builder.enabled and fixture.roles.logistics.enabled and fixture.roles.surveyor.enabled,
+            "MAB gameplay group state was not imported")
+        assert(fixture.roles.mapper.enabled, "MAB mapping state was not imported")
+        assert(fixture.roles.repair.enabled, "MAB repair state was not imported")
         run_headless_baseline()
         return
     end
@@ -345,7 +367,7 @@ function M.run()
     assert(state.root().test_clear_event and #state.root().discovery.order == 0, "MAB clear event/state failed");
     script.on_event(mapped_event, nil);
     script.on_event(clear_event, nil)
-    log("[MAB test] Phase 1 fixture passed on Factorio " .. script.active_mods.base)
+    log("[MAB test] Phase 2 fixture passed on Factorio " .. script.active_mods.base)
 end
 
 return M
