@@ -1,0 +1,6 @@
+-- Control-stage entry point for Mekatrol Assist Bot.
+--
+-- Runtime event registration will be added after the shared state, role
+-- registry, scheduler, and migration boundaries described in MERGE_PLAN.md are
+-- established. Keeping this entry point empty makes version 0.1.0 a valid,
+-- inert Factorio mod base while legacy behavior remains in its source mods.

@@ -1,0 +1,4 @@
+-- Data-stage entry point for Mekatrol Assist Bot.
+--
+-- Bot prototypes, custom inputs, shortcuts, and selection tools will be added
+-- here through focused prototype modules as the migration plan is implemented.
