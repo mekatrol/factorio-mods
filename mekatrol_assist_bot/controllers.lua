@@ -10,6 +10,7 @@ local visuals = require("visuals")
 local survey = require("survey")
 local polygon = require("polygon")
 local state = require("state")
+local logistics = require("logistics")
 local M = {}
 
 local ignored_repair = {};
@@ -43,7 +44,8 @@ local upgrades = config.tasks.upgrade.mappings
 
 local filters = {
     builder = {
-        type = "entity-ghost"
+        type = "entity-ghost",
+        force = "player"
     },
     repair = {
         force = "player"
@@ -61,7 +63,7 @@ local filters = {
         type = "cliff"
     },
     logistics = {
-        type = {"item-entity", "simple-entity", "container"}
+        type = {"item-entity", "simple-entity", "simple-entity-with-owner", "container", "resource"}
     },
     cleanup = {
         type = "item-entity"
@@ -188,7 +190,9 @@ local function valid_target(role, e, rs, anchor)
         return not (d.grouped and d.grouped[discovery.identity(e)])
     end
     if role == "logistics" then
-        return e.type == "item-entity" or (e.minable and e.force.name == "neutral")
+        local neutral = not e.force or e.force.name == "neutral"
+        return (e.type == "item-entity" or (e.minable and neutral)) and
+                   logistics.matches_pickup(e, rs and rs.pickup_name)
     end
     return true
 end
@@ -338,6 +342,9 @@ local function act(role, rs, anchor, e)
                 quality = stack.quality
             });
             if inserted > 0 then
+                if rs.pickup_remaining then
+                    rs.pickup_remaining = math.max(0, rs.pickup_remaining - inserted)
+                end
                 if inserted >= total then
                     e.destroy()
                 else
@@ -345,10 +352,34 @@ local function act(role, rs, anchor, e)
                 end
             end
         end
-        return true
+        return not rs.pickup_remaining or rs.pickup_remaining <= 0 or not e.valid
     end
     if role == "logistics" then
         local player_inv = anchor.player.get_main_inventory();
+        if e.type == "resource" then
+            if not player_inv or not e.amount or e.amount <= 0 then
+                return true
+            end
+            local products = e.prototype and e.prototype.mineable_properties and e.prototype.mineable_properties.products
+            local name = products and products[1] and products[1].name
+            if not name then
+                return true
+            end
+            local amount = math.min(config.tasks.logistics.resource_units_per_action, e.amount,
+                rs.pickup_remaining or math.huge)
+            local inserted = player_inv.insert {name = name, count = amount}
+            if inserted <= 0 then
+                return true
+            end
+            e.amount = e.amount - inserted
+            if rs.pickup_remaining then
+                rs.pickup_remaining = math.max(0, rs.pickup_remaining - inserted)
+            end
+            if e.amount <= 0 and e.valid then
+                e.deplete()
+            end
+            return not e.valid or (rs.pickup_remaining and rs.pickup_remaining <= 0)
+        end
         local contents = supply.entity_inventory(e)
         if contents then
             local job = rs.collect_job;
@@ -359,7 +390,8 @@ local function act(role, rs, anchor, e)
                 };
                 rs.collect_job = job
             end
-            if job.cursor <= #contents then
+            local stop = math.min(#contents, job.cursor + config.tasks.logistics.inventory_slots_per_action - 1)
+            while job.cursor <= stop do
                 local stack = contents[job.cursor];
                 if stack.valid_for_read then
                     local inserted = player_inv and player_inv.insert {
@@ -375,6 +407,8 @@ local function act(role, rs, anchor, e)
                     end
                 end
                 job.cursor = job.cursor + 1;
+            end
+            if job.cursor <= #contents then
                 return false
             end
             rs.collect_job = nil
@@ -389,7 +423,7 @@ local function act(role, rs, anchor, e)
         return true
     end
     if role == "builder" then
-        local name = e.ghost_name;
+        local name = logistics.placement_item(e);
         if name then
             local got = supply.take(rs, anchor.player, e, rs.entity or e, name, 1);
             if got == nil then
@@ -398,7 +432,7 @@ local function act(role, rs, anchor, e)
             if got > 0 then
                 local source = rs.last_source;
                 rs.last_source = nil;
-                local _, revived = e.revive {
+                local revived = e.revive {
                     raise_revive = true
                 };
                 if not revived then
@@ -515,9 +549,16 @@ function M.step(role, rs, anchor, bot)
         rs.path_job = nil
         rs.best_distance = nil
     end
+    if role == "logistics" and rs.pickup_remaining and rs.pickup_remaining <= 0 then
+        rs.pickup_name = nil
+        rs.pickup_remaining = nil
+        rs.task = "collect"
+        rs.scan = nil
+        rs.target = nil
+    end
     if not rs.scan and not rs.target and
         (role == "repair" or role == "logistics" or role == "surveyor" or role == "builder") then
-        local candidate, exhausted = discovery.next_for(rs);
+        local candidate, exhausted = discovery.next_for(rs, role);
         if candidate and candidate.valid and candidate.surface == anchor.surface and
             valid_target(role, candidate, rs, anchor) then
             rs.target = candidate;

@@ -7,6 +7,7 @@ local polygon = require("polygon")
 local discovery = require("discovery")
 local command = require("commands")
 local technology = require("technology")
+local logistics = require("logistics")
 local M = {}
 
 local function eq(a, b, message)
@@ -24,6 +25,9 @@ function M.run()
     eq(registry.get("s").name, "surveyor", "s alias");
     eq(registry.get("v").name, "surveyor", "legacy v alias")
     eq(registry.has_task(registry.get("builder"), "construct"), true, "builder construct task")
+    eq(registry.has_task(registry.get("logistics"), "pickup"), true, "logistics pickup task")
+    eq(logistics.first_product_name({{name = "rail", count = 1}}, "straight-rail"), "rail",
+        "builder resolves placement item from prototype metadata")
     local square = {{
         x = 0,
         y = 0

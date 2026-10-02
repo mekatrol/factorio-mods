@@ -2,6 +2,7 @@
 local state = require("state")
 local config = require("config")
 local visuals = require("visuals")
+local registry = require("role_registry")
 local M = {}
 
 function M.store(order, records, id, record)
@@ -54,10 +55,19 @@ function M.add(e)
             x = e.position.x,
             y = e.position.y
         },
+        force_name = e.force and e.force.name or nil,
         tick = game.tick
     }
     local inserted = M.store(d.order, d.records, id, record)
     index_add(d, id, record)
+    if inserted then
+        for role in pairs(registry.handoffs) do
+            if registry.accepts_handoff(role, record) then
+                d.queues[role] = d.queues[role] or {order = {}}
+                d.queues[role].order[#d.queues[role].order + 1] = id
+            end
+        end
+    end
     visuals.map_marker(id, e)
     local event = d.events and d.events.mapped;
     if event and inserted then
@@ -81,6 +91,7 @@ function M.clear()
     d.by_name = {};
     d.groups = {};
     d.grouped = {};
+    d.queues = {};
     d.generation = (d.generation or 0) + 1;
     visuals.begin_clear(root, "map:")
     local event = d.events and d.events.cleared;
@@ -161,8 +172,21 @@ function M.snapshot()
 end
 
 -- Advances at most one shared record. Callers persist their own cursor and may fall back to scanning at end.
-function M.next_for(rs)
+function M.next_for(rs, role)
     local d = state.root().discovery;
+    local queue = role and d.queues and d.queues[role]
+    if queue then
+        if rs.handoff_generation ~= (d.generation or 0) then
+            rs.handoff_generation = d.generation or 0
+            rs.handoff_cursor = 1
+        end
+        local id = queue.order[rs.handoff_cursor or 1]
+        if id then
+            rs.handoff_cursor = (rs.handoff_cursor or 1) + 1
+            local queued = d.records[id]
+            return queued and queued.entity or nil, false
+        end
+    end
     if rs.discovery_generation ~= (d.generation or 0) then
         rs.discovery_generation = d.generation or 0;
         rs.discovery_cursor = 0

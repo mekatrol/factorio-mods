@@ -25,6 +25,10 @@ function M.run()
                 dst.repair_health_pool = tonumber(legacy.repair_health_pool) or dst.repair_health_pool or 0
             end
         end
+        if previous_schema < 6 then
+            root.discovery = root.discovery or {}
+            root.discovery.queues = root.discovery.queues or {}
+        end
         root.schema_version = config.schema_version
     end
     if root.import_complete or not config.compatibility.import_legacy_state then

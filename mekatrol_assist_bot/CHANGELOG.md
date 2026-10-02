@@ -28,3 +28,9 @@
 - Added a synthetic migrated-save and two-player/two-surface integration fixture.
 - Renamed all custom inputs; Factorio cannot migrate users' saved key bindings,
   so bindings must be reapplied in Controls > Mods.
+
+## 1.0.0 - Phase 6
+
+- Completed prototype-aware same-force ghost construction with shared supply sourcing.
+- Ported bounded logistics pickup, inventory draining, neutral mining, and quantity requests.
+- Replaced the gameplay master controller with persistent role-registry discovery queues.

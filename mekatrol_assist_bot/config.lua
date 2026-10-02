@@ -1,7 +1,7 @@
 -- Public configuration for both Factorio stages. Keep this file free of runtime globals.
 return {
     -- Persistent-state/configuration schema. Positive integer.
-    schema_version = 5,
+    schema_version = 6,
     controls = {
         -- Factorio key sequences. These defaults may be rebound in Controls > Mods.
         all = "CONTROL + SHIFT + A",
@@ -100,7 +100,11 @@ return {
             projectile_speed = 0.3
         },
         logistics = {
-            radius = 64
+            radius = 64,
+            -- Inventory slots transferred by one scheduled work unit; integer >= 1.
+            inventory_slots_per_action = 1,
+            -- Resource units mined by one scheduled work unit; integer >= 1.
+            resource_units_per_action = 1
         },
         surveyor = {
             radius = 128,

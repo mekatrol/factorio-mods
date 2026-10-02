@@ -11,7 +11,8 @@ function M.root()
             order = {},
             by_name = {},
             groups = {},
-            grouped = {}
+            grouped = {},
+            queues = {}
         },
         cliffs = {},
         destroyed_sites = {},
@@ -23,6 +24,7 @@ function M.root()
     r.destroyed_sites = r.destroyed_sites or {};
     r.discovery.by_name = r.discovery.by_name or {}
     r.discovery.grouped = r.discovery.grouped or {}
+    r.discovery.queues = r.discovery.queues or {}
     if not r.discovery.index_version then
         for id, record in pairs(r.discovery.records) do
             local bucket = r.discovery.by_name[record.name] or {}

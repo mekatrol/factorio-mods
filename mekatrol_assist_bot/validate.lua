@@ -87,6 +87,8 @@ function M.run(c, known)
     num("tasks.repair.health_per_action", c.tasks.repair.health_per_action, 0.000001)
     num("tasks.repair.interaction_distance", c.tasks.repair.interaction_distance, 0.000001)
     num("tasks.cliff.projectile_speed", c.tasks.cliff.projectile_speed, 0.000001)
+    num("tasks.logistics.inventory_slots_per_action", c.tasks.logistics.inventory_slots_per_action, 1, nil, true)
+    num("tasks.logistics.resource_units_per_action", c.tasks.logistics.resource_units_per_action, 1, nil, true)
     num("tasks.surveyor.boundary_max_steps", c.tasks.surveyor.boundary_max_steps, 1, nil, true)
     for color, value in pairs(c.visuals.colors) do
         for channel, n in pairs(value) do

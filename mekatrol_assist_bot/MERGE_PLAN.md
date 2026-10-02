@@ -340,10 +340,10 @@ should retain the temporary plan as required operational documentation.
 
 ## Implementation phases
 
-Phase status as of 2026-10-02: Phases 1 through 5 are complete and verified
-against Factorio 2.0.77. Phases 6-7 may contain partial implementation, but none
-is marked complete until its phase-level behavior and applicable acceptance
-checks have been verified. The current stopping point is the end of Phase 5.
+Phase status as of 2026-10-02: Phases 1 through 6 are complete and verified
+against Factorio 2.0.77. Phase 7 may contain partial implementation, but is not
+marked complete until its phase-level behavior and applicable acceptance checks
+have been verified. The current stopping point is the end of Phase 6.
 
 ### Phase 1: Baseline and acceptance fixtures (complete)
 
@@ -405,16 +405,19 @@ Evidence and reproduction details are recorded in `PHASE4_MAPPING_DISCOVERY.md`.
 
 Evidence and reproduction details are recorded in `PHASE5_REPAIR.md`.
 
-### Phase 6: Gameplay logistics and builder
+### Phase 6: Gameplay logistics and builder (complete)
 
-- Port logistics collection/mining/inventory behavior, sharing supply and
+- [x] Port logistics collection/mining/inventory behavior, sharing supply and
   scanner primitives with cleanup and upgrade bots.
-- Define and implement the currently missing builder `construct` contract
+- [x] Define and implement the currently missing builder `construct` contract
   (recommended: fulfill nearby same-force entity ghosts using permitted supply
   sources). Until implemented and tested, do not claim construction support in
   help text.
-- Port the master-controller handoff as event/queue rules in the role registry
+- [x] Port the master-controller handoff as event/queue rules in the role registry
   instead of a second global controller.
+
+Evidence and reproduction details are recorded in
+`PHASE6_GAMEPLAY_BUILDER_LOGISTICS.md`.
 
 ### Phase 7: Controls, technology, migration, and legacy deletion
 

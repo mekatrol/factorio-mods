@@ -159,26 +159,38 @@ function M.execute(pi, text, forced)
             return
         end
         local rs = state.player(pi).roles[name];
-        rs.task = task;
-        rs.scan = nil;
-        rs.target = nil
-        if task == "move_to" then
-            local values = {}
-            for i = 4, #a do
-                local k, v = a[i]:match("^([^=]+)=(.+)$");
-                if k then
-                    values[k] = tonumber(v)
-                end
+        local values = {}
+        for i = 4, #a do
+            local k, v = a[i]:match("^([^=]+)=(.+)$")
+            if k then
+                values[k] = v
             end
-            if not values.x or not values.y then
+        end
+        if task == "move_to" then
+            local x, y = tonumber(values.x), tonumber(values.y)
+            if not x or not y then
                 say(pi, "move_to requires x=<number> y=<number>")
                 return
             end
             rs.destination = {
-                x = values.x,
-                y = values.y
+                x = x,
+                y = y
             }
+        elseif name == "logistics" and task == "pickup" then
+            local count = tonumber(values.count)
+            if not values.name or not count or count < 1 or count % 1 ~= 0 then
+                say(pi, "pickup requires name=<item-or-entity> count=<positive integer>")
+                return
+            end
+            rs.pickup_name = values.name
+            rs.pickup_remaining = count
+        elseif name == "logistics" then
+            rs.pickup_name = nil
+            rs.pickup_remaining = nil
         end
+        rs.task = task;
+        rs.scan = nil;
+        rs.target = nil
         manager.enable(pi, name, true);
         say(pi, name .. " task=" .. task);
         return

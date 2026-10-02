@@ -17,6 +17,33 @@ local tasks = {
     surveyor = {"follow", "search", "survey"}
 }
 
+-- Discovery handoffs replace the legacy master controller. Producers publish
+-- once; each consumer advances its own persistent queue under scheduler budget.
+M.handoffs = {
+    repair = {},
+    logistics = {types = {"item-entity", "simple-entity", "simple-entity-with-owner", "container", "resource"}},
+    surveyor = {types = {"resource"}}
+}
+
+function M.accepts_handoff(role, record)
+    local rule = M.handoffs[role]
+    if not rule then
+        return false
+    end
+    if rule.force and record.force_name ~= rule.force then
+        return false
+    end
+    if rule.types then
+        for _, entity_type in ipairs(rule.types) do
+            if record.type == entity_type then
+                return true
+            end
+        end
+        return false
+    end
+    return true
+end
+
 for _, name in ipairs(config.formation.role_order) do
     M.roles[name] = {
         name = name,

@@ -9,13 +9,13 @@ enabled roles and mapping data once, without retaining old bot entities.
 
 | Role | Behaviour | Technology |
 | --- | --- | --- |
-| builder | Builds nearby same-force entity ghosts from player inventory. | Construction robotics |
+| builder | Builds nearby same-force ghosts using the prototype-defined placement item. | Construction robotics |
 | repair | Repairs damaged player-force entities using repair packs and resumable wall-aware A*. | Construction robotics |
 | upgrade | Replaces supported belts, inserters, and chests using player inventory. | Construction robotics |
 | track | Traverses and locks one connected belt component, including underground peers, then progressively upgrades it. | Construction robotics |
 | lamp | Places lamps beside nearby electric poles after configured darkness. | Construction robotics + lamp |
 | cliff | Destroys only cliffs marked with the planner, consuming cliff explosives. | Cliff explosives |
-| logistics | Collects ground items and mines recoverable neutral entities to the player. | Logistic robotics |
+| logistics | Collects ground items, drains inventories in bounded batches, and incrementally mines recoverable neutral entities/resources. | Logistic robotics |
 | cleanup | Collects loose item entities into player inventory. | Logistic robotics |
 | mapper | Progressively scans an outward deterministic cell spiral and maps static entities into the shared discovery index. | Electronics |
 | surveyor | Traces resource boundaries and builds connected, polygon-backed discovery groups. | Electronics |
@@ -30,6 +30,11 @@ Bots are independently enabled. Locked bots are not created and report every
 missing technology. Research reversal recalls affected bots. All role searches,
 selection rectangles, pruning, and target planning resume from persistent cell
 cursors under one global per-tick budget.
+
+Mapper discoveries are published into independent persistent repair, logistics,
+and surveyor queues declared by the role registry. This replaces the legacy
+master controller; each consumer advances only when the shared scheduler grants
+it a work unit, then falls back to a bounded local scan after its queue ends.
 
 Repair work is split into `tasks.repair.health_per_action` health-point steps.
 Each consumed repair pack contributes exactly
@@ -64,6 +69,11 @@ Mods**. Old custom-input bindings cannot be migrated automatically.
 /mab help [role]
 /mab status [role|all]
 ```
+
+`/mab logistics task pickup name=<prototype> count=<positive integer>` requests
+a bounded quantity; `collect` resumes general collection. Builder `construct`
+revives same-force entity ghosts only after shared supply provides the item
+reported by the ghost prototype.
 
 Short role aliases include `s` for surveyor (`v` remains accepted). `/ub`,
 `/tb`, `/cb`, `/lb`, and `/db` forward to upgrade, track, cleanup, lamp, and
@@ -107,7 +117,7 @@ query more expensive.
 
 ## Compatibility and state
 
-The only persistent root is `storage.mekatrol_assist_bot` (schema 5). It contains
+The only persistent root is `storage.mekatrol_assist_bot` (schema 6). It contains
 per-player role state, resumable jobs, discoveries, groups, and marked cliffs.
 Rendering objects are not persisted. On first configuration migration the mod
 imports recognizable state from `mekatrol_game_bot`,
@@ -144,4 +154,5 @@ bots, and scans a 4,096-resource field. Never turn this on in a real save. Phase
 `PHASE2_ARCHITECTURE.md`; Phase 3 visual and formation evidence is in
 `PHASE3_VISUALS_FORMATION.md`; Phase 4 mapping evidence is in
 `PHASE4_MAPPING_DISCOVERY.md`; Phase 5 repair evidence is in
-`PHASE5_REPAIR.md`. Normal configuration keeps `debug=false`.
+`PHASE5_REPAIR.md`; Phase 6 builder/logistics evidence is in
+`PHASE6_GAMEPLAY_BUILDER_LOGISTICS.md`. Normal configuration keeps `debug=false`.
