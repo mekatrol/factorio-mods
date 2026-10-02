@@ -4,6 +4,6 @@
   "title": "Long-Range Gun Turret",
   "author": "Mekatrol",
   "factorio_version": "2.0",
-  "description": "Adds a red gun turret with 60-tile range and twice the normal damage. It requires piercing or better ammunition.",
+  "description": "Adds a gun turret with 60-tile range and twice the normal damage. It requires piercing or better ammunition.",
   "dependencies": ["base >= 2.0"]
 }

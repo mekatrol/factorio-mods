@@ -1,0 +1,9 @@
+{
+  "name": "long_range_flamethrower",
+  "version": "1.0.0",
+  "title": "Long-Range Flamethrower Turret",
+  "author": "Mekatrol",
+  "factorio_version": "2.0",
+  "description": "Adds a flamethrower turret with twice the normal range, the same minimum range, and the same oil consumption.",
+  "dependencies": ["base >= 2.0"]
+}

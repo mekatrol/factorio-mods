@@ -1,6 +1,6 @@
 # Long-Range Gun Turret
 
-Adds a red variant of the vanilla gun turret.
+Adds a long range variant of the vanilla gun turret.
 
 - Maximum range: 60 tiles (vanilla: 18; matches the long-range flamethrower)
 - Damage modifier: 2 (twice normal damage)

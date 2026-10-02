@@ -1,7 +1,7 @@
 -- Centralise the mod's identity so every generated prototype and locale lookup
 -- stays aligned when the upgraded turret is renamed.
 local config = {
-  prototype_name = "red-long-range-flamethrower-turret",
+  prototype_name = "long-range-flamethrower-turret",
 
   -- Identify the vanilla prototypes used as templates so the upgraded turret
   -- retains the standard recipe, behaviour, sounds, connections, and artwork.
@@ -34,7 +34,7 @@ local config = {
 
   -- Place the new item immediately after the standard defensive turrets so it
   -- remains easy to find in the same crafting-menu group.
-  item_order = "b[turret]-d[red-long-range-flamethrower-turret]",
+  item_order = "b[turret]-d[long-range-flamethrower-turret]",
 
   -- Upgrade an existing standard turret with two additional engines so the
   -- long-range version is an improvement step rather than a separate build.
