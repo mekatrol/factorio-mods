@@ -115,6 +115,33 @@ The legacy game bot's `bot.lua` and `track_upgrade_bot.lua` are substantially du
 Before adding ports, extract their shared fetch/upgrade/return state machine into
 an upgrade controller parameterized by task registry and progression policy.
 
+## Mandatory tick-budget and responsiveness rule
+
+Implemented code must never perform a potentially large operation or scan in a
+single tick. All discovery, entity finding, target selection, route and task
+planning, pathfinding, connected-component traversal, inventory/source search,
+grouping, surveying, pruning, migration, and similar work must be incremental,
+budgeted, and resumable across many ticks. This applies even when an operation
+is initiated by a command, hotkey, event, configuration change, or bot task;
+those entry points enqueue or initialize work and must not complete an
+unbounded search synchronously.
+
+Each such operation must store explicit progress in persistent state, process
+only its configured per-tick item/cell/node/time budget, and yield to the shared
+scheduler when that budget is exhausted. Iteration order and saved cursors must
+remain deterministic and valid across save/load. Results may be consumed
+progressively where safe, but controllers must tolerate incomplete scans and
+plans without restarting them from the beginning every tick.
+
+No controller may use a full-surface scan, a large-radius entity query, or an
+unbounded Lua loop during normal gameplay. Large radii must be divided into
+cells or another bounded work queue; entity queries within each unit of work
+must also have a defensible maximum size. Work budgets must be coordinated by
+the shared scheduler so multiple enabled bots cannot each spend the full global
+budget in the same tick. The design goal is stable gameplay frame time: a large
+factory or search area may make a task take more ticks to finish, but must not
+cause a long gameplay pause or slowdown.
+
 ## Unified bot roster, appearance, and technology gates
 
 Every role is independently enableable. “All” is a convenience operation, not
@@ -269,18 +296,19 @@ secondary/destructive/planner action. Recommended defaults:
 Standardize console control on:
 
 ```text
-/bot <role|all> <on|off|toggle|status> [options]
-/bot <role> task <task-name> [key=value ...]
-/bot <role> tasks
-/bot <role> refresh
-/bot help [role]
-/bot-status [role|all]
+/mab <role|all> <on|off|toggle|status> [options]
+/mab <role> task <task-name> [key=value ...]
+/mab <role> tasks
+/mab <role> refresh
+/mab help [role]
+/mab status [role|all]
 ```
 
-Keep `/b` as the short form. Resolve `s` consistently to `surveyor`; use full
+`/mab` is the single public command namespace; do not register `/bot`, `/b`, or
+`/bot-status` for the new mod. Resolve `s` consistently to `surveyor`; use full
 role names in persisted data. Retain `/ub`, `/tb`, `/cb`, `/lb`, and `/db` as
 documented compatibility aliases for one deprecation cycle, forwarding them to
-the unified parser. Existing saved custom key assignments cannot be migrated by
+the `/mab` parser. Existing saved custom key assignments cannot be migrated by
 script, so document renamed input prototypes and the new defaults in release
 notes.
 
@@ -298,6 +326,17 @@ Do not add comments that merely narrate syntax or arithmetic. Existing comments
 such as “compute dx” or “return false” should be removed when touched. Prefer
 names and small functions for mechanics; comments explain purpose and design
 reasoning.
+
+Keep `README.md` updated continuously as each phase and feature is implemented;
+documentation is part of the implementation work, not a final cleanup task.
+Clearly distinguish planned behavior from behavior available in the current
+release, and keep controls, commands, configuration, technology requirements,
+compatibility notes, and migration instructions synchronized with the code.
+Before declaring the merge complete, move every remaining piece of enduring
+user and maintainer documentation from this plan into `README.md`. Once all
+acceptance criteria pass and the README is the complete authoritative
+documentation for the bot, delete `MERGE_PLAN.md`; no completed implementation
+should retain the temporary plan as required operational documentation.
 
 ## Implementation phases
 
@@ -410,7 +449,10 @@ reasoning.
   death/respawn, force change, research gained/reversed, bot destruction, and
   configuration change.
 - Profiling confirms scanner work is budgeted and no port introduces a
-  full-surface scan on normal ticks.
+  full-surface scan on normal ticks. Stress tests confirm that entity finding,
+  planning, pathfinding, connected-entity traversal, surveying, pruning, and
+  migration all yield at their configured budgets and continue across many
+  ticks without noticeable gameplay stalls.
 - `README.md`, command help, locale strings, and actual default bindings agree.
 
 ## Known risks to address during implementation
