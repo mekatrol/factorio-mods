@@ -1,0 +1,609 @@
+-- Role state machines. Scan/planning phases yield after one cell; action phases handle one target.
+local config = require("config")
+local scanner = require("entity_scanner")
+local discovery = require("discovery")
+local movement = require("movement")
+local supply = require("supply")
+local track = require("track")
+local pathfinding = require("pathfinding")
+local visuals = require("visuals")
+local survey = require("survey")
+local state = require("state")
+local M = {}
+
+local ignored_repair = {};
+for _, name in ipairs(config.tasks.repair.ignored_names or {}) do
+    ignored_repair[name] = true
+end
+
+local mobile = {
+    character = true,
+    car = true,
+    ["spider-vehicle"] = true,
+    locomotive = true,
+    ["cargo-wagon"] = true,
+    ["fluid-wagon"] = true,
+    ["artillery-wagon"] = true,
+    unit = true,
+    corpse = true,
+    ["character-corpse"] = true,
+    fish = true,
+    ["combat-robot"] = true,
+    ["construction-robot"] = true,
+    ["logistic-robot"] = true,
+    projectile = true,
+    beam = true,
+    ["flying-text"] = true,
+    smoke = true,
+    fire = true,
+    stream = true
+}
+local upgrades = config.tasks.upgrade.mappings
+
+local filters = {
+    builder = {
+        type = "entity-ghost"
+    },
+    repair = {
+        force = "player"
+    },
+    upgrade = {
+        name = {}
+    },
+    track = {
+        type = {"transport-belt", "underground-belt", "splitter"}
+    },
+    lamp = {
+        type = {"electric-pole", "lamp"}
+    },
+    cliff = {
+        type = "cliff"
+    },
+    logistics = {
+        type = {"item-entity", "simple-entity", "container"}
+    },
+    cleanup = {
+        type = "item-entity"
+    },
+    mapper = {},
+    surveyor = {
+        type = "resource"
+    }
+}
+
+for name in pairs(upgrades) do
+    filters.upgrade.name[#filters.upgrade.name + 1] = name
+end
+table.sort(filters.upgrade.name)
+
+local radii = {
+    builder = "builder",
+    repair = "repair",
+    upgrade = "upgrade",
+    track = "track",
+    lamp = "lamp",
+    cliff = "cliff",
+    logistics = "logistics",
+    cleanup = "cleanup",
+    mapper = nil,
+    surveyor = "surveyor"
+}
+
+local function survey_key(e)
+    local s = config.tasks.surveyor.group_cell_size;
+    return e.surface.index .. ":" .. e.name .. ":" .. math.floor(e.position.x / s) .. ":" ..
+               math.floor(e.position.y / s)
+end
+
+local function begin(role, rs, anchor)
+    local radius = role == "mapper" and config.scanning.mapper_radius or config.tasks[radii[role]].radius
+    if role == "upgrade" then
+        radius = config.tasks.upgrade.mode_radii[rs.task] or radius
+    end
+    local f = {};
+    for k, v in pairs(filters[role]) do
+        f[k] = v
+    end
+    if f.force == "player" then
+        f.force = anchor.force
+    end
+    rs.scan = scanner.start(anchor.surface, anchor.position, radius, f);
+    rs.phase = "scan"
+end
+
+local function valid_target(role, e, rs, anchor)
+    if role == "mapper" then
+        return not mobile[e.type]
+    end
+    if role == "cliff" then
+        return state.root().cliffs[discovery.identity(e)] == true
+    end
+    if role == "repair" then
+        return
+            not ignored_repair[e.name] and e.health and e.prototype.max_health and e.health < e.prototype.max_health *
+                config.tasks.repair.threshold
+    end
+    if role == "upgrade" then
+        local target = upgrades[e.name];
+        local recipe = anchor and anchor.force.recipes[target];
+        if not target or not prototypes.entity[target] or not prototypes.item[target] or (recipe and not recipe.enabled) then
+            return false
+        end
+        local task = rs and rs.task or "combined"
+        if task == "yellow-to-red-belts" then
+            return e.name == "transport-belt" or e.name == "underground-belt" or e.name == "splitter"
+        end
+        if task == "red-to-blue-belts" then
+            return e.name == "fast-transport-belt" or e.name == "fast-underground-belt" or e.name == "fast-splitter"
+        end
+        if task == "blue-to-green-inserters" then
+            return e.name == "fast-inserter"
+        end
+        if task == "containers" then
+            return e.name == "wooden-chest" or e.name == "iron-chest"
+        end
+        return true
+    end
+    if role == "track" then
+        local target = upgrades[e.name];
+        local recipe = target and anchor and anchor.force.recipes[target];
+        return target ~= nil and prototypes.entity[target] ~= nil and prototypes.item[target] ~= nil and
+                   (not recipe or recipe.enabled) and
+                   (e.type == "transport-belt" or e.type == "underground-belt" or e.type == "splitter")
+    end
+    if role == "lamp" then
+        return e.type == "electric-pole" and e.electric_network_id ~= nil and e.surface.can_place_entity {
+            name = "small-lamp",
+            position = {e.position.x + 2, e.position.y},
+            force = e.force
+        }
+    end
+    if role == "surveyor" then
+        local d = state.root().discovery;
+        local g = d.groups[survey_key(e)];
+        return not (g and g.entities[discovery.identity(e)])
+    end
+    if role == "logistics" then
+        return e.type == "item-entity" or (e.minable and e.force.name == "neutral")
+    end
+    return true
+end
+
+local function replace(e, name)
+    if not prototypes.entity[name] then
+        return false
+    end
+    local p = {
+        name = name,
+        position = e.position,
+        direction = e.direction,
+        force = e.force,
+        player = e.last_user,
+        fast_replace = true,
+        spill = false,
+        raise_built = true
+    }
+    if e.type == "underground-belt" then
+        p.type = e.belt_to_ground_type
+    end
+    return e.surface.create_entity(p) ~= nil
+end
+
+local function act(role, rs, anchor, e)
+    if not e or not e.valid then
+        return true
+    end
+    if role == "mapper" then
+        discovery.add(e);
+        return true
+    end
+    if role == "surveyor" then
+        discovery.add(e);
+        local d = state.root().discovery;
+        local k = survey_key(e)
+        local g = d.groups[k] or {
+            name = e.name,
+            surface_index = e.surface.index,
+            entities = {},
+            bounds = {
+                left = e.position.x,
+                right = e.position.x,
+                top = e.position.y,
+                bottom = e.position.y
+            }
+        }
+        g.entities[discovery.identity(e)] = true;
+        local b = g.bounds;
+        b.left = math.min(b.left, e.position.x);
+        b.right = math.max(b.right, e.position.x);
+        b.top = math.min(b.top, e.position.y);
+        b.bottom = math.max(b.bottom, e.position.y)
+        g.polygon = (rs.survey_job and #rs.survey_job.points >= 3) and rs.survey_job.points or {{
+            x = b.left - 0.5,
+            y = b.top - 0.5
+        }, {
+            x = b.right + 0.5,
+            y = b.top - 0.5
+        }, {
+            x = b.right + 0.5,
+            y = b.bottom + 0.5
+        }, {
+            x = b.left - 0.5,
+            y = b.bottom + 0.5
+        }}
+        if rs.survey_job and #rs.survey_job.points >= 3 then
+            g.area = rs.survey_job.area or 0;
+            g.perimeter = rs.survey_job.perimeter or 0
+        else
+            local w, h = b.right - b.left + 1, b.bottom - b.top + 1;
+            g.area = w * h;
+            g.perimeter = 2 * (w + h)
+        end
+        d.groups[k] = g;
+        return true
+    end
+    if role == "repair" then
+        local max = e.prototype.max_health or e.health;
+        local need = max - e.health;
+        if need <= 0 then
+            return true
+        end
+        rs.repair_health_pool = rs.repair_health_pool or 0
+        if rs.repair_health_pool < need then
+            local packs = math.ceil((need - rs.repair_health_pool) / config.supply.repair_pack_durability);
+            local got = supply.take(rs, anchor.player, e, rs.entity or e, "repair-pack", packs);
+            if got == nil then
+                return false
+            end
+            rs.repair_health_pool = rs.repair_health_pool + got * config.supply.repair_pack_durability
+        end
+        local repaired = math.min(need, rs.repair_health_pool);
+        e.health = e.health + repaired;
+        rs.repair_health_pool = rs.repair_health_pool - repaired;
+        visuals.health(discovery.identity(e), e);
+        return true
+    end
+    if role == "cleanup" then
+        local stack = e.stack;
+        if stack and stack.valid_for_read then
+            local free = math.max(0, config.supply.cleanup_capacity - (rs.cargo_count or 0));
+            local count = math.min(stack.count, free);
+            if count > 0 then
+                local name, total = stack.name, stack.count;
+                if count >= total then
+                    e.destroy()
+                else
+                    stack.count = total - count
+                end
+                supply.queue_cargo(rs, {
+                    name = name,
+                    count = count
+                }, true)
+            end
+        end
+        return true
+    end
+    if role == "logistics" and e.type == "item-entity" then
+        local stack = e.stack;
+        if stack and stack.valid_for_read then
+            local total = stack.count;
+            local inserted = supply.player_give(anchor.player, {
+                name = stack.name,
+                count = total,
+                quality = stack.quality
+            });
+            if inserted > 0 then
+                if inserted >= total then
+                    e.destroy()
+                else
+                    stack.count = total - inserted
+                end
+            end
+        end
+        return true
+    end
+    if role == "logistics" then
+        local player_inv = anchor.player.get_main_inventory();
+        local contents = supply.entity_inventory(e)
+        if contents then
+            local job = rs.collect_job;
+            if not job or job.entity ~= e then
+                job = {
+                    entity = e,
+                    cursor = 1
+                };
+                rs.collect_job = job
+            end
+            if job.cursor <= #contents then
+                local stack = contents[job.cursor];
+                if stack.valid_for_read then
+                    local inserted = player_inv and player_inv.insert {
+                        name = stack.name,
+                        count = stack.count,
+                        quality = stack.quality
+                    } or 0;
+                    if inserted > 0 then
+                        stack.count = stack.count - inserted
+                    end
+                    if stack.valid_for_read then
+                        return false
+                    end
+                end
+                job.cursor = job.cursor + 1;
+                return false
+            end
+            rs.collect_job = nil
+        end
+        if player_inv and e.minable then
+            e.mine {
+                inventory = player_inv,
+                force = true,
+                raise_destroyed = true
+            }
+        end
+        return true
+    end
+    if role == "builder" then
+        local name = e.ghost_name;
+        if name then
+            local got = supply.take(rs, anchor.player, e, rs.entity or e, name, 1);
+            if got == nil then
+                return false
+            end
+            if got > 0 then
+                local source = rs.last_source;
+                rs.last_source = nil;
+                local _, revived = e.revive {
+                    raise_revive = true
+                };
+                if not revived then
+                    supply.give_or_carry(rs, anchor.player, {
+                        name = name,
+                        count = 1
+                    }, source)
+                end
+            end
+        end
+        return true
+    end
+    if role == "upgrade" or role == "track" then
+        local old = e.name;
+        local name = upgrades[old];
+        local recipe = name and anchor.force.recipes[name];
+        if name and (not recipe or recipe.enabled) then
+            local got = supply.take(rs, anchor.player, e, rs.entity or e, name, 1);
+            if got == nil then
+                return false
+            end
+            if got > 0 then
+                local source = rs.last_source;
+                rs.last_source = nil;
+                if replace(e, name) then
+                    supply.give_or_carry(rs, anchor.player, {
+                        name = old,
+                        count = 1
+                    }, source)
+                else
+                    supply.give_or_carry(rs, anchor.player, {
+                        name = name,
+                        count = 1
+                    }, source)
+                end
+            end
+        end
+        return true
+    end
+    if role == "cliff" then
+        local got = supply.take(rs, anchor.player, e, rs.entity or e, "cliff-explosives", 1);
+        if got == nil then
+            return false
+        end
+        if got > 0 then
+            local source = rs.last_source;
+            rs.last_source = nil;
+            local id = discovery.identity(e);
+            local projectile = e.surface.create_entity {
+                name = "cliff-explosives",
+                position = rs.entity.position,
+                target = e.position,
+                speed = config.tasks.cliff.projectile_speed,
+                force = anchor.force
+            };
+            if projectile then
+                state.root().cliffs[id] = nil;
+                visuals.clear_role("cliff:" .. id)
+            else
+                supply.give_or_carry(rs, anchor.player, {
+                    name = "cliff-explosives",
+                    count = 1
+                }, source)
+            end
+        end
+        return true
+    end
+    if role == "lamp" then
+        if anchor.surface.darkness < config.tasks.lamp.darkness then
+            return
+        end
+        local pos = {
+            x = e.position.x + 2,
+            y = e.position.y
+        };
+        if anchor.surface.can_place_entity {
+            name = "small-lamp",
+            position = pos,
+            force = anchor.force
+        } then
+            local got = supply.take(rs, anchor.player, e, rs.entity or e, "small-lamp", 1);
+            if got == nil then
+                return false
+            end
+            if got > 0 then
+                local source = rs.last_source;
+                rs.last_source = nil;
+                if not anchor.surface.create_entity {
+                    name = "small-lamp",
+                    position = pos,
+                    force = anchor.force,
+                    player = anchor.player,
+                    raise_built = true
+                } then
+                    supply.give_or_carry(rs, anchor.player, {
+                        name = "small-lamp",
+                        count = 1
+                    }, source)
+                end
+            end
+        end
+    end
+    return true
+end
+function M.step(role, rs, anchor, bot)
+    if not rs.scan and not rs.target and
+        (role == "repair" or role == "logistics" or role == "surveyor" or role == "builder") then
+        local candidate, exhausted = discovery.next_for(rs);
+        if candidate and candidate.valid and candidate.surface == anchor.surface and
+            valid_target(role, candidate, rs, anchor) then
+            rs.target = candidate;
+            rs.best_distance = movement.distance2(candidate.position, bot.position)
+        end
+        if not rs.target and not exhausted then
+            return "idle"
+        end
+    end
+    if not rs.scan and not rs.target then
+        begin(role, rs, anchor);
+        return "idle"
+    end
+    if not rs.scan.done then
+        local _, found = scanner.step(rs.scan)
+        for _, e in ipairs(found) do
+            if role == "mapper" then
+                if valid_target(role, e, rs, anchor) then
+                    discovery.add(e)
+                end
+            elseif valid_target(role, e, rs, anchor) then
+                local d = movement.distance2(e.position, bot.position);
+                if not rs.best_distance or d < rs.best_distance then
+                    rs.target = e;
+                    rs.best_distance = d
+                end
+            end
+        end
+        return "moving"
+    end
+    if rs.track_job and rs.track_job.done and (not rs.target or not rs.target.valid) then
+        local candidate, complete = track.next(rs.track_job, function(e)
+            return valid_target(role, e, rs, anchor)
+        end);
+        rs.target = candidate
+        if not candidate and not complete then
+            return "moving"
+        end
+        if complete then
+            rs.track_job = nil;
+            rs.track_started = nil;
+            rs.scan = nil;
+            rs.best_distance = nil;
+            return "idle"
+        end
+    end
+    if not rs.target then
+        rs.scan = nil;
+        rs.best_distance = nil;
+        rs.phase = "idle";
+        return "idle"
+    end
+    if not rs.target_visualized then
+        visuals.target_line(rs.visual_key or role, bot, rs.target);
+        rs.target_visualized = true
+    end
+    local grouped = (role == "track") or (role == "upgrade" and (rs.track_job or (rs.target and rs.target.valid and
+                        (rs.target.type == "transport-belt" or rs.target.type == "underground-belt" or rs.target.type ==
+                            "splitter"))))
+    if grouped then
+        if not rs.track_job then
+            rs.track_job = track.start(rs.target);
+            return "moving"
+        end
+        if not rs.track_job.done then
+            track.step(rs.track_job);
+            return "moving"
+        end
+        if not rs.track_started then
+            rs.track_started = true;
+            rs.target = nil
+        end
+        if not rs.target or not rs.target.valid then
+            local candidate, complete = track.next(rs.track_job, function(e)
+                return valid_target(role, e, rs, anchor)
+            end);
+            rs.target = candidate;
+            if not candidate and not complete then
+                return "moving"
+            end
+            if complete then
+                rs.track_job = nil;
+                rs.track_started = nil;
+                rs.scan = nil;
+                rs.best_distance = nil;
+                return "idle"
+            end
+        end
+    end
+    if role == "repair" then
+        if not rs.path_job then
+            rs.path_job =
+                pathfinding.start(anchor.surface, bot.position, rs.target.position, config.tasks.repair.radius);
+            return "moving"
+        end
+        if not rs.path_job.done then
+            pathfinding.step(rs.path_job);
+            return "moving"
+        end
+        if rs.path_job.path and rs.path_job.cursor >= 1 then
+            if movement.step(bot, rs.path_job.path[rs.path_job.cursor]) then
+                rs.path_job.cursor = rs.path_job.cursor - 1
+            end
+            return "moving"
+        end
+    end
+    if not movement.step(bot, rs.target.position) then
+        return "moving"
+    end
+    if role == "surveyor" then
+        if not rs.survey_job then
+            rs.survey_job = survey.start(rs.target);
+            return "working"
+        end
+        if not rs.survey_job.done then
+            survey.step(rs.survey_job);
+            return "working"
+        end
+    end
+    if not act(role, rs, anchor, rs.target) then
+        return "working"
+    end
+    if grouped then
+        local candidate, complete = track.next(rs.track_job, function(e)
+            return valid_target(role, e, rs, anchor)
+        end);
+        rs.target = candidate;
+        rs.target_visualized = nil;
+        if rs.target or not complete then
+            return "working"
+        end
+        rs.track_job = nil;
+        rs.track_started = nil
+    end
+    rs.target = nil;
+    rs.target_visualized = nil;
+    rs.path_job = nil;
+    rs.survey_job = nil;
+    rs.best_distance = nil;
+    rs.scan = nil;
+    rs.phase = "idle";
+    return "working"
+end
+
+return M

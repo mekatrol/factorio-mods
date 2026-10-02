@@ -340,16 +340,24 @@ should retain the temporary plan as required operational documentation.
 
 ## Implementation phases
 
-### Phase 1: Baseline and acceptance fixtures
+Phase status as of 2026-10-02: Phase 1 is complete and verified against
+Factorio 2.0.77. Phases 2-7 may contain partial implementation, but none is
+marked complete until its phase-level behavior and applicable acceptance checks
+have been verified. Per the requested stopping point, work stops at the end of
+Phase 1.
 
-- Tag/copy a known-good save and record current command output and visible bot
+### Phase 1: Baseline and acceptance fixtures (complete)
+
+- [x] Tag/copy a known-good save and record current command output and visible bot
   behavior.
-- Add a lightweight test/check harness for pure modules: configuration
+- [x] Add a lightweight test/check harness for pure modules: configuration
   validation, command parsing, formation slots, entity identity/deduplication,
   polygon operations, task registry, and technology gates.
-- Record performance baselines for ten enabled bots and large entity fields.
-- Catalogue prototype and technology names against the installed Factorio 2.0
+- [x] Record performance baselines for ten enabled bots and large entity fields.
+- [x] Catalogue prototype and technology names against the installed Factorio 2.0
   data set before finalizing defaults.
+
+Evidence and reproduction details are recorded in `PHASE1_BASELINE.md`.
 
 ### Phase 2: New assist-bot architecture
 
