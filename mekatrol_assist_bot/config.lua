@@ -19,9 +19,13 @@ return {
         cliff_planner = "CONTROL + ALT + D"
     },
     scheduler = {
+        -- Total scheduler work units shared by all players and roles each tick; integer >=1.
         work_per_tick = 24,
+        -- Maximum units per tick spent on migration, clearing, selection, and visual rebuilds; integer >=1.
         background_work_per_tick = 4,
-        idle_interval = 6, -- Counts/ticks, integers >=1; 60 ticks = one second.
+        -- Ticks between formation-follow passes; integer >=1. 60 ticks = one second.
+        idle_interval = 6,
+        -- Ticks between eligible work units for each role; registered role names, integers >=1.
         role_intervals = {
             builder = 1,
             repair = 1,
@@ -33,7 +37,7 @@ return {
             cleanup = 1,
             mapper = 2,
             surveyor = 2
-        } -- Scheduled ticks between role work units; integers >=1.
+        }
     },
     formation = {
         role_order = {"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup", "mapper",
@@ -49,10 +53,7 @@ return {
         arrival_distance = 0.25
     }, -- Tiles per step / inclusive dead band; >0.
     scanning = {
-        cell_size = 16,
-        radius = 96,
-        mapper_radius = 64, -- Inclusive tile distances, finite >0.
-        cells_per_step = 1,
+        cell_size = 16, -- Query-cell width and height in tiles; finite >0.
         prune_interval = 30, -- Ticks between bounded stale-record pruning passes; integer >=1.
         prune_per_step = 16,
         entities_per_cell = 512 -- Work counts, integers >=1; dense cells yield capped batches.
@@ -228,9 +229,13 @@ return {
         }
     },
     compatibility = {
+        -- Non-empty Factorio remote-interface name retained for mapping consumers.
         mapping_remote_interface = "mapping_bot_mod",
+        -- When true, recognized old storage roots are imported once on configuration change.
         import_legacy_state = true,
+        -- Maximum copied records returned by a synchronous compatibility snapshot; integer >=1.
         snapshot_limit = 1000
-    }, -- Records per synchronous compatibility call; integer >=1.
+    },
+    -- Runs destructive integration fixtures during initialization; keep false outside disposable saves.
     debug = false
 }

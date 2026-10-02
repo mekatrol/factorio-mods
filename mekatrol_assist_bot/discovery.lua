@@ -237,7 +237,7 @@ function M.register()
         local e = state.root().discovery.events
         return e and e.cleared
     end
-    remote.add_interface("mapping_bot_mod", {
+    remote.add_interface(config.compatibility.mapping_remote_interface, {
         get_mapped_entities = M.snapshot,
         get_mapped_entities_page = M.snapshot_page,
         get_mapped_entities_by_name_page = M.by_name_page,

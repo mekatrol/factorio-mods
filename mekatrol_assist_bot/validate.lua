@@ -53,10 +53,9 @@ function M.run(c, known)
             fail("roles." .. role .. ".required_technologies", r.required_technologies, "array of technology names")
         end
     end
-    for _, s in ipairs {"cell_size", "radius", "mapper_radius"} do
+    for _, s in ipairs {"cell_size"} do
         num("scanning." .. s, c.scanning[s], 0.000001)
     end
-    num("scanning.cells_per_step", c.scanning.cells_per_step, 1, nil, true);
     num("scanning.prune_interval", c.scanning.prune_interval, 1, nil, true);
     num("scanning.prune_per_step", c.scanning.prune_per_step, 1, nil, true);
     num("scanning.entities_per_cell", c.scanning.entities_per_cell, 1, nil, true)
@@ -102,6 +101,10 @@ function M.run(c, known)
         end
     end
     num("compatibility.snapshot_limit", c.compatibility.snapshot_limit, 1, nil, true)
+    if type(c.compatibility.mapping_remote_interface) ~= "string" or c.compatibility.mapping_remote_interface == "" then
+        fail("compatibility.mapping_remote_interface", c.compatibility.mapping_remote_interface,
+            "non-empty remote interface name")
+    end
     return true
 end
 

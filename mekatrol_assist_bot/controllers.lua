@@ -119,7 +119,7 @@ local function mapper_area(rs, anchor)
 end
 
 local function begin(role, rs, anchor)
-    local radius = role == "mapper" and config.scanning.mapper_radius or config.tasks[radii[role]].radius
+    local radius = role ~= "mapper" and config.tasks[radii[role]].radius or nil
     if role == "upgrade" then
         radius = config.tasks.upgrade.mode_radii[rs.task] or radius
     end
