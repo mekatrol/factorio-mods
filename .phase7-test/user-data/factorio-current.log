@@ -1,0 +1,50 @@
+   0.001 2026-10-02 21:13:29; Factorio 2.0.77 (build 84539, win64, steam, space-age)
+   0.001 Operating system: Windows 11 (build 26100) 
+   0.001 Program arguments: "C:\Program Files (x86)\Steam\steamapps\common\Factorio\bin\x64\factorio.exe" "--config" "C:\Users\Dad\AppData\Roaming\Factorio\mods\.phase7-test\config.ini" "--mod-directory" "C:\Users\Dad\AppData\Roaming\Factorio\mods\.phase7-test" "--create" "C:\Users\Dad\AppData\Roaming\Factorio\mods\.phase7-test\user-data\saves\phase7-final.zip" 
+   0.001 Config path: C:/Users/Dad/AppData/Roaming/Factorio/mods/.phase7-test/config.ini
+   0.001 Read data path: C:/Program Files (x86)/Steam/steamapps/common/Factorio/data
+   0.001 Write data path: C:/Users/Dad/AppData/Roaming/Factorio/mods/.phase7-test/user-data [1372652/1954415MB]
+   0.001 Binaries path: C:/Program Files (x86)/Steam/steamapps/common/Factorio/bin
+   0.011 System info: [CPU: AMD Ryzen 5 5500, 12 cores, RAM: 10978/32651 MB, page: 16385/37515 MB, virtual: 4271/134217727 MB, extended virtual: 0 MB]
+   0.024 Running in headless mode
+   0.024 Audio is disabled
+   0.025 Info ModManager.cpp:449: FeatureFlag expansion-shaders = true
+   0.026 Info ModManager.cpp:449: FeatureFlag freezing = true
+   0.026 Info ModManager.cpp:449: FeatureFlag quality = true
+   0.026 Info ModManager.cpp:449: FeatureFlag rail-bridges = true
+   0.026 Info ModManager.cpp:449: FeatureFlag segmented-units = true
+   0.026 Info ModManager.cpp:449: FeatureFlag space-travel = true
+   0.026 Info ModManager.cpp:449: FeatureFlag spoiling = true
+   0.029 Loading mod core 0.0.0 (data.lua)
+   0.043 Loading mod base 2.0.77 (data.lua)
+   0.228 Loading mod elevated-rails 2.0.77 (data.lua)
+   0.261 Loading mod mekatrol_assist_bot 1.0.0 (data.lua)
+   0.279 Loading mod quality 2.0.77 (data.lua)
+   0.299 Loading mod space-age 2.0.77 (data.lua)
+   0.681 Loading mod base 2.0.77 (data-updates.lua)
+   0.710 Loading mod quality 2.0.77 (data-updates.lua)
+   0.736 Loading mod space-age 2.0.77 (data-updates.lua)
+   0.842 Checksum for core: 4187927925
+   0.842 Checksum of base: 1879415942
+   0.842 Checksum of elevated-rails: 70351106
+   0.842 Checksum of mekatrol_assist_bot: 1607809734
+   0.842 Checksum of quality: 1142589254
+   0.842 Checksum of space-age: 1510664043
+   1.189 Prototype list checksum: 2260160473
+   1.255 Info PlayerData.cpp:66: Local player-data.json unavailable
+   1.255 Info PlayerData.cpp:71: Cloud player-data.json unavailable
+   1.257 Info GlobalContext.cpp:1300: Resetting config.
+   1.257 Factorio initialised
+   1.258 Info Create.cpp:31: Creating new map C:\Users\Dad\AppData\Roaming\Factorio\mods\.phase7-test\user-data\saves\phase7-final.zip
+   1.264 Blueprint storage "blueprint-storage-2.dat" was not found, trying to load previous version storage "blueprint-storage.dat"
+   2.322 Loading level.dat: 623230 bytes.
+   2.322 Info Scenario.cpp:154: Map version 2.0.77-0
+   2.333 Blueprint storage "blueprint-storage-2.dat" was not found, trying to load previous version storage "blueprint-storage.dat"
+   2.339 Checksum for script __level__/control.lua: 2722821277
+   2.377 Checksum for script __mekatrol_assist_bot__/control.lua: 3449147780
+   2.392 Script @__mekatrol_assist_bot__/runtime_tests.lua:59: [MAB baseline] ten role bots, 900 movement ticks (next line)
+   2.392 Script @__mekatrol_assist_bot__/runtime_tests.lua:60: Duration: 13.972300ms
+   2.427 Script @__mekatrol_assist_bot__/runtime_tests.lua:85: [MAB baseline] 4096-resource bounded scan, 25 work units (next line)
+   2.427 Script @__mekatrol_assist_bot__/runtime_tests.lua:86: Duration: 13.913200ms
+   2.427 Script @__mekatrol_assist_bot__/runtime_tests.lua:87: [MAB test] Phase 5 fixture passed on Factorio 2.0.77
+   2.617 Goodbye

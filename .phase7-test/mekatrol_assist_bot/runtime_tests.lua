@@ -84,7 +84,7 @@ local function run_headless_baseline()
     assert(field_entities >= 4096, "MAB large-field scan missed resource entities")
     log("[MAB baseline] 4096-resource bounded scan, " .. field_steps .. " work units (next line)")
     log(field_profiler)
-    log("[MAB test] consolidated fixture passed on Factorio " .. script.active_mods.base)
+    log("[MAB test] Phase 5 fixture passed on Factorio " .. script.active_mods.base)
 end
 
 function M.seed()
@@ -398,7 +398,7 @@ function M.run()
     assert(state.root().test_clear_event and #state.root().discovery.order == 0, "MAB clear event/state failed");
     script.on_event(mapped_event, nil);
     script.on_event(clear_event, nil)
-    log("[MAB test] consolidated fixture passed on Factorio " .. script.active_mods.base)
+    log("[MAB test] Phase 5 fixture passed on Factorio " .. script.active_mods.base)
 end
 
 return M
