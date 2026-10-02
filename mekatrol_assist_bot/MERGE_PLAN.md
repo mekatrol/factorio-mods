@@ -340,11 +340,11 @@ should retain the temporary plan as required operational documentation.
 
 ## Implementation phases
 
-Phase status as of 2026-10-02: Phases 1 and 2 are complete and verified against
-Factorio 2.0.77. Phases 3-7 may contain partial implementation, but none is
-marked complete until its phase-level behavior and applicable acceptance checks
-have been verified. Per the requested stopping point, work stops at the end of
-Phase 2.
+Phase status as of 2026-10-02: Phases 1 through 3 are complete and verified
+against Factorio 2.0.77. Phases 4-7 may contain partial implementation, but none
+is marked complete until its phase-level behavior and applicable acceptance
+checks have been verified. Per the requested stopping point, work stops at the
+end of Phase 3.
 
 ### Phase 1: Baseline and acceptance fixtures (complete)
 
@@ -372,13 +372,15 @@ Evidence and reproduction details are recorded in `PHASE1_BASELINE.md`.
 
 Evidence and reproduction details are recorded in `PHASE2_ARCHITECTURE.md`.
 
-### Phase 3: Visual prototypes and formation
+### Phase 3: Visual prototypes and formation (complete)
 
-- Replace static pictures with construction/logistic animation-family
+- [x] Replace static pictures with construction/logistic animation-family
   prototypes and assign the role mapping above.
-- Implement generated even spacing and direction-aware formation mirroring.
-- Verify enable/disable/research changes reflow the formation without overlap
+- [x] Implement generated even spacing and direction-aware formation mirroring.
+- [x] Verify enable/disable/research changes reflow the formation without overlap
   or save instability.
+
+Evidence and reproduction details are recorded in `PHASE3_VISUALS_FORMATION.md`.
 
 ### Phase 4: Mapping, discovery, and survey
 

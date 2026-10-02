@@ -3,6 +3,7 @@ local config = require("config")
 local M = {}
 
 function M.slots(active, direction)
+    direction = direction == -1 and -1 or 1
     local result = {};
     local per = config.formation.max_slots_per_column
     for i, name in ipairs(active) do
@@ -16,6 +17,19 @@ function M.slots(active, direction)
         }
     end
     return result
+end
+
+---Return true when every role has a distinct slot.
+function M.has_unique_slots(slots)
+    local occupied = {}
+    for _, slot in pairs(slots) do
+        local key = string.format("%.9f:%.9f", slot.x, slot.y)
+        if occupied[key] then
+            return false
+        end
+        occupied[key] = true
+    end
+    return true
 end
 
 function M.update_direction(ps, pos)

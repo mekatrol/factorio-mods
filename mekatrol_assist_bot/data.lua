@@ -1,6 +1,7 @@
 -- Data-stage definitions: controls, planner, shortcuts, and neutral scripted robots.
 local config = require("config")
 local constants = require("constants")
+local robot_prototypes = require("robot_prototypes")
 
 for _, role in ipairs(config.formation.role_order) do
     data:extend{{
@@ -58,37 +59,16 @@ data:extend{{
     small_icon_size = 64
 }}
 
-local function prototype(role, family, state)
-    local base = data.raw[family .. "-robot"][family .. "-robot"]
-    if not base then
-        error("mekatrol_assist_bot: missing base " .. family .. "-robot")
-    end
-    local p = table.deepcopy(base)
-    p.name = constants.prototype(role, state);
-    p.localised_name = {"entity-name.mekatrol-assist-bot", role}
-    p.flags = {"placeable-off-grid", "not-on-map", "not-blueprintable", "not-deconstructable", "not-selectable-in-game"}
-    p.max_payload_size = 0;
-    p.construction_radius = 0;
-    p.logistic_radius = 0;
-    p.energy_per_move = "0J";
-    p.energy_per_tick = "0J"
-    if state == "idle" then
-        p.in_motion = table.deepcopy(base.idle);
-        p.shadow_in_motion = table.deepcopy(base.shadow_idle)
-    elseif state == "working" then
-        p.idle = table.deepcopy(base.working or base.idle);
-        p.in_motion = table.deepcopy(base.working or base.in_motion);
-        p.shadow_idle = table.deepcopy(base.shadow_working or base.shadow_idle);
-        p.shadow_in_motion = table.deepcopy(base.shadow_working or base.shadow_in_motion)
-    end
-    return p
-end
-
 local out = {}
 
 for _, role in ipairs(config.formation.role_order) do
+    local family = config.roles[role].prototype_family
+    local builder = robot_prototypes[family]
+    if not builder then
+        error("mekatrol_assist_bot: unsupported prototype family for " .. role .. ": " .. tostring(family))
+    end
     for _, state in ipairs {"idle", "moving", "working"} do
-        out[#out + 1] = prototype(role, config.roles[role].prototype_family, state)
+        out[#out + 1] = builder(role, state, constants.prototype(role, state))
     end
 end
 

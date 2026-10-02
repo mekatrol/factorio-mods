@@ -22,6 +22,15 @@ local function validate_catalogue()
                            "transport-belt", "fast-transport-belt", "express-transport-belt", "turbo-transport-belt"} do
         assert(prototypes.item[name] or prototypes.entity[name], "MAB prototype catalogue missing item/entity: " .. name)
     end
+    for _, role in ipairs(config.formation.role_order) do
+        local expected_type = config.roles[role].prototype_family .. "-robot"
+        for _, visual in ipairs{"idle", "moving", "working"} do
+            local name = constants.prototype(role, visual)
+            local prototype = assert(prototypes.entity[name], "MAB missing visual prototype: " .. name)
+            assert(prototype.type == expected_type,
+                "MAB visual prototype family mismatch: " .. name .. " is " .. prototype.type)
+        end
+    end
 end
 
 local function run_headless_baseline()
@@ -74,7 +83,7 @@ local function run_headless_baseline()
     assert(field_entities >= 4096, "MAB large-field scan missed resource entities")
     log("[MAB baseline] 4096-resource bounded scan, " .. field_steps .. " work units (next line)")
     log(field_profiler)
-    log("[MAB test] Phase 2 fixture passed on Factorio " .. script.active_mods.base)
+    log("[MAB test] Phase 3 fixture passed on Factorio " .. script.active_mods.base)
 end
 
 function M.seed()

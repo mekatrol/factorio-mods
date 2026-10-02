@@ -1,10 +1,10 @@
 # Changelog
 
-## Unreleased — Phase 2 verification
+## Unreleased — Phase 3 verification
 
-- Completed and verified the shared assist-bot architecture: versioned state,
-  legacy import, role registry, scheduler, manager, scanner, visuals, unified
-  commands, and the common general/track upgrade controller.
+- Completed and verified construction/logistic animation-family prototypes,
+  runtime idle/moving/working visual switching, deterministic centered columns,
+  direction mirroring, and roster reflow without overlapping slots.
 
 ## 1.0.0
 

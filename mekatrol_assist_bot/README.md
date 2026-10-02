@@ -123,11 +123,12 @@ removal, and research reversal are handled at their lifecycle boundaries.
 
 ## Maintainer checks
 
-`tests.lua` checks configuration, command parsing, formation symmetry, entity
-identity/deduplication, polygons, aliases, task registration, and technology
-gates during initialization. Setting `debug=true` runs the destructive Phase 2
-headless fixture in a disposable save: it validates required Factorio 2.0
-prototypes, profiles ten role bots, and scans a 4,096-resource field. Never turn
-this on in a real save. Phase 1 baselines are in `PHASE1_BASELINE.md`; Phase 2
-architecture and integration evidence are in `PHASE2_ARCHITECTURE.md`. Normal
-configuration keeps `debug=false`.
+`tests.lua` checks configuration, command parsing, formation symmetry,
+mirroring, slot uniqueness and reflow, entity identity/deduplication, polygons,
+aliases, task registration, and technology gates during initialization. Setting
+`debug=true` runs the destructive headless fixture in a disposable save: it
+validates required Factorio 2.0 prototypes and role families, profiles ten role
+bots, and scans a 4,096-resource field. Never turn this on in a real save. Phase
+1 baselines are in `PHASE1_BASELINE.md`; Phase 2 architecture evidence is in
+`PHASE2_ARCHITECTURE.md`; Phase 3 visual and formation evidence is in
+`PHASE3_VISUALS_FORMATION.md`. Normal configuration keeps `debug=false`.

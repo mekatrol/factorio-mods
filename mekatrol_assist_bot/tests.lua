@@ -64,6 +64,15 @@ function M.run()
     eq(#technology.missing_from({}, {}, "all"), 0, "empty technology gate is open")
     local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff"}, 1);
     eq(many.cliff.x ~= many.builder.x, true, "formation creates another column")
+    eq(formation.has_unique_slots(many), true, "formation slots never overlap")
+    local mirrored = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff"}, -1)
+    for role, slot in pairs(many) do
+        eq(mirrored[role].x, -slot.x, "formation mirrors role " .. role)
+        eq(mirrored[role].y, slot.y, "formation mirror preserves row for " .. role)
+    end
+    local reflowed = formation.slots({"builder", "upgrade", "track", "lamp", "cliff"}, 1)
+    eq(formation.has_unique_slots(reflowed), true, "formation remains unique after disable reflow")
+    eq(reflowed.builder.y, -reflowed.cliff.y, "shortened column remains centered")
     return true
 end
 
