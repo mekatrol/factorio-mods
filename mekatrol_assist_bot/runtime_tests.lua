@@ -16,7 +16,7 @@ local function create(surface, params)
 end
 
 local function validate_catalogue()
-    for _, name in ipairs {"construction-robotics", "logistic-robotics", "lamp", "cliff-explosives", "electronics"} do
+    for _, name in ipairs {"construction-robotics", "logistic-robotics", "repair-pack", "lamp", "cliff-explosives", "electronics"} do
         assert(prototypes.technology[name], "MAB prototype catalogue missing technology: " .. name)
     end
     for _, name in ipairs {"construction-robot", "logistic-robot", "repair-pack", "small-lamp", "cliff-explosives",
@@ -300,7 +300,7 @@ function M.run()
         end
     end
     local repair_state = state.player(player.index).roles.repair
-    repair_state.entity.health = math.max(1, repair_state.entity.prototype.max_health - 10)
+    repair_state.entity.health = math.max(1, repair_state.entity.max_health - 10)
     for _, role in ipairs(config.formation.role_order) do
         assert(manager.enable(second.index, role, true), "MAB second-player enable failed: " .. role)
     end
@@ -350,8 +350,8 @@ function M.run()
     end
     assert(not loose.valid or loose.stack.count < 10, "MAB integration cleanup did not collect")
     assert(not ghost.valid, "MAB integration builder did not revive ghost")
-    assert(not damaged.valid or damaged.health >= damaged.prototype.max_health, "MAB integration repair did not heal")
-    assert(repair_state.entity.valid and repair_state.entity.health >= repair_state.entity.prototype.max_health *
+    assert(not damaged.valid or damaged.health >= damaged.max_health, "MAB integration repair did not heal")
+    assert(repair_state.entity.valid and repair_state.entity.health >= repair_state.entity.max_health *
         config.tasks.repair.self_repair_threshold, "MAB repair bot did not self-repair")
     assert((repair_state.repair_health_pool or 0) > 0,
         "MAB repair pack durability was not retained as a partial persistent pool")

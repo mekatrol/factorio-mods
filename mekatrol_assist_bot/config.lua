@@ -175,7 +175,7 @@ return {
         },
         repair = {
             prototype_family = "construction",
-            required_technologies = {"construction-robotics"},
+            required_technologies = {"repair-pack"},
             technology_mode = "all",
             default_task = "repair"
         },
@@ -211,7 +211,7 @@ return {
         },
         cleanup = {
             prototype_family = "logistic",
-            required_technologies = {"logistic-robotics"},
+            required_technologies = {},
             technology_mode = "all",
             default_task = "cleanup"
         },

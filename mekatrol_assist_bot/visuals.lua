@@ -74,10 +74,10 @@ function M.cliff_marker(id, entity)
 end
 
 function M.health(key, entity)
-    if not (entity and entity.valid and entity.health and entity.prototype.max_health) then
+    if not (entity and entity.valid and entity.health and entity.max_health) then
         return
     end
-    local ratio = entity.health / entity.prototype.max_health;
+    local ratio = entity.health / entity.max_health;
     M.clear_role("health:" .. key)
     local bad, good = config.visuals.colors.health_bad, config.visuals.colors.health_good;
     local color = {

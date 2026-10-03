@@ -24,13 +24,13 @@ implementations and create duplicate bots during the transition.
 | Role | Tasks | Behaviour | Technology |
 | --- | --- | --- | --- |
 | builder | `follow`, `move_to`, `construct` | Builds nearby same-force ghosts using the prototype-defined placement item. | Construction robotics |
-| repair | `follow`, `move_to`, `repair` | Repairs damaged player-force entities using repair packs and resumable wall-aware A*. | Construction robotics |
+| repair | `follow`, `move_to`, `repair` | Repairs damaged player-force entities using repair packs and resumable wall-aware A*. | Repair pack |
 | upgrade | `follow`, `yellow-to-red-belts`, `red-to-blue-belts`, `blue-to-green-inserters`, `containers`, `combined` | Replaces the configured belts, inserters, and chests. | Construction robotics plus an available target recipe |
 | track | `follow`, `track` | Locks and traverses one connected belt component, including underground peers, then progressively upgrades it. | Construction robotics; later stages wait for their recipes |
 | lamp | `follow`, `place` | Places lamps beside nearby electric poles after configured darkness. | Construction robotics + lamp |
 | cliff | `follow`, `demolish` | Destroys only cliffs marked with the planner, consuming cliff explosives. | Cliff explosives |
 | logistics | `follow`, `collect`, `pickup` | Collects ground items, drains inventories in bounded batches, and incrementally mines recoverable neutral entities/resources. | Logistic robotics |
-| cleanup | `follow`, `cleanup` | Collects loose item entities and prefers a nearby container already holding that item. | Logistic robotics |
+| cleanup | `follow`, `cleanup` | Collects loose item entities and prefers a nearby container already holding that item. | None |
 | mapper | `follow`, `search` | Progressively scans an outward deterministic cell spiral and maps static entities into the shared discovery index. | Electronics |
 | surveyor | `follow`, `search`, `survey` | Traces resource boundaries and builds connected, polygon-backed discovery groups. | Electronics |
 

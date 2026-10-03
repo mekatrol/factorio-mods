@@ -147,7 +147,7 @@ local function valid_target(role, e, rs, anchor)
     end
     if role == "repair" then
         return
-            not ignored_repair[e.name] and e.health and e.prototype.max_health and e.health < e.prototype.max_health *
+            not ignored_repair[e.name] and e.health and e.max_health and e.health < e.max_health *
                 config.tasks.repair.threshold
     end
     if role == "upgrade" then
@@ -220,10 +220,10 @@ end
 -- Repair durability is a persistent pool: packs are consumed only when the
 -- pool cannot cover a bounded repair action, so partial packs survive save/load.
 local function repair_entity(rs, anchor, e)
-    if not (e and e.valid and e.health and e.prototype.max_health) then
+    if not (e and e.valid and e.health and e.max_health) then
         return true
     end
-    local need = math.min(e.prototype.max_health - e.health, config.tasks.repair.health_per_action)
+    local need = math.min(e.max_health - e.health, config.tasks.repair.health_per_action)
     if need <= 0 then
         return true
     end
@@ -245,10 +245,10 @@ local function repair_entity(rs, anchor, e)
         rs.out_of_repair_packs_warned = nil
     end
     local repaired = math.min(need, rs.repair_health_pool)
-    e.health = math.min(e.prototype.max_health, e.health + repaired)
+    e.health = math.min(e.max_health, e.health + repaired)
     rs.repair_health_pool = rs.repair_health_pool - repaired
     visuals.health(discovery.identity(e), e)
-    return e.health >= e.prototype.max_health * config.tasks.repair.threshold
+    return e.health >= e.max_health * config.tasks.repair.threshold
 end
 
 local function act(role, rs, anchor, e)
@@ -538,8 +538,8 @@ local function act(role, rs, anchor, e)
     return true
 end
 function M.step(role, rs, anchor, bot)
-    if role == "repair" and bot.health and bot.prototype.max_health and
-        bot.health < bot.prototype.max_health * config.tasks.repair.self_repair_threshold then
+    if role == "repair" and bot.health and bot.max_health and
+        bot.health < bot.max_health * config.tasks.repair.self_repair_threshold then
         repair_entity(rs, anchor, bot)
         return "working"
     end

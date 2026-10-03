@@ -2,6 +2,8 @@
 
 ## 1.0.0 — Phase 7 consolidation
 
+- Fixed repair and health-overlay code for Factorio 2.0 by reading maximum
+  health from runtime entities instead of the prototype API.
 - Unified localized command help and enforced role technology gates before task
   mutation, including actionable recipe availability errors for upgrade tasks.
 - Added configuration-change migration verification and declared all four source
@@ -14,7 +16,7 @@
 - Completed bounded repair actions, exact persistent repair-pack durability
   pooling, self-repair, discovery-fed damage selection, and resumable A* travel.
 - Added destroyed-site lifecycle visuals and legacy repair-pool migration; health
-  limits are derived from runtime prototypes.
+  limits are derived from runtime entities.
 
 - Added deterministic outward mapper exploration, indexed shared discovery,
   connected resource survey polygons, incremental clearing, and copy-only
