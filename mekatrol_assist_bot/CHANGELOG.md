@@ -8,6 +8,8 @@
 - Bots now keep one persistent visual entity instead of being destroyed and
   recreated for animation-state changes, eliminating blurred duplicate sprites
   during per-tick movement.
+- Trailing formations now follow all four cardinal headings, moving below the
+  player while travelling up and above the player while travelling down.
 
 ## 1.0.0 — Phase 7 consolidation
 

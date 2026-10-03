@@ -49,7 +49,7 @@ return {
         -- Keep every bot in one vertical column behind the player, as in the
         -- pre-consolidation follow implementation.
         max_slots_per_column = 10, -- Positive integer.
-        direction_threshold = 0.1 -- Tiles of horizontal movement before mirroring; >0.
+        direction_threshold = 0.1 -- Tiles of movement before choosing the trailing side; >0.
     },
     movement = {
         -- Values restored from mekatrol_game_play_mod's proven movement code.
