@@ -64,6 +64,7 @@ function M.enable(index, role, quiet)
             y = a.position.y + slot.y
         }, "moving")
     end
+    visuals.bot_label(rs.visual_key, rs.entity, role, rs.phase == "idle" and "follow" or rs.task, index)
     if not quiet then
         a.player.print("[MAB] " .. role .. " enabled")
     end
@@ -82,6 +83,7 @@ function M.disable(index, role, reason)
     rs.track_job = nil;
     rs.track_started = nil;
     visuals.clear_role(index .. ":" .. role)
+    visuals.clear_role("label:" .. index .. ":" .. role)
     if rs.entity and rs.entity.valid then
         rs.entity.destroy()
     end
@@ -148,10 +150,13 @@ function M.remove_player(index)
     local root = state.root();
     local ps = root.players[index];
     if ps then
-        for _, rs in pairs(ps.roles) do
+        for role, rs in pairs(ps.roles) do
             if rs.entity and rs.entity.valid then
                 rs.entity.destroy()
             end
+            local visual_key = rs.visual_key or (index .. ":" .. role)
+            visuals.clear_role(visual_key)
+            visuals.clear_role("label:" .. visual_key)
         end
         root.players[index] = nil
     end

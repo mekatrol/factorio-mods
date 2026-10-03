@@ -50,10 +50,15 @@ function M.slots(active, direction)
     -- heading_x/heading_y point in the direction the player is travelling.
     local heading_x, heading_y = heading(direction)
 
-    -- Rotating (x, y) clockwise gives (-y, x). This perpendicular vector is
-    -- the row axis along which bots spread. For left/right movement it is
-    -- vertical; for up/down movement it is horizontal.
-    local row_x, row_y = -heading_y, heading_x
+    -- Keep configured role order stable when the player reverses direction.
+    -- Horizontal travel always lays rows from top to bottom; vertical travel
+    -- always lays them from left to right. Only the trailing axis is mirrored.
+    local row_x, row_y
+    if heading_x ~= 0 then
+        row_x, row_y = 0, 1
+    else
+        row_x, row_y = 1, 0
+    end
 
     -- Each role receives exactly one offset in this result table.
     local result = {};

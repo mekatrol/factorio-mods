@@ -129,13 +129,21 @@ return {
         } -- Health ratio is [0,1]; names are exact prototypes.
     },
     visuals = {
+        label_offset = {0, 1},
+        label_scale = 0.85,
         -- RGBA channels are each in [0,1].
         colors = {
+            label = {
+                r = 0.7,
+                g = 1,
+                b = 0.15,
+                a = 0.9
+            },
             target = {
-                r = 1,
-                g = 0.6,
-                b = 0.1,
-                a = 0.8
+                r = 0.7,
+                g = 1,
+                b = 0.15,
+                a = 0.35
             },
             map = {
                 r = 0.2,

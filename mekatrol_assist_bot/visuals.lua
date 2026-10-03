@@ -13,17 +13,55 @@ function M.clear_role(key)
 end
 
 function M.target_line(key, from, to)
-    M.clear_role(key)
-    if not (from and from.valid and to and to.valid) then
+    if not (from and from.valid and to) or to.valid == false then
+        M.clear_role(key)
         return
     end
+    local objects = owned[key]
+    local line = objects and objects[1]
+    if line and line.valid then
+        line.from = from
+        line.to = to
+        return
+    end
+    M.clear_role(key)
     owned[key] = {rendering.draw_line {
         color = config.visuals.colors.target,
-        width = 2,
+        width = 1,
         from = from,
         to = to,
         surface = from.surface,
-        time_to_live = 120
+        draw_on_ground = true,
+        only_in_alt_mode = false,
+        players = {assert(tonumber(key:match("^(%d+):")), "target visual key must start with a player index")}
+    }}
+end
+
+function M.bot_label(key, entity, role, task, player_index)
+    local label_key = "label:" .. key
+    local objects = owned[label_key]
+    local label = objects and objects[1]
+    local text = role .. ": " .. task
+    if label and label.valid then
+        label.text = text
+        label.target = entity
+        return
+    end
+    M.clear_role(label_key)
+    if not (entity and entity.valid) then
+        return
+    end
+    owned[label_key] = {rendering.draw_text {
+        text = text,
+        surface = entity.surface,
+        target = entity,
+        target_offset = config.visuals.label_offset,
+        color = config.visuals.colors.label,
+        scale = config.visuals.label_scale,
+        alignment = "center",
+        vertical_alignment = "top",
+        only_in_alt_mode = false,
+        players = {player_index}
     }}
 end
 

@@ -90,6 +90,7 @@ function M.tick(event)
             end
             if a and rs.enabled and rs.entity and rs.entity.valid and event.tick %
                 config.scheduler.role_intervals[item.name] == 0 then
+                local visual_key = rs.visual_key or (item.player_index .. ":" .. item.name)
                 if not supply.flush_cargo(rs, a.player, rs.entity) then
                     local cargo_name = rs.cargo_order and rs.cargo_order[rs.cargo_cursor or 1]
                     local destination = cargo_name and rs.cargo_destinations and rs.cargo_destinations[cargo_name]
@@ -113,6 +114,17 @@ function M.tick(event)
                     rs.phase = controllers.step(item.name, rs, a, rs.entity);
                     manager.set_visual(item.name, rs, a, rs.phase == "scan" and "moving" or rs.phase)
                 end
+                if rs.task == "follow" then
+                    visuals.clear_role(visual_key)
+                elseif rs.target and rs.target.valid then
+                    visuals.target_line(visual_key, rs.entity, rs.target)
+                elseif rs.task == "move_to" and rs.destination then
+                    visuals.target_line(visual_key, rs.entity, rs.destination)
+                else
+                    visuals.clear_role(visual_key)
+                end
+                local current_task = rs.phase == "idle" and "follow" or rs.task
+                visuals.bot_label(visual_key, rs.entity, item.name, current_task, item.player_index)
             end
             budget = budget - 1
         end
