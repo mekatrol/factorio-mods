@@ -29,6 +29,8 @@ function M.start(surface, center, radius, filter)
         x1 = x1,
         y0 = y0,
         y1 = y1,
+        -- A caller may omit filtering to map every stationary entity. Store an
+        -- empty table in that case so `step` can always iterate the field.
         filter = filter or {},
         results = {},
         done = false
@@ -50,6 +52,9 @@ function M.start_area(surface, area, filter)
             x = (area[1][1] + area[2][1]) / 2,
             y = (area[1][2] + area[2][2]) / 2
         },
+        -- Rectangle scans share the circular scan implementation. Infinite
+        -- radius makes every finite squared-distance comparison pass; the
+        -- explicit rectangle bounds below remain the authoritative clip.
         radius = math.huge,
         x = x0,
         y = y0,
@@ -77,10 +82,19 @@ function M.step(scan)
         return true, {}
     end
     local s = config.scanning.cell_size;
+    -- Jobs created by an older version may not contain `subcells`, and new jobs
+    -- do not allocate it until their first step. Normalize both cases here.
     scan.subcells = scan.subcells or {};
+    -- `table.remove` without an index pops the final item, making subcells a
+    -- cheap LIFO work stack. Finishing subdivisions before the next base cell
+    -- keeps the main x/y cursor simple.
     local area = table.remove(scan.subcells)
     if not area then
+        -- Cell indices describe the half-open world square [x*s,(x+1)*s] by
+        -- [y*s,(y+1)*s]. Factorio accepts that pair as a bounding box.
         area = {{scan.x * s, scan.y * s}, {(scan.x + 1) * s, (scan.y + 1) * s}};
+        -- Traverse left-to-right, then wrap to the next row. Advancing before
+        -- the query means the persisted cursor already points at future work.
         scan.x = scan.x + 1;
         if scan.x > scan.x1 then
             scan.x = scan.x0;
@@ -91,9 +105,13 @@ function M.step(scan)
         area = area,
         limit = config.scanning.entities_per_cell
     }
+    -- Copy the caller's name/type/force fields into a fresh table so adding the
+    -- current area and limit never mutates the reusable persisted filter.
     for k, v in pairs(scan.filter) do
         f[k] = v
     end
+    -- Squaring infinity is still infinity in Lua, which is exactly what the
+    -- rectangular scan's sentinel radius requires.
     local r2 = scan.radius * scan.radius
     local queried = surface.find_entities_filtered(f);
     local width = area[2][1] - area[1][1];
@@ -113,6 +131,9 @@ function M.step(scan)
     for _, e in ipairs(queried) do
         local dx = e.position.x - scan.center.x;
         local dy = e.position.y - scan.center.y;
+        -- Radius jobs have no `scan.area`, so their square-cell results only
+        -- need the circle test. Rectangle jobs additionally reject entities in
+        -- partial boundary-cell regions outside the requested coordinates.
         local inside = not scan.area or
                            (e.position.x >= scan.area[1][1] and e.position.x <= scan.area[2][1] and e.position.y >=
                                scan.area[1][2] and e.position.y <= scan.area[2][2]);
@@ -125,6 +146,8 @@ function M.step(scan)
     if scan.y > scan.y1 and #scan.subcells == 0 then
         scan.done = true
     end
+    -- `results` deliberately means the most recent work unit, not all results.
+    -- Accumulating every entity would make a large scan grow without bound.
     scan.results = found;
     return scan.done, found
 end

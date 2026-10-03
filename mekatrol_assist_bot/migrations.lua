@@ -17,13 +17,19 @@ end
 ---Prepare schema upgrades and detach supported legacy stores for incremental import.
 function M.run()
     local root = state.root();
+    -- The earliest persisted format had no explicit schema number, so absence
+    -- is interpreted as version one rather than as a brand-new current save.
     local previous_schema = root.schema_version or 1
     if previous_schema < config.schema_version then
         root.scheduler = root.scheduler or {};
         root.destroyed_sites = root.destroyed_sites or {};
         if previous_schema < 5 then
+            -- Both the legacy mod root and its player table are optional. The
+            -- final empty table lets the import loop become a no-op when absent.
             for pi, legacy in pairs((storage.mekatrol_repair_mod and storage.mekatrol_repair_mod.players) or {}) do
                 local dst = state.player(pi).roles.repair
+                -- Coerce legacy string values when possible, otherwise preserve
+                -- an already migrated value, finally defaulting new state to zero.
                 dst.repair_health_pool = tonumber(legacy.repair_health_pool) or dst.repair_health_pool or 0
             end
         end
@@ -38,6 +44,8 @@ function M.run()
         end
         root.schema_version = config.schema_version
     end
+    -- Import runs once per save and can be disabled explicitly for installations
+    -- that want a clean state despite legacy mod data still being present.
     if root.import_complete or not config.compatibility.import_legacy_state then
         return
     end

@@ -135,14 +135,20 @@ end
 
 ---Initialize one bounded scan appropriate to a role and its current task.
 local function begin(role, rs, anchor)
+    -- Every finite service role maps to a task radius. Mapper is the exception:
+    -- it scans one spiral cell, represented by nil here and handled below.
     local radius = role ~= "mapper" and config.tasks[radii[role]].radius or nil
     if role == "upgrade" then
+        -- Specialized upgrade modes may narrow their search. Combined mode has
+        -- no override and therefore falls back to the general upgrade radius.
         radius = config.tasks.upgrade.mode_radii[rs.task] or radius
     end
     local f = {};
     for k, v in pairs(filters[role]) do
         f[k] = v
     end
+    -- `player` in the static filter is a stage-independent placeholder. Runtime
+    -- scanning needs the actual anchor force object, including custom forces.
     if f.force == "player" then
         f.force = anchor.force
     end
@@ -158,6 +164,8 @@ end
 ---Multiplying max health by a ratio makes the policy scale across prototypes
 ---with very different health totals.
 function M.is_repair_target(e, anchor)
+    -- The left-to-right guards are significant: some entity types have neither
+    -- health nor maximum health, so those fields must exist before arithmetic.
     return anchor and e.force == anchor.force and not ignored_repair[e.name] and e.health and e.max_health and
                e.health < e.max_health * config.tasks.repair.threshold
 end
@@ -181,6 +189,8 @@ local function valid_target(role, e, rs, anchor)
         if not target or not prototypes.entity[target] or not prototypes.item[target] or (recipe and not recipe.enabled) then
             return false
         end
+        -- Pure tests may call target validation without role state. Combined is
+        -- the broad, backward-compatible policy in that case.
         local task = rs and rs.task or "combined"
         if task == "yellow-to-red-belts" then
             return e.name == "transport-belt" or e.name == "underground-belt" or e.name == "splitter"
@@ -215,6 +225,9 @@ local function valid_target(role, e, rs, anchor)
         return not (d.grouped and d.grouped[discovery.identity(e)])
     end
     if role == "logistics" then
+        -- Some minable world entities expose no force; others explicitly use
+        -- `neutral`. Both mean logistics may collect them without stealing from
+        -- another player or an enemy force.
         local neutral = not e.force or e.force.name == "neutral"
         return (e.type == "item-entity" or (e.minable and neutral)) and
                    logistics.matches_pickup(e, rs and rs.pickup_name)
@@ -256,6 +269,8 @@ local function repair_entity(rs, anchor, e)
     if need <= 0 then
         return true
     end
+    -- The pool was added after early save versions, and zero also represents a
+    -- new role with no partially used pack.
     rs.repair_health_pool = rs.repair_health_pool or 0
     if rs.repair_health_pool < need then
         -- Convert missing durability to whole packs. Ceiling is required: any
@@ -297,7 +312,12 @@ local function act(role, rs, anchor, e)
         discovery.add(e);
         local d = state.root().discovery;
         local job = rs.survey_job
+        -- A surveyed patch is identified by surface, resource prototype, and
+        -- trace seed. Including the surface prevents identical map coordinates
+        -- on Nauvis and another surface from merging.
         local k = e.surface.index .. ":" .. e.name .. ":" .. job.start_x .. ":" .. job.start_y
+        -- Reuse a prior group when another entity resolves to the same patch;
+        -- otherwise initialize its membership and bounds from this target.
         local g = d.groups[k] or {
             name = e.name,
             surface_index = e.surface.index,
@@ -356,6 +376,8 @@ local function act(role, rs, anchor, e)
         if stack and stack.valid_for_read then
             -- Capacity is global across carried item types. Clamp at zero in
             -- case an older save already contains more than the new limit.
+            -- `cargo_count` is absent in saves from before bounded cleanup
+            -- cargo, so nil means the bot is currently carrying zero items.
             local free = math.max(0, config.supply.cleanup_capacity - (rs.cargo_count or 0));
             local count = math.min(stack.count, free);
             if count > 0 then
@@ -421,6 +443,9 @@ local function act(role, rs, anchor, e)
             if e.amount <= 0 and e.valid then
                 e.deplete()
             end
+            -- Depletion invalidates the resource entity. Otherwise a finite
+            -- pickup request completes at zero; an ordinary collect task has no
+            -- remaining counter and continues until the target is exhausted.
             return not e.valid or (rs.pickup_remaining and rs.pickup_remaining <= 0)
         end
         local contents = supply.entity_inventory(e)
@@ -438,6 +463,8 @@ local function act(role, rs, anchor, e)
             while job.cursor <= stop do
                 local stack = contents[job.cursor];
                 if stack.valid_for_read then
+                    -- A player without a main inventory (possible in controller
+                    -- modes) inserts zero and leaves the source stack untouched.
                     local inserted = player_inv and player_inv.insert {
                         name = stack.name,
                         count = stack.count,
@@ -476,6 +503,8 @@ local function act(role, rs, anchor, e)
             if got > 0 then
                 local source = rs.last_source;
                 rs.last_source = nil;
+                -- `revive` consumes the ghost and creates the real entity. It
+                -- can still fail after the earlier checks if world state changed.
                 local revived = e.revive {
                     raise_revive = true
                 };
@@ -502,6 +531,9 @@ local function act(role, rs, anchor, e)
                 local source = rs.last_source;
                 rs.last_source = nil;
                 if replace(e, name) then
+                    -- Successful fast replacement returns the removed lower-tier
+                    -- item to its source/player. Failure returns the unused new
+                    -- item instead, so upgrades never silently destroy inventory.
                     supply.give_or_carry(rs, anchor.player, {
                         name = old,
                         count = 1
@@ -545,6 +577,9 @@ local function act(role, rs, anchor, e)
         return true
     end
     if role == "lamp" then
+        -- Darkness is normalized from 0 (day) to 1 (dark). Returning nil here
+        -- is acceptable to `step`: it means no completed action yet and the bot
+        -- may reconsider the same pole when lighting conditions change.
         if anchor.surface.darkness < config.tasks.lamp.darkness then
             return
         end
@@ -623,6 +658,9 @@ function M.step(role, rs, anchor, bot)
             rs.target = candidate;
             rs.best_distance = movement.distance2(candidate.position, bot.position)
         end
+        -- One handoff record is examined per work unit. If it was unsuitable
+        -- but more records remain, yield instead of falling through to a full
+        -- spatial scan in the same scheduler unit.
         if not rs.target and not exhausted then
             return "idle"
         end
@@ -650,6 +688,9 @@ function M.step(role, rs, anchor, bot)
         end
         -- Scanning is background work; passive service bots should keep their
         -- formation until an actual target has been selected.
+        -- Repair and cleanup are passive services and should visually remain in
+        -- formation while searching. Other roles display moving to communicate
+        -- that an active search task is under way.
         return (role == "repair" or role == "cleanup") and "idle" or "moving"
     end
     if rs.track_job and rs.track_job.done and (not rs.target or not rs.target.valid) then
@@ -678,6 +719,9 @@ function M.step(role, rs, anchor, bot)
         visuals.target_line(rs.visual_key or role, bot, rs.target, anchor.player.index);
         rs.target_visualized = true
     end
+    -- Track always consumes a connected belt graph. Upgrade does so only after
+    -- selecting a belt-family target (or while an existing graph job resumes);
+    -- inserters and containers remain isolated upgrades.
     local grouped = (role == "track") or (role == "upgrade" and (rs.track_job or (rs.target and rs.target.valid and
                         (rs.target.type == "transport-belt" or rs.target.type == "underground-belt" or rs.target.type ==
                             "splitter"))))

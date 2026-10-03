@@ -7,11 +7,16 @@ local owned = {}
 
 ---Resolve which player may see a role-owned rendering.
 local function player_filter(player_index, key)
+    -- Most callers provide the owner explicitly. Older/internal call sites encode
+    -- it at the beginning of keys such as `3:repair`; parse that as a fallback.
+    -- Map/site keys do not begin with digits and correctly produce nil here.
     local index = player_index or tonumber(key:match("^(%d+):"))
     local player = index and game.get_player(index)
     if not (player and player.valid) then
         return nil
     end
+    -- The rendering API expects an array of permitted player indices, not a
+    -- single scalar. Restricting it prevents one player's bot UI leaking to all.
     return {player.index}
 end
 
@@ -22,6 +27,8 @@ function M.clear_role(key)
             object.destroy()
         end
     end
+    -- Retain an empty bucket rather than nil so repeated clear/update calls have
+    -- a consistent iterable value and cannot rediscover destroyed handles.
     owned[key] = {}
 end
 
@@ -36,6 +43,8 @@ function M.target_line(key, from, to, player_index)
         M.clear_role(key)
         return
     end
+    -- A target line has exactly one object. Reuse it when valid because changing
+    -- endpoints is cheaper and visually smoother than destroy/recreate.
     local objects = owned[key]
     local line = objects and objects[1]
     if line and line.valid then
@@ -58,6 +67,8 @@ end
 
 ---Create or update the player-visible role/task label over a bot.
 function M.bot_label(key, entity, role, task, player_index)
+    -- Prefix labels separately because the base role key owns its target line.
+    -- The two visuals can then be updated or cleared independently.
     local label_key = "label:" .. key
     local objects = owned[label_key]
     local label = objects and objects[1]
@@ -161,6 +172,8 @@ function M.health(key, entity)
         max_radius = 0.65,
         min_radius = 0.56,
         start_angle = 0,
+        -- Factorio's draw_arc uses a fraction of one turn, not radians. The
+        -- normalized health ratio therefore maps directly to visible arc length.
         angle = ratio,
         target = entity,
         surface = entity.surface,
@@ -182,6 +195,9 @@ function M.step_clear(root)
     if not job then
         return false
     end
+    -- Lua's `next(table, previous_key)` resumes hash-table iteration without
+    -- materializing all keys. The cursor is transiently meaningful only while
+    -- `owned` remains unchanged enough for this best-effort cleanup job.
     local key, value = next(owned, job.cursor);
     job.cursor = key
     if key == nil then
@@ -196,6 +212,9 @@ function M.step_clear(root)
                 end
             end
         end
+        -- Use false rather than nil during `next` iteration. Deleting the current
+        -- key can make the next cursor invalid in Lua; false removes ownership
+        -- semantically while leaving the key available to resume iteration.
         owned[key] = false
     end
     return true

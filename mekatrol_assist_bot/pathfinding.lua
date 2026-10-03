@@ -54,6 +54,8 @@ function M.start(surface, from, to, max_radius, goal_distance)
         surface_index = surface.index,
         start = a,
         goal = b,
+        -- Defaults keep the standalone helper useful: 96 tiles bounds an
+        -- omitted search, while zero requires reaching the exact goal tile.
         max_radius = max_radius or 96,
         goal_distance = goal_distance or 0,
         open = {{
@@ -92,7 +94,10 @@ local function pop(job)
     if #heap == 0 then
         return nil
     end
+    -- Index one is the minimum because `push` maintains a min-heap.
     local root = heap[1];
+    -- Move the final element into the root hole, then shorten the array. When
+    -- there was only one element this correctly assigns then clears index one.
     heap[1] = heap[#heap];
     heap[#heap] = nil;
     local i = 1
@@ -102,6 +107,9 @@ local function pop(job)
             break
         end
         local right = left + 1;
+        -- Prefer the right child only when it exists and is strictly cheaper;
+        -- otherwise choose left. This expression also gives deterministic left
+        -- preference when both children compare equal.
         local child = right <= #heap and less(heap[right], heap[left]) and right or left;
         if not less(heap[child], heap[i]) then
             break
@@ -127,11 +135,15 @@ function M.step(job)
             job.done = true;
             return true
         end
+        -- Keys were serialized as `x,y`. Splitting at the first comma is safe
+        -- for negative and decimal text because neither contains another comma.
         local x, y = k:match("^([^,]+),(.+)$");
         -- Parents point from child toward the start, so this array is built
         -- goal-to-start. Controllers consume it from `cursor = #path`, which
         -- consequently walks start-to-goal without reversing the whole array.
         job.path[#job.path + 1] = {
+            -- Search coordinates name tile corners; movement destinations use
+            -- centers, hence the half-tile offset on both axes.
             x = tonumber(x) + 0.5,
             y = tonumber(y) + 0.5
         };
@@ -162,6 +174,9 @@ function M.step(job)
         -- max_radius bounds both CPU/memory growth and how far a bot may stray.
         -- A candidate is useful only if it is traversable and improves the
         -- best route previously found to the same tile.
+        -- `scores[k]` is absent for an unseen tile. For a seen tile, accept only
+        -- a strictly cheaper route; equal routes add no information and would
+        -- bloat the open heap with duplicates.
         if h(job.start, p) <= job.max_radius and not blocked(surface, p) and (not job.scores[k] or g < job.scores[k]) then
             job.scores[k] = g;
             job.parents[k] = key(node.p);

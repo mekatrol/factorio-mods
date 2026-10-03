@@ -42,6 +42,13 @@ end
 ---surface, prototype, and coordinates quantized to 1/256 tile; quantization
 ---avoids tiny floating-point representation differences changing the key.
 function M.identity(e)
+    -- Unit numbers are Factorio's unique identity for entities that own one and
+    -- remain stable while the entity exists. Decorative/resource-like or
+    -- modded entities may have no unit number, so the fallback identifies them
+    -- by surface, prototype, and position. Multiplication by 256 converts a
+    -- coordinate to 1/256-tile fixed-point before floor removes insignificant
+    -- floating-point noise. The `u:`/`p:` prefixes prevent the two key schemes
+    -- from ever colliding.
     return e.unit_number and ("u:" .. e.unit_number) or
                ("p:" .. e.surface.index .. ":" .. e.name .. ":" .. math.floor(e.position.x * 256) .. ":" ..
                    math.floor(e.position.y * 256))
@@ -66,6 +73,9 @@ function M.add(e)
         force_name = e.force and e.force.name or nil,
         tick = game.tick
     }
+    -- `inserted` distinguishes a genuinely new discovery from refreshing the
+    -- timestamp/entity reference of an already known identity. Only new IDs
+    -- should be appended to consumer queues or emit the mapped event.
     local inserted = M.store(d.order, d.records, id, record)
     index_add(d, id, record)
     if inserted then
@@ -103,6 +113,8 @@ function M.clear()
     d.groups = {};
     d.grouped = {};
     d.queues = {};
+    -- Older saves may predate the generation counter, hence zero as the base.
+    -- Consumers compare this number to reset cursors after an atomic clear.
     d.generation = (d.generation or 0) + 1;
     visuals.begin_clear(root, "map:")
     local event = d.events and d.events.cleared;
@@ -134,6 +146,8 @@ function M.prune(limit)
     -- numeric index because the following array element shifts into that slot.
     local d = state.root().discovery;
     local n = 0;
+    -- The cursor is persistent so repeated bounded calls eventually inspect
+    -- the whole array instead of always revisiting its first `limit` entries.
     d.prune_cursor = d.prune_cursor or 1
     while #d.order > 0 and n < limit do
         if d.prune_cursor > #d.order then

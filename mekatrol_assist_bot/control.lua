@@ -174,6 +174,10 @@ end)
 
 ---Create a stable key for a destroyed entity site.
 local function site_key(entity)
+    -- Quantize to sixteenth-tile coordinates. Entity positions can contain
+    -- fractions and minor floating-point differences; fixed-point integers make
+    -- a stable string key while remaining precise enough to distinguish normal
+    -- neighbouring factory entities. Surface is included for cross-surface safety.
     return entity.surface.index .. ":" .. math.floor(entity.position.x * 16) .. ":" ..
                math.floor(entity.position.y * 16)
 end
@@ -183,6 +187,8 @@ local function belongs_to_player_force(force)
     if not force then
         return false
     end
+    -- Checking live player force objects also supports custom player-created
+    -- forces; hard-coding the force name "player" would miss those factories.
     for _, player in pairs(game.players) do
         if player.force == force then
             return true

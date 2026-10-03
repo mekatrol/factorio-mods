@@ -23,10 +23,14 @@ end
 ---Create the inert visual robot and attach it to its persistent role state.
 local function spawn(role, rs, a, position, visual)
     rs.entity = a.surface.create_entity {
+        -- Callers may omit a visual during initial creation. Idle is the least
+        -- surprising animation and also guarantees a valid prototype suffix.
         name = constants.prototype(role, visual or "idle"),
         position = position,
         force = a.force
     };
+    -- Mirror the exact fallback used for the prototype name so logical and
+    -- rendered state cannot disagree.
     rs.visual = visual or "idle";
     return rs.entity
 end
@@ -40,6 +44,8 @@ function M.set_visual(role, rs, a, visual)
         -- bot is repositioned every tick.
         return rs.entity
     end
+    -- Recreating a missing bot at the anchor avoids spawning at an obsolete
+    -- saved coordinate. Moving is the default because it must rejoin its slot.
     return spawn(role, rs, a, a.position, visual or "moving")
 end
 
@@ -58,8 +64,13 @@ function M.enable(index, role, quiet)
     rs.enabled = true;
     rs.visual_key = index .. ":" .. role
     if not rs.entity or not rs.entity.valid then
+        -- Saves predating direction tracking may contain nil. Legacy value 1
+        -- means right and yields the same initial formation as old versions.
         local slots = formation.slots(active_names(ps), ps.direction or 1);
         local slot = slots[role] or {
+            -- The fallback is defensive: a newly enabled role should normally
+            -- be in `active_names`, but origin is safer than indexing nil if a
+            -- malformed/partially migrated state disagrees.
             x = 0,
             y = 0
         };
@@ -68,6 +79,8 @@ function M.enable(index, role, quiet)
             y = a.position.y + slot.y
         }, "moving")
     end
+    -- Idle means the controller is not performing its configured task, so show
+    -- the user-facing activity "follow" rather than a misleading task label.
     visuals.bot_label(rs.visual_key, rs.entity, role, rs.phase == "idle" and "follow" or rs.task, index)
     if not quiet then
         a.player.print("[MAB] " .. role .. " enabled")
@@ -164,6 +177,8 @@ function M.remove_player(index)
             if rs.entity and rs.entity.valid then
                 rs.entity.destroy()
             end
+            -- `visual_key` was introduced after early saves. Reconstructing its
+            -- deterministic format lets cleanup remove legacy players' renders.
             local visual_key = rs.visual_key or (index .. ":" .. role)
             visuals.clear_role(visual_key)
             visuals.clear_role("label:" .. visual_key)

@@ -3,11 +3,18 @@ local M = {}
 
 ---Return an identity stable for the duration of this traversal.
 local function key(e)
+    -- Belt-like entities normally have a globally unique unit number, so use
+    -- its string form as the compact identity. The fallback covers unusual or
+    -- modded valid entities without a unit number by combining prototype and
+    -- exact position. This key is only scoped to one connected-belt job; unlike
+    -- discovery identities it does not need a surface prefix or quantization.
     return e.unit_number and tostring(e.unit_number) or (e.name .. ":" .. e.position.x .. ":" .. e.position.y)
 end
 
 ---Restrict the graph to the three entity types that form belt networks.
 local function allowed(e)
+    -- Test existence and validity before reading `type`: queued LuaEntity
+    -- references can become invalid if a player mines a belt mid-traversal.
     return e and e.valid and (e.type == "transport-belt" or e.type == "underground-belt" or e.type == "splitter")
 end
 
@@ -40,8 +47,12 @@ function M.step(job)
     if allowed(e) and e.force.index == job.force_index then
         job.entities[#job.entities + 1] = e
         local neighbours = {};
+        -- Normal belts and splitters expose directed inputs/outputs through
+        -- `belt_neighbours`. Either side may be absent at the end of a line.
         local belt = e.belt_neighbours
         if belt then
+            -- `or {}` converts a missing input/output list into an empty
+            -- iterable list, avoiding a branch for endpoints.
             for _, v in ipairs(belt.inputs or {}) do
                 neighbours[#neighbours + 1] = v
             end
@@ -49,6 +60,8 @@ function M.step(job)
                 neighbours[#neighbours + 1] = v
             end
         end
+        -- The paired underground endpoint is not always present in ordinary
+        -- input/output lists, so add Factorio's explicit tunnel neighbour too.
         if e.type == "underground-belt" and e.neighbours then
             neighbours[#neighbours + 1] = e.neighbours
         end
@@ -76,6 +89,8 @@ end
 ---Consume one discovered entity and return it only if it still matches.
 ---The second result distinguishes exhaustion from a skipped/invalid entry.
 function M.next(job, predicate)
+    -- Traversal and action consumption are separate phases. Old/new jobs have
+    -- no action cursor until consumption starts, making index one the default.
     job.action_index = job.action_index or 1;
     local e = job.entities[job.action_index];
     if not e then

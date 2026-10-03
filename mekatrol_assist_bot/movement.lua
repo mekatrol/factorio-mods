@@ -21,8 +21,20 @@ local function remaining_distance(entity)
         movement_tick = tick
         distance_moved = {}
     end
+    -- Most world entities have a numeric `unit_number`, which is stable for the
+    -- lifetime of that entity and therefore makes the cheapest, clearest table
+    -- key. Some valid Factorio entities do not receive unit numbers, however.
+    -- Lua permits an object reference itself to be a table key, so the entity
+    -- reference is the collision-free fallback for this transient, one-tick
+    -- cache. We never persist that fallback in `storage`; it is discarded when
+    -- `game.tick` changes, before save safety could become a concern.
     local key = entity.unit_number or entity
+    -- A missing entry means this is the entity's first movement request in the
+    -- current tick, so it has consumed zero of its allowance.
     local moved = distance_moved[key] or 0
+    -- A bot may already have spent the full allowance in an earlier scheduler
+    -- call. `max` prevents floating-point rounding from returning a small
+    -- negative distance which would make the bot step backward.
     return math.max(0, config.movement.step - moved), key, moved
 end
 

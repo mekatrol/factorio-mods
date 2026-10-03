@@ -11,6 +11,8 @@ local M = {}
 ---Split command text on whitespace into a compact argument array.
 local function words(s)
     local out = {}
+    -- Factorio passes nil when a command has no parameter. Empty text makes the
+    -- same iterator simply yield no words, which is the parser's help case.
     for w in (s or ""):gmatch("%S+") do
         out[#out + 1] = w
     end
@@ -20,16 +22,22 @@ end
 ---Parse both canonical `/mab ROLE ACTION` and forced legacy role aliases.
 function M.parse(text, forced)
     local arguments = words(text)
+    -- Compatibility commands inject their role. Remember whether the user
+    -- supplied no other text because bare `/gamebot` retains legacy cycling.
     local bare_forced = forced ~= nil and #arguments == 0
     if forced then
         table.insert(arguments, 1, forced)
     end
+    -- The registry expects a string; empty input intentionally resolves to nil.
     local role = registry.get(arguments[1] or "")
     return {
         arguments = arguments,
         bare_forced = bare_forced,
         role = role,
+        -- A registry match is canonicalized; `all` is a command pseudo-role;
+        -- anything else stays nil so execute can report an unknown role.
         role_name = role and role.name or (arguments[1] == "all" and "all" or nil),
+        -- Omitting the action is deliberately equivalent to a hotkey toggle.
         action = arguments[2] or "toggle"
     }
 end
@@ -55,6 +63,8 @@ end
 ---Report enabled state, task, and current controller phase for a role or all roles.
 local function status(pi, name)
     local ps = state.player(pi);
+    -- A concrete name becomes a one-element work list. Missing/all reuses the
+    -- canonical roster, preserving the same stable order as formation display.
     local names = name and name ~= "all" and {name} or config.formation.role_order
     local player = game.get_player(pi);
     for _, r in ipairs(names) do
@@ -118,6 +128,8 @@ function M.execute(pi, text, forced)
         local next_index = 1;
         for i, v in ipairs(cycle) do
             if v == rs.task then
+                -- Lua arrays are one-based. `i % length + 1` maps the last item
+                -- back to one and every other item to its successor.
                 next_index = i % #cycle + 1
             end
         end
@@ -187,6 +199,9 @@ function M.execute(pi, text, forced)
         local rs = state.player(pi).roles[name];
         local values = {}
         for i = 4, #a do
+            -- Require a non-empty key and value separated by the first equals
+            -- sign; malformed optional arguments are ignored here and caught
+            -- later when required named values are missing.
             local k, v = a[i]:match("^([^=]+)=(.+)$")
             if k then
                 values[k] = v
@@ -204,6 +219,8 @@ function M.execute(pi, text, forced)
             }
         elseif name == "logistics" and task == "pickup" then
             local count = tonumber(values.count)
+            -- `count % 1 ~= 0` rejects fractional quantities because Factorio
+            -- item stacks contain integral units.
             if not values.name or not count or count < 1 or count % 1 ~= 0 then
                 say(pi, "pickup requires name=<item-or-entity> count=<positive integer>")
                 return

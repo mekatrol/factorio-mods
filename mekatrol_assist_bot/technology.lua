@@ -7,6 +7,8 @@ function M.missing_from(researched, required, mode)
     local missing = {};
     local any = false
     for _, name in ipairs(required) do
+        -- Require literal true rather than generic truthiness so nil/missing
+        -- entries and malformed values both count as not researched.
         local has = researched[name] == true;
         any = any or has
         if not has then
@@ -36,6 +38,8 @@ function M.missing(force, role)
     local r = config.roles[role];
     local researched = {}
     for _, name in ipairs(r.required_technologies) do
+        -- A technology may be absent when another mod changes prototypes. Guard
+        -- the lookup and normalize absence to false rather than raising here.
         researched[name] = force.technologies[name] and force.technologies[name].researched or false
     end
     return M.missing_from(researched, r.required_technologies, r.technology_mode)
@@ -76,10 +80,15 @@ function M.task_allowed(force, role, task)
     local unavailable = {}
     for _, source in ipairs(sources) do
         local target = config.tasks.upgrade.mappings[source]
+        -- A mapping without a target short-circuits safely. A valid target may
+        -- have no recipe (for example a modded item); absence is treated as not
+        -- recipe-gated, while an existing disabled recipe blocks the task.
         local recipe = target and force.recipes[target]
         if target and prototypes.entity[target] and prototypes.item[target] and (not recipe or recipe.enabled) then
             return true, {}
         end
+        -- Report the desired target when known; otherwise report the malformed
+        -- source mapping so the diagnostic is still actionable.
         unavailable[#unavailable + 1] = target or source
     end
     return false, unavailable

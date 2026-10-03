@@ -1,6 +1,9 @@
 -- Incremental Moore-neighbour resource-boundary trace; each step performs a fixed query count.
 local config = require("config")
 local M = {}
+-- Clockwise Moore-neighbour order makes candidate choice deterministic. Because
+-- previously visited tiles are rejected, the tracer advances around the edge
+-- until returning to its seed rather than oscillating between two cells.
 local dirs = {{-1, -1}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}}
 local four = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
 ---Create a stable set key for one resource tile.
@@ -59,6 +62,8 @@ function M.step(job)
         job.done = true
         return true
     end
+    -- Count seek and trace calls alike. This is a hard safety bound for malformed
+    -- or extremely large resource layouts, not merely the final vertex count.
     job.steps = job.steps + 1;
     if job.steps > config.tasks.surveyor.boundary_max_steps then
         job.done = true;
@@ -86,6 +91,9 @@ function M.step(job)
         local x, y = job.x + d[1], job.y + d[2];
         if inside(surface, job.name, x, y) and boundary(surface, job.name, x, y) then
             local id = k(x, y);
+            -- Returning to the seed closes only a genuine polygon of at least
+            -- three recorded points. Otherwise select an unvisited boundary tile
+            -- so a two-tile patch cannot be mistaken for a closed area.
             if (x == job.start_x and y == job.start_y and #job.points >= 3) or not job.seen[id] then
                 next_x, next_y = x, y;
                 break

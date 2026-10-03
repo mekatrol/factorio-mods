@@ -29,16 +29,24 @@ end
 ---A destination suppresses player insertion because the item should be
 ---returned to the container that originally supplied it.
 function M.give_or_carry(rs, player, stack, destination)
+    -- A non-nil destination means the item was borrowed from that container and
+    -- must be returned there; bypass the player even if they have room. With no
+    -- destination, insert into the player immediately. Lua's `and/or` idiom is
+    -- safe here because the chosen zero is truthy in Lua (unlike some languages).
     local inserted = destination and 0 or M.player_give(player, stack);
     local remaining = stack.count - inserted
     if remaining > 0 then
         rs.cargo = rs.cargo or {};
         rs.cargo_order = rs.cargo_order or {};
         rs.cargo_destinations = rs.cargo_destinations or {};
+        -- `cargo` is a count map for consolidation, while `cargo_order` provides
+        -- deterministic iteration. Append a name only on its first queued unit.
         if not rs.cargo[stack.name] then
             rs.cargo_order[#rs.cargo_order + 1] = stack.name
         end
         rs.cargo[stack.name] = (rs.cargo[stack.name] or 0) + remaining;
+        -- Only store a live LuaEntity. Invalid references cannot be dereferenced
+        -- later; omitting it safely falls back to delivery to the player.
         if destination and destination.valid then
             rs.cargo_destinations[stack.name] = destination
         end
@@ -58,6 +66,9 @@ function M.queue_cargo(rs, stack, prefer_existing_container)
     rs.cargo[stack.name] = (rs.cargo[stack.name] or 0) + stack.count;
     rs.cargo_count = rs.cargo_count + stack.count
     if prefer_existing_container then
+        -- Boolean false is an intentional sentinel distinct from nil:
+        -- false = search for a suitable existing container;
+        -- nil   = no container preference, deliver to the player.
         rs.cargo_destinations[stack.name] = false
     end
 end
@@ -72,6 +83,9 @@ function M.flush_cargo(rs, player, bot)
     if not name then
         return true
     end
+    -- Old saves or partially initialized roles may have an order array without
+    -- a cargo table. The temporary empty table makes that mismatch a missing
+    -- count, which the cursor repair branch below can skip safely.
     local count = (rs.cargo or {})[name]
     if not count then
         rs.cargo_cursor = rs.cargo_cursor + 1;
@@ -112,6 +126,8 @@ function M.flush_cargo(rs, player, bot)
             end
             return false
         end
+        -- `job.source` remains nil when no same-item container had capacity.
+        -- In that case clearing the destination selects the player fallback.
         destination = job.source;
         rs.cargo_destinations[name] = destination or nil;
         rs.drop_job = nil
@@ -121,6 +137,9 @@ function M.flush_cargo(rs, player, bot)
             return false
         end
         local inv = M.entity_inventory(destination);
+        -- The destination could lose its supported inventory after selection
+        -- (for example through replacement by another mod). Treat that as zero
+        -- inserted and retain the cargo for a later attempt.
         inserted = inv and inv.insert {
             name = name,
             count = count
@@ -133,6 +152,9 @@ function M.flush_cargo(rs, player, bot)
     end
     count = count - inserted;
     rs.cargo_count = math.max(0, (rs.cargo_count or 0) - inserted);
+    -- Removing a completed key rather than retaining zero keeps `cargo` a map
+    -- of real outstanding work and allows a future stack of this name to be
+    -- appended to the ordered manifest again.
     rs.cargo[name] = count > 0 and count or nil
     if count == 0 then
         if rs.cargo_destinations then
@@ -140,6 +162,8 @@ function M.flush_cargo(rs, player, bot)
         end
         rs.cargo_cursor = rs.cargo_cursor + 1
     end
+    -- Completion requires both the current type to be empty and no later
+    -- ordered type. If insertion was partial, the same cursor resumes next call.
     return count == 0 and rs.cargo_order[rs.cargo_cursor] == nil
 end
 
@@ -150,6 +174,9 @@ function M.entity_inventory(e)
     if not e or not e.valid then
         return nil
     end
+    -- Query known inventory IDs in preference order. Factorio returns nil when
+    -- an ID is unsupported, so this works across chests, wagons, furnaces, and
+    -- assembling machines without branching on every entity type.
     for _, id in ipairs {defines.inventory.chest, defines.inventory.cargo_wagon, defines.inventory.furnace_source,
                          defines.inventory.assembling_machine_input} do
         if e.get_inventory and e.get_inventory(id) then
@@ -170,14 +197,21 @@ function M.take(rs, player, target, bot, name, count)
         rs.supplied[name] = carried - used;
         return used
     end
+    -- An empty policy is an explicit configuration choice meaning bots may not
+    -- obtain supplies from either players or containers.
     if #config.supply.source_priority == 0 then
         return 0
     end
+    -- Ordering changes behavior: when player is first, any available player
+    -- item avoids a container trip. Otherwise containers are exhausted before
+    -- the player is tried as a fallback.
     local player_first = config.supply.source_priority[1] == "player";
     local use_containers = false;
     for _, policy in ipairs(config.supply.source_priority) do
         use_containers = use_containers or policy == "containers"
     end
+    -- Lua's zero is truthy, so this `and/or` expression reliably yields zero
+    -- when the player policy is not first rather than evaluating another branch.
     local got = player_first and M.player_take(player, name, count) or 0;
     if got > 0 then
         return got
@@ -200,6 +234,10 @@ function M.take(rs, player, target, bot, name, count)
                 count = count
             };
             if got > 0 then
+                -- Stage the removed amount instead of returning it immediately.
+                -- Returning nil tells the controller that this work unit was
+                -- spent travelling/withdrawing; the next call consumes it from
+                -- `supplied` and performs the actual target action.
                 rs.supplied[name] = got;
                 rs.last_source = cached;
                 return nil
@@ -235,6 +273,8 @@ function M.take(rs, player, target, bot, name, count)
     end
     if not (job.source and job.source.valid) then
         rs.supply_job = nil;
+        -- If player inventory was already checked first, zero is final. If
+        -- containers were first, this is the deferred player fallback.
         return player_first and 0 or M.player_take(player, name, count)
     end
     if not movement.step(bot, job.source.position) then

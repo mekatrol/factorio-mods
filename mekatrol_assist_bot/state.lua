@@ -6,6 +6,9 @@ local M = {}
 ---This lazy normalization is intentionally safe to call from every subsystem:
 ---old saves gain newly introduced tables before any caller indexes them.
 function M.root()
+    -- `storage` is Factorio 2.0's save-serialized global table. The `or`
+    -- preserves an existing save verbatim; the literal is used only for a new
+    -- game or a save which has never loaded this mod.
     storage.mekatrol_assist_bot = storage.mekatrol_assist_bot or {
         schema_version = config.schema_version,
         players = {},
@@ -24,6 +27,9 @@ function M.root()
         }
     }
     local r = storage.mekatrol_assist_bot;
+    -- These additive defaults are intentionally outside the initial literal.
+    -- That makes loading an older schema safe before the incremental migration
+    -- has had scheduler time to finish.
     r.destroyed_sites = r.destroyed_sites or {};
     r.discovery.by_name = r.discovery.by_name or {}
     r.discovery.grouped = r.discovery.grouped or {}
@@ -46,6 +52,8 @@ function M.player(index)
     local r = M.root();
     local p = r.players[index]
     if not p then
+        -- Direction 1 is the legacy representation of "right" and remains
+        -- accepted by formation.lua, allowing old and new saves to coexist.
         p = {
             roles = {},
             direction = 1,
@@ -62,6 +70,8 @@ function M.player(index)
         p.scheduler_registered = true
     end
     for _, name in ipairs(config.formation.role_order) do
+        -- Preserve existing role state, including in-progress serializable jobs.
+        -- Only roles absent from an old save receive a fresh default record.
         p.roles[name] = p.roles[name] or {
             enabled = false,
             task = config.roles[name].default_task,
@@ -83,6 +93,8 @@ function M.next_role()
     if #s.player_order == 0 then
         return nil
     end
+    -- Lua arrays are one-based. A missing cursor therefore begins at one, not
+    -- zero; persisted cursors resume rather than restarting each tick.
     s.player_cursor = s.player_cursor or 1;
     s.role_cursor = s.role_cursor or 1
     if s.player_cursor > #s.player_order then

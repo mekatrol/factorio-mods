@@ -15,6 +15,8 @@ end
 ---zero payload, radii, and energy use prevent logistic-network autonomy.
 local function build(role, family, state, name)
     local base_name = family .. "-robot"
+    -- `data.raw` is grouped first by prototype type and then by name. Guard the
+    -- outer lookup because a heavily modified data stage may remove a family.
     local base = data.raw[base_name] and data.raw[base_name][base_name]
     if not base then
         error("mekatrol_assist_bot: missing base " .. base_name)
@@ -27,6 +29,8 @@ local function build(role, family, state, name)
         require_graphic(base, family, "shadow_working")
     end
 
+    -- Factorio prototypes contain nested animation tables. A deep copy is
+    -- essential; mutating a shallow copy would also alter the vanilla robot.
     local prototype = table.deepcopy(base)
     prototype.name = name
     prototype.localised_name = {"entity-name.mekatrol-assist-bot", role}
@@ -46,6 +50,9 @@ local function build(role, family, state, name)
     elseif state == "working" then
         -- Vanilla logistic robots have no dedicated working graphic in 2.0.77;
         -- their complete in-motion animation is the closest family-native state.
+        -- Construction robots supply dedicated working graphics. Logistic
+        -- robots do not in vanilla 2.0, so their complete movement animation is
+        -- the family-consistent fallback.
         local working = base.working or base.in_motion
         local working_shadow = base.shadow_working or base.shadow_in_motion
         prototype.idle = table.deepcopy(working)

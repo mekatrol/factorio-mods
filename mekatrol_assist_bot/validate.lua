@@ -3,12 +3,17 @@ local M = {}
 
 ---Raise a configuration error which identifies path, value, and expectation.
 local function fail(path, value, range)
+    -- Stack level three points the traceback at the configuration-specific
+    -- caller rather than this generic helper or its numeric wrapper.
     error("mekatrol_assist_bot config " .. path .. "=" .. tostring(value) .. "; expected " .. range, 3)
 end
 
 ---Validate a finite numeric field and its optional bounds/integer constraint.
 local function num(path, v, min, max, int)
+    -- `v ~= v` is Lua's portable NaN test: NaN is the only number unequal to
+    -- itself. Infinities need explicit rejection because they pass type checks.
     if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge or v < min or (max and v > max) or
+        -- A finite number has no fractional component exactly when v % 1 == 0.
         (int and v % 1 ~= 0) then
         fail(path, v, (int and "integer " or "finite number ") .. ">=" .. min .. (max and " and <=" .. max or ""))
     end

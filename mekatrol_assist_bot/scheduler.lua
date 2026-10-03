@@ -19,6 +19,9 @@ local function destroyed_visual_job(root)
     if not job then
         return false
     end
+    -- `next` resumes directly after the previous hash key without allocating a
+    -- copied key list. The chosen ordering is unspecified but completeness, not
+    -- presentation order, matters for rebuilding markers.
     local key, site = next(root.destroyed_sites, job.cursor)
     job.cursor = key
     if key == nil then
@@ -64,6 +67,8 @@ end
 ---responsiveness while the total cap prevents cost scaling without bound.
 function M.tick(event)
     local root = state.root();
+    -- Saves from before cliff selection have no queue. Lazy initialization also
+    -- avoids requiring a schema migration for an empty optional feature.
     root.selection_jobs = root.selection_jobs or {}
     local budget = config.scheduler.work_per_tick;
     local background = 0
@@ -94,6 +99,8 @@ function M.tick(event)
             end
             local a = anchor.get(item.player_index);
             local rs = item.state
+            -- Recreate an enabled bot whose engine entity disappeared, but only
+            -- when its player currently has a usable anchor.
             if a and rs.enabled and (not rs.entity or not rs.entity.valid) then
                 manager.enable(item.player_index, item.name, true)
             end
@@ -103,11 +110,15 @@ function M.tick(event)
                 if not supply.flush_cargo(rs, a.player, rs.entity) then
                     -- Cargo delivery takes precedence over ordinary role work;
                     -- this prevents collected items from becoming stranded.
+                    -- Cargo fields may not exist on roles/saves which have never
+                    -- carried anything. Cursor one is the first Lua array item.
                     local cargo_name = rs.cargo_order and rs.cargo_order[rs.cargo_cursor or 1]
                     local destination = cargo_name and rs.cargo_destinations and rs.cargo_destinations[cargo_name]
                     -- Cleanup can keep formation while it searches for a
                     -- matching chest or waits for player inventory space.
                     -- A concrete destination still owns movement explicitly.
+                    -- Lua has no ternary operator; `condition and A or B` works
+                    -- here because both A and B are non-false strings.
                     rs.phase = item.name == "cleanup" and
                                    (destination == nil or destination == false) and "idle" or "working"
                     manager.set_visual(item.name, rs, a, rs.phase)
@@ -123,6 +134,8 @@ function M.tick(event)
                     end
                 else
                     rs.phase = controllers.step(item.name, rs, a, rs.entity);
+                    -- Robots have no `scan` prototype. Scanning uses the moving
+                    -- animation, while idle/working/moving map directly.
                     manager.set_visual(item.name, rs, a, rs.phase == "scan" and "moving" or rs.phase)
                 end
                 if rs.task == "follow" then
@@ -134,6 +147,8 @@ function M.tick(event)
                 else
                     visuals.clear_role(visual_key)
                 end
+                -- An idle controller is physically following formation even if
+                -- its configured task remains repair/search/etc.
                 local current_task = rs.phase == "idle" and "follow" or rs.task
                 visuals.bot_label(visual_key, rs.entity, item.name, current_task, item.player_index)
             end
