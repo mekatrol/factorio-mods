@@ -7,6 +7,11 @@
 -- This module does not create, move, or retain any LuaEntity objects.
 local config = require("config")
 
+---A two-dimensional player position or formation offset.
+---@class FormationPosition
+---@field x number Horizontal world coordinate or relative offset.
+---@field y number Vertical world coordinate or relative offset.
+
 -- Exported functions are collected in M and returned at the bottom of the file.
 local M = {}
 
@@ -40,7 +45,7 @@ end
 ---Calculate player-relative slots for all active bot roles.
 ---@param active string[] Role names in their stable configured display order.
 ---@param direction string|number Cardinal direction, including legacy +/-1.
----@return table<string, {x:number, y:number}> slots Offset indexed by role name.
+---@return table<string, FormationPosition> slots Offset indexed by role name.
 function M.slots(active, direction)
     -- heading_x/heading_y point in the direction the player is travelling.
     local heading_x, heading_y = heading(direction)
@@ -96,7 +101,7 @@ function M.slots(active, direction)
 end
 
 ---Return true when every role has a distinct slot.
----@param slots table<string, {x:number, y:number}> Formation offsets by role.
+---@param slots table<string, FormationPosition> Formation offsets by role.
 ---@return boolean unique True if no two roles occupy the same coordinates.
 function M.has_unique_slots(slots)
     -- Treat this table as a set of normalized coordinate strings.
@@ -123,7 +128,7 @@ end
 
 ---Update and return a player's most recent cardinal travel direction.
 ---@param ps table Persistent per-player state owned by state.lua.
----@param pos {x:number, y:number} Current player/character anchor position.
+---@param pos FormationPosition Current player/character anchor position.
 ---@return string|number|nil direction Current direction or legacy/default value.
 function M.update_direction(ps, pos)
     -- A previous sample is required before a movement delta can be calculated.
