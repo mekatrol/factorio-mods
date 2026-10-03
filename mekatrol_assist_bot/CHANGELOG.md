@@ -4,6 +4,9 @@
 
 - Fixed repair and health-overlay code for Factorio 2.0 by reading maximum
   health from runtime entities instead of the prototype API.
+- Repair bots now keep following their player while background target scans run.
+- Cleanup bots now keep following during target/deposit scans and while waiting
+  for player inventory space.
 - Unified localized command help and enforced role technology gates before task
   mutation, including actionable recipe availability errors for upgrade tasks.
 - Added configuration-change migration verification and declared all four source

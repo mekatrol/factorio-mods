@@ -587,7 +587,9 @@ function M.step(role, rs, anchor, bot)
                 end
             end
         end
-        return "moving"
+        -- Scanning is background work; passive service bots should keep their
+        -- formation until an actual target has been selected.
+        return (role == "repair" or role == "cleanup") and "idle" or "moving"
     end
     if rs.track_job and rs.track_job.done and (not rs.target or not rs.target.valid) then
         local candidate, complete = track.next(rs.track_job, function(e)

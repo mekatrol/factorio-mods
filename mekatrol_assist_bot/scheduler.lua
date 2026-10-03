@@ -91,7 +91,14 @@ function M.tick(event)
             if a and rs.enabled and rs.entity and rs.entity.valid and event.tick %
                 config.scheduler.role_intervals[item.name] == 0 then
                 if not supply.flush_cargo(rs, a.player, rs.entity) then
-                    rs.phase = "working"
+                    local cargo_name = rs.cargo_order and rs.cargo_order[rs.cargo_cursor or 1]
+                    local destination = cargo_name and rs.cargo_destinations and rs.cargo_destinations[cargo_name]
+                    -- Cleanup can keep formation while it searches for a
+                    -- matching chest or waits for player inventory space.
+                    -- A concrete destination still owns movement explicitly.
+                    rs.phase = item.name == "cleanup" and
+                                   (destination == nil or destination == false) and "idle" or "working"
+                    manager.set_visual(item.name, rs, a, rs.phase)
                 elseif rs.task == "follow" then
                     rs.phase = "idle"
                 elseif rs.task == "move_to" then
