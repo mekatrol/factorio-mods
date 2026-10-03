@@ -9,6 +9,7 @@ local technology = require("technology")
 local visuals = require("visuals")
 local M = {}
 
+---List enabled roles in configured formation order.
 local function active_names(ps)
     local out = {};
     for _, name in ipairs(config.formation.role_order) do
@@ -19,6 +20,7 @@ local function active_names(ps)
     return out
 end
 
+---Create the inert visual robot and attach it to its persistent role state.
 local function spawn(role, rs, a, position, visual)
     rs.entity = a.surface.create_entity {
         name = constants.prototype(role, visual or "idle"),
@@ -29,6 +31,7 @@ local function spawn(role, rs, a, position, visual)
     return rs.entity
 end
 
+---Ensure the role has a live visual entity.
 function M.set_visual(role, rs, a, visual)
     if rs.entity and rs.entity.valid then
         -- Keep one persistent entity per bot. Destroying and recreating a
@@ -40,6 +43,7 @@ function M.set_visual(role, rs, a, visual)
     return spawn(role, rs, a, a.position, visual or "moving")
 end
 
+---Enable a role after checking its player anchor and technology gate.
 function M.enable(index, role, quiet)
     local a = anchor.get(index);
     if not a then
@@ -71,6 +75,7 @@ function M.enable(index, role, quiet)
     return true
 end
 
+---Disable a role and discard all transient work/entity/render references.
 function M.disable(index, role, reason)
     local p = game.get_player(index);
     local rs = state.player(index).roles[role];
@@ -93,6 +98,7 @@ function M.disable(index, role, reason)
     end
 end
 
+---Flip one role's enabled state and report gate failures to its player.
 function M.toggle(index, role)
     local rs = state.player(index).roles[role];
     if rs.enabled then
@@ -109,6 +115,7 @@ function M.toggle(index, role)
     return ok
 end
 
+---Disable active roles whose technology prerequisites are no longer true.
 function M.enforce_gates()
     for pi, ps in pairs(state.root().players) do
         local a = anchor.get(pi);
@@ -122,6 +129,7 @@ function M.enforce_gates()
     end
 end
 
+---Move every idle role toward its formation slot behind the player.
 function M.follow(index)
     local a = anchor.get(index);
     if not a then
@@ -138,6 +146,7 @@ function M.follow(index)
                 x = a.position.x + slot.x,
                 y = a.position.y + slot.y
             };
+            -- Compare squared values so an idle formation pass needs no sqrt.
             local moving = not rs.entity or not rs.entity.valid or movement.distance2(rs.entity.position, target) >
                                config.movement.arrival_distance ^ 2;
             local e = M.set_visual(role, rs, a, moving and "moving" or "idle");
@@ -146,6 +155,7 @@ function M.follow(index)
     end
 end
 
+---Destroy a departing player's bots and remove their scheduler registration.
 function M.remove_player(index)
     local root = state.root();
     local ps = root.players[index];

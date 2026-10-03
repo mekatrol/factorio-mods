@@ -3,9 +3,13 @@ local config = require("config")
 local M = {}
 local dirs = {{-1, -1}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}}
 local four = {{0, -1}, {1, 0}, {0, 1}, {-1, 0}}
+---Create a stable set key for one resource tile.
 local function k(x, y)
     return x .. "," .. y
 end
+---Test whether a resource entity of `name` occupies a tile.
+---Tile centers are at integer + 0.5; radius 0.7 covers the tile center while
+---remaining small enough not to reach a cardinally adjacent center.
 local function inside(surface, name, x, y)
     return #surface.find_entities_filtered {
         position = {x + 0.5, y + 0.5},
@@ -15,6 +19,9 @@ local function inside(surface, name, x, y)
         limit = 1
     } > 0
 end
+---A resource tile is on the boundary when any cardinal neighbour is empty.
+---Diagonal gaps do not create an edge, hence this uses four rather than eight
+---neighbours even though tracing may proceed diagonally.
 local function boundary(surface, name, x, y)
     for _, d in ipairs(four) do
         if not inside(surface, name, x + d[1], y + d[2]) then
@@ -24,6 +31,7 @@ local function boundary(surface, name, x, y)
     return false
 end
 
+---Start a save-safe, incremental boundary trace at a resource entity's tile.
 function M.start(entity)
     local x, y = math.floor(entity.position.x), math.floor(entity.position.y)
     return {
@@ -41,6 +49,7 @@ function M.start(entity)
     }
 end
 
+---Perform one seek or trace step and accumulate polygon measurements.
 function M.step(job)
     if job.done then
         return true
@@ -57,6 +66,8 @@ function M.step(job)
         return true
     end
     if job.phase == "seek" then
+        -- Walk north until leaving the patch. The last occupied tile is a known
+        -- boundary seed, which avoids beginning the contour in its interior.
         if inside(surface, job.name, job.x, job.y - 1) then
             job.y = job.y - 1;
             return false
@@ -91,7 +102,11 @@ function M.step(job)
         y = next_y + 0.5
     };
     local dx, dy = next_point.x - previous.x, next_point.y - previous.y;
+    -- Each boundary segment is horizontal, vertical, or diagonal. Pythagoras
+    -- adds lengths 1 or sqrt(2) without assuming which direction was chosen.
     job.perimeter = job.perimeter + math.sqrt(dx * dx + dy * dy);
+    -- Incrementally accumulate the shoelace cross-product. At closure the
+    -- absolute signed sum divided by two is the enclosed polygon area.
     job.area_twice = job.area_twice + previous.x * next_point.y - next_point.x * previous.y
     if next_x == job.start_x and next_y == job.start_y then
         job.area = math.abs(job.area_twice) / 2;

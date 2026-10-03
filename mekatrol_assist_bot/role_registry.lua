@@ -25,6 +25,7 @@ M.handoffs = {
     surveyor = {types = {"resource"}}
 }
 
+---Return whether a discovery record satisfies a role's subscription rule.
 function M.accepts_handoff(role, record)
     local rule = M.handoffs[role]
     if not rule then
@@ -66,10 +67,12 @@ M.aliases = {
     v = "surveyor"
 }
 
+---Resolve a canonical role name or configured short/legacy alias.
 function M.get(name)
     return M.roles[M.aliases[name] or name]
 end
 
+---Return whether a task name is supported by the supplied role metadata.
 function M.has_task(role, task)
     for _, v in ipairs(role.tasks) do
         if v == task then

@@ -1,8 +1,11 @@
 -- Central rendering ownership. IDs remain transient and are recreated from logical state.
 local config = require("config")
 local M = {};
+-- Rendering objects cannot be stored in persistent `storage`. This transient
+-- ownership map centralizes their lifetime and is rebuilt from logical state.
 local owned = {}
 
+---Resolve which player may see a role-owned rendering.
 local function player_filter(player_index, key)
     local index = player_index or tonumber(key:match("^(%d+):"))
     local player = index and game.get_player(index)
@@ -12,6 +15,7 @@ local function player_filter(player_index, key)
     return {player.index}
 end
 
+---Destroy every transient rendering owned by a logical key.
 function M.clear_role(key)
     for _, object in pairs(owned[key] or {}) do
         if object and object.valid then
@@ -21,6 +25,7 @@ function M.clear_role(key)
     owned[key] = {}
 end
 
+---Create or update the line connecting a bot to its current target.
 function M.target_line(key, from, to, player_index)
     if not (from and from.valid and to) or to.valid == false then
         M.clear_role(key)
@@ -51,6 +56,7 @@ function M.target_line(key, from, to, player_index)
     }}
 end
 
+---Create or update the player-visible role/task label over a bot.
 function M.bot_label(key, entity, role, task, player_index)
     local label_key = "label:" .. key
     local objects = owned[label_key]
@@ -83,6 +89,7 @@ function M.bot_label(key, entity, role, task, player_index)
     }}
 end
 
+---Draw a short-lived ring around a newly mapped entity.
 function M.map_marker(id, entity)
     if not (entity and entity.valid) then
         return
@@ -100,6 +107,7 @@ function M.map_marker(id, entity)
     }}
 end
 
+---Draw a short-lived world-position marker for a destroyed player entity.
 function M.destroyed_site(key, surface, position)
     M.clear_role("site:" .. key);
     owned["site:" .. key] = {rendering.draw_circle {
@@ -113,6 +121,7 @@ function M.destroyed_site(key, surface, position)
     }}
 end
 
+---Draw or refresh the marker identifying a player-selected cliff.
 function M.cliff_marker(id, entity)
     local key = "cliff:" .. id;
     M.clear_role(key);
@@ -129,13 +138,18 @@ function M.cliff_marker(id, entity)
     end
 end
 
+---Visualize remaining health as both arc length and a red-to-green gradient.
 function M.health(key, entity)
     if not (entity and entity.valid and entity.health and entity.max_health) then
         return
     end
+    -- Normalize health to [0,1]. The arc API also interprets its angle as a
+    -- fraction of a full revolution, so this value drives length directly.
     local ratio = entity.health / entity.max_health;
     M.clear_role("health:" .. key)
     local bad, good = config.visuals.colors.health_bad, config.visuals.colors.health_good;
+    -- Linear interpolation per channel: bad + (good - bad) * ratio. At zero it
+    -- is exactly the bad color; at one it is exactly the good color.
     local color = {
         r = bad.r + (good.r - bad.r) * ratio,
         g = bad.g + (good.g - bad.g) * ratio,
@@ -154,6 +168,7 @@ function M.health(key, entity)
     }}
 end
 
+---Schedule incremental deletion for all rendering keys with a prefix.
 function M.begin_clear(root, prefix)
     root.visual_clear = {
         prefix = prefix,
@@ -161,6 +176,7 @@ function M.begin_clear(root, prefix)
     }
 end
 
+---Inspect and optionally destroy one owned rendering group.
 function M.step_clear(root)
     local job = root.visual_clear;
     if not job then

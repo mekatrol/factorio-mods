@@ -2,6 +2,9 @@
 local config = require("config")
 local M = {}
 
+---Return the mod's sole persistent root, repairing additive fields as needed.
+---This lazy normalization is intentionally safe to call from every subsystem:
+---old saves gain newly introduced tables before any caller indexes them.
 function M.root()
     storage.mekatrol_assist_bot = storage.mekatrol_assist_bot or {
         schema_version = config.schema_version,
@@ -26,6 +29,8 @@ function M.root()
     r.discovery.grouped = r.discovery.grouped or {}
     r.discovery.queues = r.discovery.queues or {}
     if not r.discovery.index_version then
+        -- Rebuild the secondary name index once for saves created before it
+        -- existed. The authoritative records remain untouched.
         for id, record in pairs(r.discovery.records) do
             local bucket = r.discovery.by_name[record.name] or {}
             bucket[id] = true
@@ -36,6 +41,7 @@ function M.root()
     return r
 end
 
+---Return or initialize one player's persistent state and every role record.
 function M.player(index)
     local r = M.root();
     local p = r.players[index]
@@ -48,6 +54,8 @@ function M.player(index)
         r.players[index] = p
     end
     if not p.scheduler_registered then
+        -- Stable numeric ordering makes round-robin behavior deterministic and
+        -- ensures a player is registered exactly once across repeated calls.
         r.scheduler.player_order = r.scheduler.player_order or {};
         r.scheduler.player_order[#r.scheduler.player_order + 1] = index;
         table.sort(r.scheduler.player_order);
@@ -64,6 +72,10 @@ function M.player(index)
     return p
 end
 
+---Return the next player/role pair from the global round-robin cursor.
+---The cursor advances even for disabled roles; the scheduler decides whether
+---the returned record warrants work. This prevents one player from consuming
+---the budget simply because more of their bots are enabled.
 function M.next_role()
     local r = M.root();
     local s = r.scheduler;
@@ -85,6 +97,8 @@ function M.next_role()
         s.player_cursor = s.player_cursor + 1
     end
     if not p then
+        -- Player deletion normally removes the index eagerly. Recursing skips
+        -- any stale entry left by an unusual event ordering.
         return M.next_role()
     end
     return {

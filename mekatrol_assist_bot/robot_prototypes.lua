@@ -3,12 +3,16 @@
 -- vanilla logistic-network work or carry payloads independently.
 local M = {}
 
+---Fail early when a vanilla prototype cannot provide a required animation.
 local function require_graphic(base, family, field)
     if not base[field] then
         error("mekatrol_assist_bot: vanilla " .. family .. "-robot has no " .. field .. " animation")
     end
 end
 
+---Clone and neutralize a vanilla robot for one role/visual state.
+---The clone retains complete directional graphics and attackability while its
+---zero payload, radii, and energy use prevent logistic-network autonomy.
 local function build(role, family, state, name)
     local base_name = family .. "-robot"
     local base = data.raw[base_name] and data.raw[base_name][base_name]

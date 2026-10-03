@@ -1,10 +1,12 @@
 -- Pure startup validation with paths in every diagnostic.
 local M = {}
 
+---Raise a configuration error which identifies path, value, and expectation.
 local function fail(path, value, range)
     error("mekatrol_assist_bot config " .. path .. "=" .. tostring(value) .. "; expected " .. range, 3)
 end
 
+---Validate a finite numeric field and its optional bounds/integer constraint.
 local function num(path, v, min, max, int)
     if type(v) ~= "number" or v ~= v or v == math.huge or v == -math.huge or v < min or (max and v > max) or
         (int and v % 1 ~= 0) then
@@ -12,6 +14,7 @@ local function num(path, v, min, max, int)
     end
 end
 
+---Validate the complete public configuration and cross-reference role names.
 function M.run(c, known)
     num("schema_version", c.schema_version, 1, nil, true);
     num("scheduler.work_per_tick", c.scheduler.work_per_tick, 1, nil, true);

@@ -4,6 +4,7 @@ local state = require("state")
 local discovery = require("discovery")
 local M = {}
 
+---Copy the two pieces of legacy role intent that remain meaningful.
 local function copy_enabled(dst, src, role)
     if src and src.enabled ~= nil then
         dst.roles[role].enabled = src.enabled
@@ -13,6 +14,7 @@ local function copy_enabled(dst, src, role)
     end
 end
 
+---Prepare schema upgrades and detach supported legacy stores for incremental import.
 function M.run()
     local root = state.root();
     local previous_schema = root.schema_version or 1
@@ -98,6 +100,7 @@ function M.run()
     root.import_complete = true
 end
 
+---Import one legacy record per call, returning whether budget was consumed.
 function M.step()
     local root = state.root();
     local job = root.migration;

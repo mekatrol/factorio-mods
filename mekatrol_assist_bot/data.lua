@@ -3,6 +3,9 @@ local config = require("config")
 local constants = require("constants")
 local robot_prototypes = require("robot_prototypes")
 
+-- Role hotkeys are generated from the canonical formation roster. `consuming =
+-- none` lets Factorio continue handling the same physical key for other input
+-- contexts rather than swallowing it globally.
 for _, role in ipairs(config.formation.role_order) do
     data:extend{{
         type = "custom-input",
@@ -12,6 +15,9 @@ for _, role in ipairs(config.formation.role_order) do
     }}
 end
 
+-- Global controls and the selection tool are declared together. Normal select
+-- marks cliffs; alternate select clears marks. `mode = nothing` deliberately
+-- leaves entity eligibility to the runtime's bounded cliff scan.
 data:extend{{
     type = "custom-input",
     name = constants.input("all"),
@@ -61,6 +67,8 @@ data:extend{{
 
 local out = {}
 
+-- Every role has three named animation-state prototypes. They are inert clones
+-- of the configured vanilla family; runtime code owns all movement and actions.
 for _, role in ipairs(config.formation.role_order) do
     local family = config.roles[role].prototype_family
     local builder = robot_prototypes[family]
@@ -72,4 +80,6 @@ for _, role in ipairs(config.formation.role_order) do
     end
 end
 
+-- Extending once keeps the data-stage output easy to inspect and guarantees all
+-- generated prototypes have passed family validation before any are registered.
 data:extend(out)

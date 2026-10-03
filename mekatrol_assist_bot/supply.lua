@@ -4,6 +4,7 @@ local config = require("config")
 local scanner = require("entity_scanner")
 local movement = require("movement")
 
+---Remove up to `count` items from the player's main inventory.
 function M.player_take(player, name, count)
     local inv = player.get_main_inventory();
     if not inv then
@@ -15,6 +16,7 @@ function M.player_take(player, name, count)
     }
 end
 
+---Insert as much of a stack as possible into the player's main inventory.
 function M.player_give(player, stack)
     local inv = player.get_main_inventory();
     if not inv then
@@ -23,6 +25,9 @@ function M.player_give(player, stack)
     return inv.insert(stack)
 end
 
+---Return a stack immediately or retain the uninserted remainder as bot cargo.
+---A destination suppresses player insertion because the item should be
+---returned to the container that originally supplied it.
 function M.give_or_carry(rs, player, stack, destination)
     local inserted = destination and 0 or M.player_give(player, stack);
     local remaining = stack.count - inserted
@@ -41,6 +46,7 @@ function M.give_or_carry(rs, player, stack, destination)
     return inserted
 end
 
+---Append collected material to the role's ordered cargo manifest.
 function M.queue_cargo(rs, stack, prefer_existing_container)
     rs.cargo = rs.cargo or {};
     rs.cargo_order = rs.cargo_order or {};
@@ -56,6 +62,9 @@ function M.queue_cargo(rs, stack, prefer_existing_container)
     end
 end
 
+---Advance delivery of the current cargo type.
+---Returns true only when the entire ordered manifest is empty. A false result
+---means scanning, travel, insertion, or a later item type still needs work.
 function M.flush_cargo(rs, player, bot)
     rs.cargo_order = rs.cargo_order or {};
     rs.cargo_cursor = rs.cargo_cursor or 1;
@@ -71,6 +80,8 @@ function M.flush_cargo(rs, player, bot)
     local destination = rs.cargo_destinations and rs.cargo_destinations[name];
     local inserted
     if destination == false then
+        -- Cleanup prefers a nearby friendly container which already stores the
+        -- same item, keeping factory organization intact. Search incrementally.
         local job = rs.drop_job
         if not job or job.name ~= name then
             job = {
@@ -90,6 +101,8 @@ function M.flush_cargo(rs, player, bot)
                     name = name,
                     count = 1
                 } then
+                    -- Only relative ordering matters, so squared distance is
+                    -- both exact enough and cheaper than Euclidean distance.
                     local d = movement.distance2(e.position, bot.position);
                     if not job.distance or d < job.distance then
                         job.source = e;
@@ -130,6 +143,9 @@ function M.flush_cargo(rs, player, bot)
     return count == 0 and rs.cargo_order[rs.cargo_cursor] == nil
 end
 
+---Return the first supported inventory exposed by an entity.
+---The order expresses which inventory is meaningful for mixed-purpose
+---entities; most supported entities expose only one of these IDs.
 function M.entity_inventory(e)
     if not e or not e.valid then
         return nil
@@ -147,6 +163,9 @@ function M.take(rs, player, target, bot, name, count)
     rs.supplied = rs.supplied or {};
     local carried = rs.supplied[name] or 0
     if carried > 0 then
+        -- `supplied` is a one-call staging area. A container withdrawal returns
+        -- nil first (after travel), then this branch supplies it on the next
+        -- controller call, preserving the bounded state-machine contract.
         local used = math.min(count, carried);
         rs.supplied[name] = carried - used;
         return used
@@ -169,6 +188,8 @@ function M.take(rs, player, target, bot, name, count)
     rs.source_cache = rs.source_cache or {};
     local cached = rs.source_cache[name]
     if cached and cached.valid then
+        -- Reusing a known source avoids repeating a radius scan for successive
+        -- construction/upgrade items, but its live contents are revalidated.
         local inv = M.entity_inventory(cached);
         if inv and inv.get_item_count(name) > 0 then
             if not movement.step(bot, cached.position) then
@@ -202,6 +223,7 @@ function M.take(rs, player, target, bot, name, count)
         for _, e in ipairs(found) do
             local inv = M.entity_inventory(e);
             if inv and inv.get_item_count(name) > 0 then
+                -- Select the nearest source by squared Euclidean distance.
                 local d = movement.distance2(e.position, bot.position);
                 if not job.distance or d < job.distance then
                     job.source = e;

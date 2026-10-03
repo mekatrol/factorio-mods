@@ -5,10 +5,12 @@ local M = {
     command = "mab"
 }
 
+---Construct the data-stage prototype name for a role and animation state.
 function M.prototype(role, state)
     return "mekatrol-assist-" .. role .. "-bot-" .. (state or "idle")
 end
 
+---Construct a custom-input name, translating Lua-style underscores to hyphens.
 function M.input(action)
     return "mekatrol-assist-" .. action:gsub("_", "-")
 end

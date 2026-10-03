@@ -32,7 +32,10 @@ local function destroyed_visual_job(root)
     return true
 end
 
+---Advance the oldest queued cliff-planner selection by one scan cell.
 local function selection_job(root)
+    -- Planner selections can cover huge areas, so they use the same one-cell
+    -- scanner budget as role searches instead of querying everything at once.
     local job = root.selection_jobs and root.selection_jobs[1];
     if not job then
         return false
@@ -55,6 +58,10 @@ local function selection_job(root)
     return true
 end
 
+---Spend this tick's global work budget across maintenance and role state machines.
+---A "work unit" is deliberately coarse: one scan cell, migration item, visual
+---item, or controller transition. The background cap preserves foreground bot
+---responsiveness while the total cap prevents cost scaling without bound.
 function M.tick(event)
     local root = state.root();
     root.selection_jobs = root.selection_jobs or {}
@@ -79,6 +86,8 @@ function M.tick(event)
             background = background + 1;
             budget = budget - 1
         else
+            -- Round-robin selection gives every player-role pair an equal
+            -- opportunity independent of how expensive its current task is.
             local item = state.next_role();
             if not item then
                 return
@@ -92,6 +101,8 @@ function M.tick(event)
                 config.scheduler.role_intervals[item.name] == 0 then
                 local visual_key = rs.visual_key or (item.player_index .. ":" .. item.name)
                 if not supply.flush_cargo(rs, a.player, rs.entity) then
+                    -- Cargo delivery takes precedence over ordinary role work;
+                    -- this prevents collected items from becoming stranded.
                     local cargo_name = rs.cargo_order and rs.cargo_order[rs.cargo_cursor or 1]
                     local destination = cargo_name and rs.cargo_destinations and rs.cargo_destinations[cargo_name]
                     -- Cleanup can keep formation while it searches for a
@@ -131,12 +142,16 @@ function M.tick(event)
     end
 
     if event.tick % config.scheduler.idle_interval == 0 then
+        -- Formation following is outside the work loop, but movement.lua still
+        -- enforces one physical speed budget per entity and tick.
         for pi in pairs(root.players) do
             manager.follow(pi)
         end
     end
     
     if event.tick % config.scanning.prune_interval == 0 then
+        -- Pruning itself is bounded by prune_per_step, spreading stale-record
+        -- cleanup over time rather than pausing the simulation.
         discovery.prune(config.scanning.prune_per_step)
     end
 end

@@ -13,11 +13,15 @@ local state = require("state")
 local logistics = require("logistics")
 local M = {}
 
+-- Convert the configured ignore list to a set once. Target checks occur often,
+-- so O(1) membership is preferable to repeatedly scanning an array.
 local ignored_repair = {};
 for _, name in ipairs(config.tasks.repair.ignored_names or {}) do
     ignored_repair[name] = true
 end
 
+-- Mapping records stationary world features only. Mobile/transient entity
+-- types would create stale map records almost immediately after discovery.
 local mobile = {
     character = true,
     car = true,
@@ -42,6 +46,9 @@ local mobile = {
 }
 local upgrades = config.tasks.upgrade.mappings
 
+-- Coarse Factorio query filters reduce the candidate set cheaply. The richer
+-- per-role policy which needs state, recipes, or prototypes lives in
+-- `valid_target` below.
 local filters = {
     builder = {
         type = "entity-ghost",
@@ -92,8 +99,15 @@ local radii = {
     surveyor = "surveyor"
 }
 
+---Return the mapper's next cell in an outward square spiral.
+---
+---Directions cycle right, down, left, up. Leg lengths follow
+---`1,1,2,2,3,3,...`: after each leg the direction turns 90 degrees, and after
+---each pair of legs the length grows by one. This enumerates every grid cell
+---around the origin without retaining an unbounded queue of future cells.
 local function mapper_area(rs, anchor)
     if rs.mapper_surface ~= anchor.surface.index then
+        -- Changing surfaces starts a new spiral centered on the current anchor.
         rs.mapper_surface = anchor.surface.index
         rs.mapper_origin = {x = anchor.position.x, y = anchor.position.y}
         rs.mapper_leg, rs.mapper_leg_progress, rs.mapper_leg_length = 0, 0, 1
@@ -103,6 +117,7 @@ local function mapper_area(rs, anchor)
     local x = math.floor(rs.mapper_origin.x / s) + rs.mapper_x
     local y = math.floor(rs.mapper_origin.y / s) + rs.mapper_y
     local area = {{x * s, y * s}, {(x + 1) * s, (y + 1) * s}}
+    -- Direction-indexed unit vectors apply one cell step along the current leg.
     local dx = ({1, 0, -1, 0})[rs.mapper_direction]
     local dy = ({0, 1, 0, -1})[rs.mapper_direction]
     rs.mapper_x, rs.mapper_y = rs.mapper_x + dx, rs.mapper_y + dy
@@ -118,6 +133,7 @@ local function mapper_area(rs, anchor)
     return area
 end
 
+---Initialize one bounded scan appropriate to a role and its current task.
 local function begin(role, rs, anchor)
     local radius = role ~= "mapper" and config.tasks[radii[role]].radius or nil
     if role == "upgrade" then
@@ -138,11 +154,17 @@ local function begin(role, rs, anchor)
     rs.phase = "scan"
 end
 
+---Return whether an entity belongs to the player and is below repair threshold.
+---Multiplying max health by a ratio makes the policy scale across prototypes
+---with very different health totals.
 function M.is_repair_target(e, anchor)
     return anchor and e.force == anchor.force and not ignored_repair[e.name] and e.health and e.max_health and
                e.health < e.max_health * config.tasks.repair.threshold
 end
 
+---Apply role-specific eligibility rules after the coarse scanner filter.
+---This function is intentionally side-effect free so the same rule can be used
+---for freshly scanned, discovered, and connected-belt candidates.
 local function valid_target(role, e, rs, anchor)
     if role == "mapper" then
         return not mobile[e.type]
@@ -200,6 +222,8 @@ local function valid_target(role, e, rs, anchor)
     return true
 end
 
+---Fast-replace an entity while preserving direction, force, and last user.
+---Underground belts also require their input/output type to preserve topology.
 local function replace(e, name)
     if not prototypes.entity[name] then
         return false
@@ -226,12 +250,16 @@ local function repair_entity(rs, anchor, e)
     if not (e and e.valid and e.health and e.max_health) then
         return true
     end
+    -- Bound healing per scheduler action so one large entity cannot consume an
+    -- arbitrary amount of work or inventory in a single tick.
     local need = math.min(e.max_health - e.health, config.tasks.repair.health_per_action)
     if need <= 0 then
         return true
     end
     rs.repair_health_pool = rs.repair_health_pool or 0
     if rs.repair_health_pool < need then
+        -- Convert missing durability to whole packs. Ceiling is required: any
+        -- positive fractional deficit still needs one complete inventory item.
         local packs = math.ceil((need - rs.repair_health_pool) / config.supply.repair_pack_durability)
         local got = supply.take(rs, anchor.player, e, rs.entity or e, "repair-pack", packs)
         if got == nil then
@@ -254,6 +282,9 @@ local function repair_entity(rs, anchor, e)
     return e.health >= e.max_health * config.tasks.repair.threshold
 end
 
+---Perform one bounded action on a target.
+---Returns false only when a supporting supply job must continue first; true
+---means this action can be considered complete for the current target.
 local function act(role, rs, anchor, e)
     if not e or not e.valid then
         return true
@@ -288,6 +319,8 @@ local function act(role, rs, anchor, e)
         b.right = math.max(b.right, e.position.x);
         b.top = math.min(b.top, e.position.y);
         b.bottom = math.max(b.bottom, e.position.y)
+        -- Three vertices are the minimum polygon. If tracing could not produce
+        -- them, use a half-tile-expanded bounding rectangle around resources.
         g.polygon = (job and #job.points >= 3) and job.points or {{
             x = b.left - 0.5,
             y = b.top - 0.5
@@ -305,6 +338,9 @@ local function act(role, rs, anchor, e)
             g.area = job.area or 0;
             g.perimeter = job.perimeter or 0
         else
+            -- Resource positions are tile centers, so inclusive width/height
+            -- are coordinate span + 1. Rectangle area is w*h and perimeter is
+            -- twice the sum of its side lengths.
             local w, h = b.right - b.left + 1, b.bottom - b.top + 1;
             g.area = w * h;
             g.perimeter = 2 * (w + h)
@@ -318,6 +354,8 @@ local function act(role, rs, anchor, e)
     if role == "cleanup" then
         local stack = e.stack;
         if stack and stack.valid_for_read then
+            -- Capacity is global across carried item types. Clamp at zero in
+            -- case an older save already contains more than the new limit.
             local free = math.max(0, config.supply.cleanup_capacity - (rs.cargo_count or 0));
             local count = math.min(stack.count, free);
             if count > 0 then
@@ -368,6 +406,8 @@ local function act(role, rs, anchor, e)
             if not name then
                 return true
             end
+            -- One action is bounded by policy, remaining resource quantity,
+            -- and the explicit command quantity (when one was requested).
             local amount = math.min(config.tasks.logistics.resource_units_per_action, e.amount,
                 rs.pickup_remaining or math.huge)
             local inserted = player_inv.insert {name = name, count = amount}
@@ -393,6 +433,7 @@ local function act(role, rs, anchor, e)
                 };
                 rs.collect_job = job
             end
+            -- Inclusive stop index: cursor + N - 1 processes at most N slots.
             local stop = math.min(#contents, job.cursor + config.tasks.logistics.inventory_slots_per_action - 1)
             while job.cursor <= stop do
                 local stack = contents[job.cursor];
@@ -540,19 +581,32 @@ local function act(role, rs, anchor, e)
     end
     return true
 end
+
+---Advance one role state machine by one scheduler work unit.
+---
+---The common lifecycle is discovery handoff -> bounded scan -> nearest target
+---> optional group/path planning -> movement -> one action -> reset. Every
+---long-running sub-operation stores a cursor/job in `rs`, allowing the next
+---tick (or a reloaded save) to resume exactly where this call stopped.
 function M.step(role, rs, anchor, bot)
+    -- A repair bot prioritizes itself below the configured safety threshold;
+    -- an incapacitated service bot cannot help anything else reliably.
     if role == "repair" and bot.health and bot.max_health and
         bot.health < bot.max_health * config.tasks.repair.self_repair_threshold then
         repair_entity(rs, anchor, bot)
         return "working"
     end
     if rs.target and not rs.target.valid then
+        -- LuaEntity references become invalid when another player or mod
+        -- removes them. Clear all calculations derived from that entity.
         rs.target = nil
         rs.target_visualized = nil
         rs.path_job = nil
         rs.best_distance = nil
     end
     if role == "logistics" and rs.pickup_remaining and rs.pickup_remaining <= 0 then
+        -- Completing a finite pickup request returns logistics to its normal
+        -- opportunistic collection mode.
         rs.pickup_name = nil
         rs.pickup_remaining = nil
         rs.task = "collect"
@@ -561,6 +615,8 @@ function M.step(role, rs, anchor, bot)
     end
     if not rs.scan and not rs.target and
         (role == "repair" or role == "logistics" or role == "surveyor" or role == "builder") then
+        -- Prefer shared mapper/event discoveries. Each role owns an independent
+        -- cursor, so accepting a record never steals it from another consumer.
         local candidate, exhausted = discovery.next_for(rs, role);
         if candidate and candidate.valid and candidate.surface == anchor.surface and
             valid_target(role, candidate, rs, anchor) then
@@ -583,6 +639,8 @@ function M.step(role, rs, anchor, bot)
                     discovery.add(e)
                 end
             elseif valid_target(role, e, rs, anchor) then
+                -- Squared distance is enough for ordering and avoids sqrt for
+                -- every candidate returned by the scanner.
                 local d = movement.distance2(e.position, bot.position);
                 if not rs.best_distance or d < rs.best_distance then
                     rs.target = e;
@@ -624,6 +682,9 @@ function M.step(role, rs, anchor, bot)
                         (rs.target.type == "transport-belt" or rs.target.type == "underground-belt" or rs.target.type ==
                             "splitter"))))
     if grouped then
+        -- Belt entities are a graph rather than isolated targets. First finish
+        -- the bounded breadth-first traversal, then act on its stable list one
+        -- entity per scheduler opportunity.
         if not rs.track_job then
             rs.track_job = track.start(rs.target);
             return "moving"
@@ -656,6 +717,9 @@ function M.step(role, rs, anchor, bot)
     if role == "repair" then
         if not rs.path_job then
             rs.path_job =
+                -- Stop within interaction distance instead of entering the
+                -- target's occupied tile. floor converts the world radius into
+                -- the pathfinder's integer Manhattan tolerance.
                 pathfinding.start(anchor.surface, bot.position, rs.target.position, config.tasks.repair.radius,
                     math.max(1, math.floor(config.tasks.repair.interaction_distance)));
             return "moving"
@@ -678,6 +742,7 @@ function M.step(role, rs, anchor, bot)
             end
             return "moving"
         end
+        -- Squared-radius comparison avoids sqrt on every repair work unit.
         if movement.distance2(bot.position, rs.target.position) <= config.tasks.repair.interaction_distance ^ 2 then
             if not act(role, rs, anchor, rs.target) then
                 return "working"
@@ -706,6 +771,8 @@ function M.step(role, rs, anchor, bot)
             return "working"
         end
         if not rs.survey_job.collect_scan then
+            -- The traced polygon gives an economical bounding box. Expand by
+            -- one tile so entities centered on the contour are not clipped.
             local left, right, top, bottom = rs.target.position.x, rs.target.position.x,
                 rs.target.position.y, rs.target.position.y
             for _, point in ipairs(rs.survey_job.points) do
@@ -720,6 +787,8 @@ function M.step(role, rs, anchor, bot)
         if not rs.survey_job.collect_scan.done then
             local _, found = scanner.step(rs.survey_job.collect_scan)
             for _, found_entity in ipairs(found) do
+                -- Rectangle scanning finds candidates; the point-in-polygon
+                -- test removes resources from neighbouring or enclosed patches.
                 if polygon.contains(rs.survey_job.points, found_entity.position) then
                     local id = discovery.identity(found_entity)
                     rs.survey_job.entities[id] = true
@@ -745,6 +814,8 @@ function M.step(role, rs, anchor, bot)
         rs.track_started = nil
     end
     rs.target = nil;
+    -- A completed isolated action, survey, or group clears all transient jobs.
+    -- The next call may consume another discovery or begin a fresh scan.
     rs.target_visualized = nil;
     rs.path_job = nil;
     rs.survey_job = nil;

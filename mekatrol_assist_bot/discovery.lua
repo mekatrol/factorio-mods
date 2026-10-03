@@ -5,6 +5,7 @@ local visuals = require("visuals")
 local registry = require("role_registry")
 local M = {}
 
+---Insert or update a record while preserving first-seen order.
 function M.store(order, records, id, record)
     local inserted = records[id] == nil
     if inserted then
@@ -14,6 +15,7 @@ function M.store(order, records, id, record)
     return inserted
 end
 
+---Add an ID to the secondary exact-name index.
 local function index_add(d, id, record)
     d.by_name = d.by_name or {}
     local bucket = d.by_name[record.name]
@@ -24,6 +26,7 @@ local function index_add(d, id, record)
     bucket[id] = true
 end
 
+---Remove an ID from the name index and discard empty buckets.
 local function index_remove(d, id, record)
     local bucket = d.by_name and record and d.by_name[record.name]
     if bucket then
@@ -34,12 +37,17 @@ local function index_remove(d, id, record)
     end
 end
 
+---Build a stable identity for a live entity.
+---Unit numbers are authoritative when available. Entities without one use
+---surface, prototype, and coordinates quantized to 1/256 tile; quantization
+---avoids tiny floating-point representation differences changing the key.
 function M.identity(e)
     return e.unit_number and ("u:" .. e.unit_number) or
                ("p:" .. e.surface.index .. ":" .. e.name .. ":" .. math.floor(e.position.x * 256) .. ":" ..
                    math.floor(e.position.y * 256))
 end
 
+---Publish a valid entity into the shared map and eligible role handoff queues.
 function M.add(e)
     if not e.valid then
         return
@@ -78,6 +86,9 @@ function M.add(e)
     end
 end
 
+---Atomically expose an empty discovery database and schedule old data cleanup.
+---Detaching the former tables makes clear immediate from callers' perspective;
+---the scheduler releases their entries incrementally to avoid a large pause.
 function M.clear()
     local root = state.root();
     local d = root.discovery;
@@ -117,7 +128,10 @@ function M.step_clear(root)
     return true
 end
 
+---Inspect a bounded number of records and remove invalid entity references.
 function M.prune(limit)
+    -- Inspect at most `limit` records. Removal leaves the cursor at the same
+    -- numeric index because the following array element shifts into that slot.
     local d = state.root().discovery;
     local n = 0;
     d.prune_cursor = d.prune_cursor or 1
@@ -138,12 +152,16 @@ function M.prune(limit)
     end
 end
 
+---Return a bounded, copied page of valid discovery metadata.
+---Copies prevent remote-interface consumers from mutating internal state or
+---retaining the mod's authoritative record tables.
 function M.snapshot_page(cursor, limit)
     local out = {};
     local d = state.root().discovery;
     local first = math.max(1, tonumber(cursor) or 1);
     local count = math.min(config.compatibility.snapshot_limit,
         math.max(1, tonumber(limit) or config.compatibility.snapshot_limit));
+    -- The page is inclusive, so N items end at first + N - 1.
     local last = math.min(#d.order, first + count - 1)
     for i = first, last do
         local id = d.order[i];
@@ -167,6 +185,7 @@ function M.snapshot_page(cursor, limit)
     }
 end
 
+---Return the first compatibility-sized page for legacy remote consumers.
 function M.snapshot()
     return M.snapshot_page(1, config.compatibility.snapshot_limit).records
 end
@@ -200,6 +219,7 @@ function M.next_for(rs, role)
     return r and r.entity or nil, false
 end
 
+---Allocate stable custom event IDs once and persist them with the save.
 function M.ensure_events()
     local d = state.root().discovery;
     d.events = d.events or {
@@ -228,6 +248,7 @@ function M.by_name_page(name, cursor, limit)
     return {records = out, next_cursor = last < #d.order and last + 1 or nil}
 end
 
+---Publish the backward-compatible remote API used by other mods.
 function M.register()
     local mapped = function()
         local e = state.root().discovery.events

@@ -10,11 +10,13 @@ local movement = require("movement")
 local migrations = require("migrations")
 local M = {}
 
+---Attempt fixture entity creation without allowing a prototype error to abort setup.
 local function create(surface, params)
     local ok, e = pcall(surface.create_entity, params);
     return ok and e or nil
 end
 
+---Assert that required vanilla and generated prototypes exist with expected types.
 local function validate_catalogue()
     for _, name in ipairs {"construction-robotics", "logistic-robotics", "repair-pack", "lamp", "cliff-explosives", "electronics"} do
         assert(prototypes.technology[name], "MAB prototype catalogue missing technology: " .. name)
@@ -34,6 +36,7 @@ local function validate_catalogue()
     end
 end
 
+---Exercise prototype creation and movement when no player character is available.
 local function run_headless_baseline()
     local surface = game.surfaces[1];
     local slots = formation.slots(config.formation.role_order, 1);
@@ -87,6 +90,7 @@ local function run_headless_baseline()
     log("[MAB test] consolidated fixture passed on Factorio " .. script.active_mods.base)
 end
 
+---Create the opt-in in-world integration fixture and remember its entities.
 function M.seed()
     if not config.debug then
         return
@@ -152,6 +156,7 @@ function M.seed()
     }
 end
 
+---Advance/assert the integration scenario, cleaning it up when complete.
 function M.run()
     if not config.debug then
         return

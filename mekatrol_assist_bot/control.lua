@@ -18,6 +18,9 @@ local visuals = require("visuals")
 discovery.register()
 command.register()
 
+---Initialize validated persistent/runtime state after creation or mod changes.
+---The operation is idempotent because configuration changes may invoke it on
+---an established save; each subsystem repairs or resumes its own state.
 local function initialize()
     tests.run();
     technology.validate();
@@ -46,16 +49,22 @@ script.on_configuration_changed(initialize)
 
 script.on_event(defines.events.on_tick, scheduler.tick)
 
+-- Player removal is the one lifecycle point where persistent role records and
+-- transient bot/rendering objects must both be discarded.
 script.on_event(defines.events.on_player_removed, function(e)
     manager.remove_player(e.player_index)
 end)
 
+-- Register new players immediately so their position in the deterministic
+-- scheduler order does not depend on which command they use first.
 script.on_event(defines.events.on_player_created, function(e)
     state.player(e.player_index)
 end)
 
 script.on_event({defines.events.on_research_finished, defines.events.on_research_reversed}, manager.enforce_gates)
 
+-- Visual robots belong to a force. Recreate enabled bots after a force change,
+-- then apply the destination force's technology requirements.
 script.on_event(defines.events.on_player_changed_force, function(e)
     local ps = state.player(e.player_index);
     for _, role in ipairs(config.formation.role_order) do
@@ -73,6 +82,8 @@ script.on_event(defines.events.on_player_changed_force, function(e)
     end
 end)
 
+-- Rejoining or respawning may replace the character used as anchor. `enable`
+-- is idempotent and restores any visual entity that disappeared meanwhile.
 script.on_event({defines.events.on_player_joined_game, defines.events.on_player_respawned}, function(e)
     local ps = state.player(e.player_index);
     for _, role in ipairs(config.formation.role_order) do
@@ -82,12 +93,15 @@ script.on_event({defines.events.on_player_joined_game, defines.events.on_player_
     end
 end)
 
+-- Each configured role gets a dedicated hotkey with identical toggle behavior.
 for _, role in ipairs(config.formation.role_order) do
     script.on_event(constants.input(role), function(e)
         manager.toggle(e.player_index, role)
     end)
 end
 
+-- "All" means enable all when at least one role is off; only an already-complete
+-- set is turned off. This makes the shortcut useful for recovering partial state.
 script.on_event(constants.input("all"), function(e)
     local ps = state.player(e.player_index);
     local turn_on = false
@@ -106,6 +120,8 @@ script.on_event(constants.input("all"), function(e)
     end
 end)
 
+-- Map clearing changes logical state immediately; detached rendering and record
+-- tables are reclaimed incrementally by background scheduler work.
 script.on_event(constants.input("clear_map"), function(e)
     discovery.clear();
     local p = game.get_player(e.player_index);
@@ -114,6 +130,7 @@ script.on_event(constants.input("clear_map"), function(e)
     end
 end)
 
+---Put the cliff selection tool in the invoking player's cursor.
 local function planner(e)
     local p = game.get_player(e.player_index);
     if p then
@@ -132,6 +149,7 @@ script.on_event(defines.events.on_lua_shortcut, function(e)
     end
 end)
 
+---Queue a bounded area scan to mark or unmark cliffs selected by the tool.
 local function selection(e, mark)
     if e.item ~= "mekatrol-assist-cliff-planner" then
         return
@@ -154,11 +172,13 @@ script.on_event(defines.events.on_player_alt_selected_area, function(e)
     selection(e, false)
 end)
 
+---Create a stable key for a destroyed entity site.
 local function site_key(entity)
     return entity.surface.index .. ":" .. math.floor(entity.position.x * 16) .. ":" ..
                math.floor(entity.position.y * 16)
 end
 
+---Return whether a force is the player force or one of its friends.
 local function belongs_to_player_force(force)
     if not force then
         return false
@@ -177,6 +197,7 @@ script.on_event(defines.events.on_entity_died, function(e)
         return
     end
     state.root().cliffs[discovery.identity(entity)] = nil
+    -- Assist bots are implementation visuals, not destroyed factory sites.
     if belongs_to_player_force(entity.force) and not entity.name:find("^mekatrol%-assist%-") then
         local key = site_key(entity);
         state.root().destroyed_sites[key] = {
@@ -192,6 +213,7 @@ script.on_event(defines.events.on_entity_died, function(e)
     end
 end)
 
+---Record newly built entities in the discovery index.
 local function built(e)
     local entity = e.entity or e.created_entity or e.destination;
     if entity and entity.valid then

@@ -8,6 +8,7 @@ local visuals = require("visuals")
 local discovery = require("discovery")
 local M = {}
 
+---Split command text on whitespace into a compact argument array.
 local function words(s)
     local out = {}
     for w in (s or ""):gmatch("%S+") do
@@ -16,6 +17,7 @@ local function words(s)
     return out
 end
 
+---Parse both canonical `/mab ROLE ACTION` and forced legacy role aliases.
 function M.parse(text, forced)
     local arguments = words(text)
     local bare_forced = forced ~= nil and #arguments == 0
@@ -32,6 +34,7 @@ function M.parse(text, forced)
     }
 end
 
+---Print an unlocalized diagnostic prefixed with the mod's short name.
 local function say(pi, text)
     local p = game.get_player(pi);
     if p then
@@ -39,6 +42,7 @@ local function say(pi, text)
     end
 end
 
+---Print a locale-backed message with variadic substitution parameters.
 local function say_localized(pi, key, ...)
     local p = game.get_player(pi)
     if not p then
@@ -48,6 +52,7 @@ local function say_localized(pi, key, ...)
     p.print(message)
 end
 
+---Report enabled state, task, and current controller phase for a role or all roles.
 local function status(pi, name)
     local ps = state.player(pi);
     local names = name and name ~= "all" and {name} or config.formation.role_order
@@ -60,6 +65,7 @@ local function status(pi, name)
     end
 end
 
+---Apply enable, disable, or toggle uniformly to one role or the complete roster.
 local function operate(pi, name, action)
     local names = name == "all" and config.formation.role_order or {name}
     for _, r in ipairs(names) do
@@ -76,6 +82,7 @@ local function operate(pi, name, action)
     end
 end
 
+---Validate and execute one parsed command without throwing on user mistakes.
 function M.execute(pi, text, forced)
     if not pi then
         game.print("[MAB] command must be run by a player")
@@ -221,6 +228,7 @@ function M.execute(pi, text, forced)
     end
 end
 
+---Register the canonical command and compatibility aliases with Factorio.
 function M.register()
     commands.add_command("mab", {"mab.command-description"}, function(c)
         M.execute(c.player_index, c.parameter)

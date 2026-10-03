@@ -11,12 +11,14 @@ local logistics = require("logistics")
 local controllers = require("controllers")
 local M = {}
 
+---Assert exact equality while adding consistent mod-specific context.
 local function eq(a, b, message)
     if a ~= b then
         error("MAB test failed: " .. message .. " (" .. tostring(a) .. " ~= " .. tostring(b) .. ")")
     end
 end
 
+---Run deterministic unit-style checks that require no temporary world fixture.
 function M.run()
     validate.run(config, registry.roles)
     local odd = formation.slots({"builder", "repair", "upgrade"}, 1);

@@ -2,6 +2,9 @@
 local config = require("config")
 local M = {}
 
+---Resolve a connected player and the entity/position bots should follow.
+---A character is preferred, while god/editor-style players may use their
+---player position directly; disconnected or invalid players have no anchor.
 function M.get(index)
     local p = game.get_player(index)
     if not p or not p.valid or (not p.connected and not config.debug) then

@@ -2,6 +2,7 @@
 local config = require("config")
 local M = {}
 
+---Return unmet technology names under an `all` or `any` requirement policy.
 function M.missing_from(researched, required, mode)
     local missing = {};
     local any = false
@@ -18,6 +19,7 @@ function M.missing_from(researched, required, mode)
     return missing
 end
 
+---Validate that every configured prerequisite exists in the loaded prototype set.
 function M.validate()
     for role, r in pairs(config.roles) do
         for i, name in ipairs(r.required_technologies) do
@@ -29,6 +31,7 @@ function M.validate()
     end
 end
 
+---Read a force's research state and return prerequisites missing for a role.
 function M.missing(force, role)
     local r = config.roles[role];
     local researched = {}
@@ -38,6 +41,7 @@ function M.missing(force, role)
     return M.missing_from(researched, r.required_technologies, r.technology_mode)
 end
 
+---Return true when the force currently satisfies a role's technology gate.
 function M.allowed(force, role)
     return #M.missing(force, role) == 0
 end
