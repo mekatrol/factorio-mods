@@ -123,16 +123,16 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 | `controls.<action>` | See Controls | Non-empty Factorio key sequence for every role, `all`, `clear_map`, and `cliff_planner`. |
 | `scheduler.work_per_tick` | `24` | Global work units per tick; integer >= 1. |
 | `scheduler.background_work_per_tick` | `4` | Maximum units used by migration, clearing, selection, and visual rebuilds per tick; integer >= 1. |
-| `scheduler.idle_interval` | `6` | Ticks between formation-follow passes; integer >= 1. |
+| `scheduler.idle_interval` | `1` | Ticks between formation-follow passes; integer >= 1. Keep at `1` for smooth pursuit. |
 | `scheduler.role_intervals.<role>` | `1`, except lamp `6`, mapper/surveyor `2` | Ticks between eligible role work units; integer >= 1. |
 | `formation.role_order` | Ten roles above | Every registered role exactly once; fixes deterministic slot and scheduler order. |
-| `formation.slot_spacing` | `1.5` | Vertical separation between slots; finite > 0. |
-| `formation.side_distance` | `3` | First-column horizontal distance from the player; finite > 0. |
+| `formation.slot_spacing` | `1.333` | Vertical separation between slots; finite > 0. |
+| `formation.side_distance` | `2` | Horizontal distance behind the player; finite > 0. |
 | `formation.column_spacing` | `2` | Horizontal separation between additional columns; finite > 0. |
-| `formation.max_slots_per_column` | `5` | Maximum bots in one centered column; integer >= 1. |
-| `formation.direction_threshold` | `0.2` | Horizontal player movement needed to mirror the formation; finite > 0. |
-| `movement.step` | `0.35` | Maximum movement per role work step; finite > 0. |
-| `movement.arrival_distance` | `0.25` | Arrival dead band; finite > 0. |
+| `formation.max_slots_per_column` | `10` | Maximum bots in one centered column; integer >= 1. |
+| `formation.direction_threshold` | `0.1` | Horizontal player movement needed to mirror the formation; finite > 0. |
+| `movement.step` | `0.18` | Maximum movement per role work step; finite > 0. |
+| `movement.arrival_distance` | `0.01` | Arrival dead band; finite > 0. |
 | `scanning.cell_size` | `16` | Width and height of one bounded query cell; finite > 0. |
 | `scanning.prune_interval` | `30` | Ticks between stale-discovery pruning passes; integer >= 1. |
 | `scanning.prune_per_step` | `16` | Records checked per pruning pass; integer >= 1. |

@@ -23,8 +23,9 @@ return {
         work_per_tick = 24,
         -- Maximum units per tick spent on migration, clearing, selection, and visual rebuilds; integer >=1.
         background_work_per_tick = 4,
-        -- Ticks between formation-follow passes; integer >=1. 60 ticks = one second.
-        idle_interval = 6,
+        -- Ticks between formation-follow passes; keep at 1 for smooth pursuit.
+        -- 60 ticks = one second.
+        idle_interval = 1,
         -- Ticks between eligible work units for each role; registered role names, integers >=1.
         role_intervals = {
             builder = 1,
@@ -42,15 +43,18 @@ return {
     formation = {
         role_order = {"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup", "mapper",
                       "surveyor"},
-        slot_spacing = 1.5,
-        side_distance = 3,
+        slot_spacing = 1.333,
+        side_distance = 2,
         column_spacing = 2, -- Tiles, finite >0.
-        max_slots_per_column = 5, -- Positive integer.
-        direction_threshold = 0.2 -- Tiles of horizontal movement before mirroring; >0.
+        -- Keep every bot in one vertical column behind the player, as in the
+        -- pre-consolidation follow implementation.
+        max_slots_per_column = 10, -- Positive integer.
+        direction_threshold = 0.1 -- Tiles of horizontal movement before mirroring; >0.
     },
     movement = {
-        step = 0.35,
-        arrival_distance = 0.25
+        -- Values restored from mekatrol_game_play_mod's proven movement code.
+        step = 0.18,
+        arrival_distance = 0.01
     }, -- Tiles per step / inclusive dead band; >0.
     scanning = {
         cell_size = 16, -- Query-cell width and height in tiles; finite >0.

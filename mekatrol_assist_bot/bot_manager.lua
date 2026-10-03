@@ -30,14 +30,14 @@ local function spawn(role, rs, a, position, visual)
 end
 
 function M.set_visual(role, rs, a, visual)
-    if rs.visual == visual and rs.entity and rs.entity.valid then
+    if rs.entity and rs.entity.valid then
+        -- Keep one persistent entity per bot. Destroying and recreating a
+        -- flying robot to change animation prototypes leaves both generations
+        -- visible during the render interpolation frame, especially when the
+        -- bot is repositioned every tick.
         return rs.entity
     end
-    local p = rs.entity and rs.entity.valid and rs.entity.position or a.position
-    if rs.entity and rs.entity.valid then
-        rs.entity.destroy()
-    end
-    return spawn(role, rs, a, p, visual)
+    return spawn(role, rs, a, a.position, visual or "moving")
 end
 
 function M.enable(index, role, quiet)
@@ -62,7 +62,7 @@ function M.enable(index, role, quiet)
         spawn(role, rs, a, {
             x = a.position.x + slot.x,
             y = a.position.y + slot.y
-        }, "idle")
+        }, "moving")
     end
     if not quiet then
         a.player.print("[MAB] " .. role .. " enabled")

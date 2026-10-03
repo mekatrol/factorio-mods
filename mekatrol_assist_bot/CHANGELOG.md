@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Restored the pre-consolidation follow tuning: movement updates every tick at
+  0.18 tiles per tick, bots form one centered column two tiles behind the
+  player, and that column automatically mirrors with horizontal travel.
+- Bots now keep one persistent visual entity instead of being destroyed and
+  recreated for animation-state changes, eliminating blurred duplicate sprites
+  during per-tick movement.
+
 ## 1.0.0 — Phase 7 consolidation
 
 - Fixed repair and health-overlay code for Factorio 2.0 by reading maximum

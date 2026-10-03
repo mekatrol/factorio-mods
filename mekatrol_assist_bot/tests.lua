@@ -70,10 +70,12 @@ function M.run()
     eq(#technology.missing_from({}, {}, "all"), 0, "empty technology gate is open")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
-    local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff"}, 1);
-    eq(many.cliff.x ~= many.builder.x, true, "formation creates another column")
+    local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
+                                  "mapper", "surveyor"}, 1);
+    eq(many.surveyor.x, many.builder.x, "all roles remain in one trailing column")
     eq(formation.has_unique_slots(many), true, "formation slots never overlap")
-    local mirrored = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff"}, -1)
+    local mirrored = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
+                                      "mapper", "surveyor"}, -1)
     for role, slot in pairs(many) do
         eq(mirrored[role].x, -slot.x, "formation mirrors role " .. role)
         eq(mirrored[role].y, slot.y, "formation mirror preserves row for " .. role)
