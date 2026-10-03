@@ -3,6 +3,15 @@ local config = require("config")
 local M = {};
 local owned = {}
 
+local function player_filter(player_index, key)
+    local index = player_index or tonumber(key:match("^(%d+):"))
+    local player = index and game.get_player(index)
+    if not (player and player.valid) then
+        return nil
+    end
+    return {player.index}
+end
+
 function M.clear_role(key)
     for _, object in pairs(owned[key] or {}) do
         if object and object.valid then
@@ -12,8 +21,13 @@ function M.clear_role(key)
     owned[key] = {}
 end
 
-function M.target_line(key, from, to)
+function M.target_line(key, from, to, player_index)
     if not (from and from.valid and to) or to.valid == false then
+        M.clear_role(key)
+        return
+    end
+    local players = player_filter(player_index, key)
+    if not players then
         M.clear_role(key)
         return
     end
@@ -33,7 +47,7 @@ function M.target_line(key, from, to)
         surface = from.surface,
         draw_on_ground = true,
         only_in_alt_mode = false,
-        players = {assert(tonumber(key:match("^(%d+):")), "target visual key must start with a player index")}
+        players = players
     }}
 end
 
@@ -51,6 +65,10 @@ function M.bot_label(key, entity, role, task, player_index)
     if not (entity and entity.valid) then
         return
     end
+    local players = player_filter(player_index, key)
+    if not players then
+        return
+    end
     owned[label_key] = {rendering.draw_text {
         text = text,
         surface = entity.surface,
@@ -61,7 +79,7 @@ function M.bot_label(key, entity, role, task, player_index)
         alignment = "center",
         vertical_alignment = "top",
         only_in_alt_mode = false,
-        players = {player_index}
+        players = players
     }}
 end
 

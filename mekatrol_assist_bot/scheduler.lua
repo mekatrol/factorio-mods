@@ -117,9 +117,9 @@ function M.tick(event)
                 if rs.task == "follow" then
                     visuals.clear_role(visual_key)
                 elseif rs.target and rs.target.valid then
-                    visuals.target_line(visual_key, rs.entity, rs.target)
+                    visuals.target_line(visual_key, rs.entity, rs.target, item.player_index)
                 elseif rs.task == "move_to" and rs.destination then
-                    visuals.target_line(visual_key, rs.entity, rs.destination)
+                    visuals.target_line(visual_key, rs.entity, rs.destination, item.player_index)
                 else
                     visuals.clear_role(visual_key)
                 end

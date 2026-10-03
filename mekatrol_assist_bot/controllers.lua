@@ -617,7 +617,7 @@ function M.step(role, rs, anchor, bot)
         return "idle"
     end
     if not rs.target_visualized then
-        visuals.target_line(rs.visual_key or role, bot, rs.target);
+        visuals.target_line(rs.visual_key or role, bot, rs.target, anchor.player.index);
         rs.target_visualized = true
     end
     local grouped = (role == "track") or (role == "upgrade" and (rs.track_job or (rs.target and rs.target.valid and

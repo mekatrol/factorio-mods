@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Target lines and bot labels now validate their live player viewer instead of
+  trusting a potentially stale migrated visual key, preventing tick crashes
+  after a player has been removed or indices have changed.
 - Repair bots no longer select or repair enemy entities discovered by mapper
   bots, and destroyed-site circles are now limited to player-owned forces.
 - Existing destroyed-site records are cleared during migration because older
