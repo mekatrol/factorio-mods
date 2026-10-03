@@ -159,13 +159,25 @@ local function site_key(entity)
                math.floor(entity.position.y * 16)
 end
 
+local function belongs_to_player_force(force)
+    if not force then
+        return false
+    end
+    for _, player in pairs(game.players) do
+        if player.force == force then
+            return true
+        end
+    end
+    return false
+end
+
 script.on_event(defines.events.on_entity_died, function(e)
     local entity = e.entity;
     if not entity or not entity.valid then
         return
     end
     state.root().cliffs[discovery.identity(entity)] = nil
-    if entity.force and entity.force.name ~= "neutral" and not entity.name:find("^mekatrol%-assist%-") then
+    if belongs_to_player_force(entity.force) and not entity.name:find("^mekatrol%-assist%-") then
         local key = site_key(entity);
         state.root().destroyed_sites[key] = {
             surface_index = entity.surface.index,

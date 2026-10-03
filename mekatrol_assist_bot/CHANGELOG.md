@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Repair bots no longer select or repair enemy entities discovered by mapper
+  bots, and destroyed-site circles are now limited to player-owned forces.
+- Existing destroyed-site records are cleared during migration because older
+  records did not store enough force information to remove enemy sites safely.
 - Restored the pre-consolidation follow tuning: movement updates every tick at
   0.18 tiles per tick, bots form one centered column two tiles behind the
   player, and that column automatically mirrors with horizontal travel.

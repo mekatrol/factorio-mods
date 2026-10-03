@@ -138,6 +138,11 @@ local function begin(role, rs, anchor)
     rs.phase = "scan"
 end
 
+function M.is_repair_target(e, anchor)
+    return anchor and e.force == anchor.force and not ignored_repair[e.name] and e.health and e.max_health and
+               e.health < e.max_health * config.tasks.repair.threshold
+end
+
 local function valid_target(role, e, rs, anchor)
     if role == "mapper" then
         return not mobile[e.type]
@@ -146,9 +151,7 @@ local function valid_target(role, e, rs, anchor)
         return state.root().cliffs[discovery.identity(e)] == true
     end
     if role == "repair" then
-        return
-            not ignored_repair[e.name] and e.health and e.max_health and e.health < e.max_health *
-                config.tasks.repair.threshold
+        return M.is_repair_target(e, anchor)
     end
     if role == "upgrade" then
         local target = upgrades[e.name];

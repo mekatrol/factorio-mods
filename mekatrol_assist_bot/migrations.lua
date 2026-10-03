@@ -29,6 +29,11 @@ function M.run()
             root.discovery = root.discovery or {}
             root.discovery.queues = root.discovery.queues or {}
         end
+        if previous_schema < 7 then
+            -- Older records did not retain force ownership, so enemy deaths
+            -- cannot be distinguished safely from player-owned losses.
+            root.destroyed_sites = {}
+        end
         root.schema_version = config.schema_version
     end
     if root.import_complete or not config.compatibility.import_legacy_state then
@@ -146,36 +151,10 @@ function M.step()
         end
         return true
     end
-    local sites = storage.mekatrol_repair_mod and storage.mekatrol_repair_mod.destroyed_sites or {}
-    if not job.surface_cursor then
-        local k, list = next(sites, job.cursor);
-        job.cursor = k;
-        if k == nil then
-            job.done = true;
-            return false
-        end
-        job.surface_cursor = k;
-        job.site_index = 1
-    end
-    local list = sites[job.surface_cursor] or {};
-    local site = list[job.site_index];
-    job.site_index = job.site_index + 1
-    if not site then
-        job.surface_cursor = nil;
-        return true
-    end
-    local x, y = site.x or site.position.x, site.y or site.position.y;
-    local key = job.surface_cursor .. ":" .. math.floor(x * 16) .. ":" .. math.floor(y * 16);
-    root.destroyed_sites[key] = {
-        surface_index = job.surface_cursor,
-        position = {
-            x = x,
-            y = y
-        },
-        name = site.name,
-        tick = 0
-    };
-    return true
+    -- Legacy destroyed-site records have no force ownership. Importing them
+    -- can recreate enemy death markers, so finish without copying them.
+    job.done = true
+    return false
 end
 
 return M

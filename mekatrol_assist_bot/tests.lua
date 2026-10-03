@@ -8,6 +8,7 @@ local discovery = require("discovery")
 local command = require("commands")
 local technology = require("technology")
 local logistics = require("logistics")
+local controllers = require("controllers")
 local M = {}
 
 local function eq(a, b, message)
@@ -68,6 +69,14 @@ function M.run()
     eq(#technology.missing_from({a = true}, {"a", "b"}, "all"), 1, "all gate reports missing technology")
     eq(#technology.missing_from({a = true}, {"a", "b"}, "any"), 0, "any gate accepts one technology")
     eq(#technology.missing_from({}, {}, "all"), 0, "empty technology gate is open")
+    local player_force = {}
+    local enemy_force = {}
+    local damaged = {name = "test", force = player_force, health = 50, max_health = 100}
+    eq(controllers.is_repair_target(damaged, {force = player_force}), true,
+        "repair accepts a damaged entity on the player's force")
+    damaged.force = enemy_force
+    eq(controllers.is_repair_target(damaged, {force = player_force}), false,
+        "repair rejects a damaged entity on another force")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
     local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",

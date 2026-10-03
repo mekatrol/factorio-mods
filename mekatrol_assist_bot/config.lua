@@ -1,7 +1,7 @@
 -- Public configuration for both Factorio stages. Keep this file free of runtime globals.
 return {
     -- Persistent-state/configuration schema. Positive integer.
-    schema_version = 6,
+    schema_version = 7,
     controls = {
         -- Factorio key sequences. These defaults may be rebound in Controls > Mods.
         all = "CONTROL + SHIFT + A",
