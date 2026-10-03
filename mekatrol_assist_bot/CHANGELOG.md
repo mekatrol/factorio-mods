@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Capped each assist bot's combined movement to 0.18 tiles per game tick, so
+  repeated scheduler work in one tick cannot multiply its flight speed beyond
+  the fully upgraded finite vanilla worker-robot range.
+
 - Target lines and bot labels now validate their live player viewer instead of
   trusting a potentially stale migrated visual key, preventing tick crashes
   after a player has been removed or indices have changed.

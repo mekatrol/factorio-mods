@@ -53,6 +53,7 @@ return {
     },
     movement = {
         -- Values restored from mekatrol_game_play_mod's proven movement code.
+        -- This is a per-bot, per-game-tick ceiling across all scheduler calls.
         step = 0.18,
         arrival_distance = 0.01
     }, -- Tiles per step / inclusive dead band; >0.

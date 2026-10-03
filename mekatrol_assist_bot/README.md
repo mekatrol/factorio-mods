@@ -131,7 +131,7 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 | `formation.column_spacing` | `2` | Horizontal separation between additional columns; finite > 0. |
 | `formation.max_slots_per_column` | `10` | Maximum bots in one centered column; integer >= 1. |
 | `formation.direction_threshold` | `0.1` | Player movement needed to place the formation behind their cardinal heading; finite > 0. |
-| `movement.step` | `0.18` | Maximum movement per role work step; finite > 0. |
+| `movement.step` | `0.18` | Maximum movement per bot per game tick across all role work; finite > 0. |
 | `movement.arrival_distance` | `0.01` | Arrival dead band; finite > 0. |
 | `scanning.cell_size` | `16` | Width and height of one bounded query cell; finite > 0. |
 | `scanning.prune_interval` | `30` | Ticks between stale-discovery pruning passes; integer >= 1. |
