@@ -193,31 +193,31 @@ return {
         },
         upgrade = {
             prototype_family = "construction",
-            required_technologies = {"construction-robotics"},
+            required_technologies = {"fast-inserter"},
             technology_mode = "all",
             default_task = "combined"
         },
         track = {
             prototype_family = "construction",
-            required_technologies = {"construction-robotics"},
+            required_technologies = {"logistics-2"},
             technology_mode = "all",
             default_task = "track"
         },
         lamp = {
             prototype_family = "construction",
-            required_technologies = {"construction-robotics", "lamp"},
+            required_technologies = {"lamp"},
             technology_mode = "all",
             default_task = "place"
         },
         cliff = {
             prototype_family = "construction",
-            required_technologies = {"cliff-explosives"},
+            required_technologies = {},
             technology_mode = "all",
             default_task = "demolish"
         },
         logistics = {
             prototype_family = "logistic",
-            required_technologies = {"logistic-robotics"},
+            required_technologies = {},
             technology_mode = "all",
             default_task = "collect"
         },
@@ -229,13 +229,13 @@ return {
         },
         mapper = {
             prototype_family = "construction",
-            required_technologies = {"electronics"},
+            required_technologies = {},
             technology_mode = "all",
             default_task = "search"
         },
         surveyor = {
             prototype_family = "construction",
-            required_technologies = {"electronics"},
+            required_technologies = {},
             technology_mode = "all",
             default_task = "survey"
         }
