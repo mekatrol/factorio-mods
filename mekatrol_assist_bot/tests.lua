@@ -84,6 +84,9 @@ function M.run()
         "cleanup flushes partial cargo after exhausting its search")
     eq(cleanup_role.should_flush_cargo({task = "follow", cargo_count = 1}), true,
         "cleanup flushes retained cargo after changing tasks")
+    eq(cleanup_role.scan_phase, "moving", "cleanup does not follow formation between pickups")
+    eq(cleanup_role.cargo_phase(false), "working", "cleanup does not follow formation while finding a chest")
+    eq(cleanup_role.cargo_phase(nil), "idle", "cleanup may follow while waiting for player inventory space")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
     local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",

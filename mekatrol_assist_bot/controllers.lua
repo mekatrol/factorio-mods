@@ -70,7 +70,10 @@ function M.step(role, rs, anchor, bot)
     end
     if not rs.scan and not rs.target then
         begin(def, rs, anchor)
-        return "idle"
+        -- Starting a scan is already active role work.  Returning idle for this
+        -- one scheduler opportunity allows formation following to move the bot
+        -- away before the first scan cell is examined.
+        return def.scan_phase or "idle"
     end
     if rs.scan and not rs.scan.done then
         local _, found = scanner.step(rs.scan)

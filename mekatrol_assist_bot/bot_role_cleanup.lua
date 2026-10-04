@@ -3,12 +3,16 @@ local config = require("config")
 local supply = require("supply")
 local M = {
     tasks = {"follow", "cleanup"},
-    scan_phase = "idle"
+    -- Searching for the next stack is active cleanup work.  Marking this idle
+    -- lets the formation follower pull the bot back toward the player between
+    -- every pickup, producing an unnecessary zig-zag detour.
+    scan_phase = "moving"
 }
 
----Cleanup remains visually idle while it searches or waits for cargo space.
+---Keep formation only while waiting for player inventory space.  A false
+---destination means the bounded chest search is still active.
 function M.cargo_phase(destination)
-    return (destination == nil or destination == false) and "idle" or "working"
+    return destination == nil and "idle" or "working"
 end
 
 function M.radius()
