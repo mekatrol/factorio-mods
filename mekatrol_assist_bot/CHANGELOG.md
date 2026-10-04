@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Track bots now follow their player while searching for a belt graph, matching
+  the idle-search behaviour of repair and cleanup bots.
 - Capped each assist bot's combined movement to 0.18 tiles per game tick, so
   repeated scheduler work in one tick cannot multiply its flight speed beyond
   the fully upgraded finite vanilla worker-robot range.

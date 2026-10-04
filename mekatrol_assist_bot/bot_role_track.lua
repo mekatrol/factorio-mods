@@ -4,7 +4,9 @@ local supply = require("supply")
 local upgrades = config.tasks.upgrade.mappings
 local M = {
     tasks = {"follow", "track"},
-    scan_phase = "moving"
+    -- Searching does not own movement, so remain eligible for formation
+    -- following until a belt graph has actually been selected.
+    scan_phase = "idle"
 }
 
 function M.radius()

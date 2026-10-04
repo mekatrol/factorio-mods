@@ -10,6 +10,7 @@ local technology = require("technology")
 local logistics = require("logistics")
 local repair_role = require("bot_role_repair")
 local cleanup_role = require("bot_role_cleanup")
+local track_role = require("bot_role_track")
 local M = {}
 
 ---Assert exact equality while adding consistent mod-specific context.
@@ -90,6 +91,7 @@ function M.run()
         "cleanup stops following after selecting a target")
     eq(cleanup_role.cargo_phase(false), "working", "cleanup does not follow formation while finding a chest")
     eq(cleanup_role.cargo_phase(nil), "idle", "cleanup may follow while waiting for player inventory space")
+    eq(track_role.scan_phase, "idle", "track follows formation while searching for a belt graph")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
     local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
