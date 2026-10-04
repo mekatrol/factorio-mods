@@ -117,7 +117,9 @@ end
 function M.before_step(rs, anchor, bot)
     if bot.health and bot.max_health and bot.health < bot.max_health * config.tasks.repair.self_repair_threshold then
         M.act(rs, anchor, bot)
-        return rs.waiting_inventory and "idle" or "working"
+        -- A selected player supply source owns movement just as it does for a
+        -- normal repair target; idle would let formation following oppose it.
+        return rs.player_supply_name and "moving" or (rs.waiting_inventory and "idle" or "working")
     end
 end
 

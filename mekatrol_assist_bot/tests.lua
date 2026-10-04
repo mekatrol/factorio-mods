@@ -9,6 +9,7 @@ local command = require("commands")
 local technology = require("technology")
 local logistics = require("logistics")
 local repair_role = require("bot_role_repair")
+local supply = require("supply")
 local cleanup_role = require("bot_role_cleanup")
 local track_role = require("bot_role_track")
 local upgrade_role = require("bot_role_upgrade")
@@ -91,6 +92,37 @@ function M.run()
         "repair chains its next scan from the bot position")
     eq(repair_role.scan_phase(repair_scan_state), "moving",
         "repair remains in place during a chained scan")
+    local supply_count = 1
+    local supply_inventory = {
+        get_item_count = function(name)
+            return name == "repair-pack" and supply_count or 0
+        end,
+        remove = function(stack)
+            local removed = math.min(stack.count, supply_count)
+            supply_count = supply_count - removed
+            return removed
+        end
+    }
+    local supply_player = {
+        position = {x = 10, y = 0},
+        get_main_inventory = function()
+            return supply_inventory
+        end
+    }
+    local supply_bot = {
+        valid = true,
+        position = {x = 0, y = 0}
+    }
+    supply_bot.teleport = function(position)
+        supply_bot.position = position
+    end
+    local supply_state = {}
+    eq(supply.take(supply_state, supply_player, {surface = {}}, supply_bot, "repair-pack", 1), nil,
+        "player supply travel yields the work unit")
+    eq(supply_state.waiting_inventory, "repair-pack",
+        "player supply travel suppresses target navigation")
+    eq(supply_state.player_supply_name, "repair-pack",
+        "player supply travel suppresses formation following")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity - 1}), false,
         "cleanup retains partial cargo while more items may remain")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity}), true,

@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Fixed supply-seeking bots oscillating between the player and their work
+  target while travelling to withdraw an item from player inventory.
 - Bots now fly to the live position of a player before withdrawing supplies
   from that player's inventory, then return to their work target before using
   the item.

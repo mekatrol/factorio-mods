@@ -173,7 +173,10 @@ function M.step(role, rs, anchor, bot)
         end
     end
     if not def.act(rs, anchor, rs.target) then
-        return rs.waiting_inventory and "idle" or "working"
+        -- An inventory wait with a selected player source owns movement.  It
+        -- must not be marked idle because formation following would then pull
+        -- the bot away from the player between scheduler opportunities.
+        return rs.player_supply_name and "moving" or (rs.waiting_inventory and "idle" or "working")
     end
     if def.keep_target and def.keep_target(rs.target, rs, anchor) then
         return "working"

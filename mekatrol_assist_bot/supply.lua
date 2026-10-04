@@ -27,6 +27,10 @@ local function take_from_player(rs, player, bot, name, count)
         return 0
     end
     rs.player_supply_name = name
+    -- Mark the role as supply-waiting before yielding movement.  Controllers
+    -- process inventory waits before target navigation, so this prevents the
+    -- next work unit from pulling the bot back toward its repair/build target.
+    rs.waiting_inventory = name
     if not movement.step(bot, player.position) then
         return nil
     end
@@ -34,12 +38,12 @@ local function take_from_player(rs, player, bot, name, count)
         name = name,
         count = count
     }
-    rs.player_supply_name = nil
     if got > 0 then
         rs.supplied[name] = (rs.supplied[name] or 0) + got
         rs.last_source = nil
         return nil
     end
+    rs.player_supply_name = nil
     return 0
 end
 
@@ -222,6 +226,11 @@ function M.take(rs, player, target, bot, name, count)
         -- controller call, preserving the bounded state-machine contract.
         local used = math.min(count, carried);
         rs.supplied[name] = carried - used;
+        -- A player withdrawal keeps this marker through staging so target
+        -- navigation cannot resume between pickup and this handoff.
+        if rs.player_supply_name == name then
+            rs.player_supply_name = nil
+        end
         return used
     end
     -- A player fallback selected after a completed container scan must resume
