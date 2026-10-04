@@ -14,6 +14,8 @@
   transit and withdrawing only one item on arrival.
 - Fast replacement no longer uses Factorio's simulated-player mode, which was
   depositing removed entities directly into the player's remote inventory.
+- Upgrade bots now retain movement control while scanning between targets in
+  an active batch instead of drifting back toward their formation position.
 - Assist bots can no longer be collected by holding the mine control while one
   flies beneath the cursor.
 - Removed the custom repair health arc; repaired entities use Factorio's native

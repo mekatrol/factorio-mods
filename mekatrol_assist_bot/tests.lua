@@ -138,7 +138,11 @@ function M.run()
     eq(cleanup_role.cargo_phase(false), "working", "cleanup does not follow formation while finding a chest")
     eq(cleanup_role.cargo_phase(nil), "moving", "cleanup physically returns cargo to the player")
     eq(track_role.scan_phase, "idle", "track follows formation while searching for a belt graph")
-    eq(upgrade_role.scan_phase, "idle", "upgrade follows formation while searching for a target")
+    eq(upgrade_role.scan_phase({}), "idle", "upgrade follows formation during an empty background scan")
+    eq(upgrade_role.scan_phase({supplied = {["iron-chest"] = 4}}), "moving",
+        "upgrade retains movement control between targets in a supply batch")
+    eq(upgrade_role.scan_phase({cargo_count = 1}), "moving",
+        "upgrade retains movement control while carrying recovered items")
     eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "fast-transport-belt"}),
         "follow (fast-transport-belt)", "inventory wait label names the required item")
     eq(manager.activity({phase = "idle", task = "track"}), "follow", "ordinary idle label remains follow")

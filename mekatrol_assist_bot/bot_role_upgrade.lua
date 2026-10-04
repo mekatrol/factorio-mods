@@ -5,12 +5,20 @@ local movement = require("movement")
 local upgrades = config.tasks.upgrade.mappings
 local M = {
     tasks = {"follow", "yellow-to-red-belts", "red-to-blue-belts", "blue-to-green-inserters", "containers",
-             "combined"},
-    -- A bounded scan does not own a movement destination. Keep formation while
-    -- it searches; active movement begins only after the nearest target has
-    -- been selected from the completed scan.
-    scan_phase = "idle"
+             "combined"}
 }
+
+---Ordinary background scans may follow formation. Once a batch has started,
+---retain control between targets so formation movement cannot pull the bot
+---toward its follow slot after every individual replacement.
+function M.scan_phase(rs)
+    for _, count in pairs(rs.supplied or {}) do
+        if count > 0 then
+            return "moving"
+        end
+    end
+    return (rs.cargo_count or 0) > 0 and "moving" or "idle"
+end
 
 -- Supplying prototype names to the engine avoids scanning unrelated entities.
 local names = {}
