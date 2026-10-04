@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Bots now fly to the live position of a player before withdrawing supplies
+  from that player's inventory, then return to their work target before using
+  the item.
 - Repair bots now fly directly over walls and other ground obstacles instead
   of planning a ground-style route around them.
 - Stale bot labels are now reclaimed after save/load, preventing overlapping

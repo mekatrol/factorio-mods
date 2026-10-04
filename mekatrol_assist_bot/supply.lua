@@ -16,6 +16,33 @@ function M.player_take(player, name, count)
     }
 end
 
+---Travel to the player's live position and stage withdrawn supplies.
+---Returns zero when the player has no matching item, and nil while travelling
+---or after withdrawing. Staging forces the role to travel back to its target
+---before the next call consumes the item and performs the action.
+local function take_from_player(rs, player, bot, name, count)
+    local inv = player.get_main_inventory()
+    if not inv or inv.get_item_count(name) <= 0 then
+        rs.player_supply_name = nil
+        return 0
+    end
+    rs.player_supply_name = name
+    if not movement.step(bot, player.position) then
+        return nil
+    end
+    local got = inv.remove {
+        name = name,
+        count = count
+    }
+    rs.player_supply_name = nil
+    if got > 0 then
+        rs.supplied[name] = (rs.supplied[name] or 0) + got
+        rs.last_source = nil
+        return nil
+    end
+    return 0
+end
+
 ---Insert as much of a stack as possible into the player's main inventory.
 function M.player_give(player, stack)
     local inv = player.get_main_inventory();
@@ -197,6 +224,12 @@ function M.take(rs, player, target, bot, name, count)
         rs.supplied[name] = carried - used;
         return used
     end
+    -- A player fallback selected after a completed container scan must resume
+    -- that trip directly. Restarting the scan on every tick would prevent a
+    -- distant bot from ever reaching the player.
+    if rs.player_supply_name == name then
+        return take_from_player(rs, player, bot, name, count)
+    end
     -- An empty policy is an explicit configuration choice meaning bots may not
     -- obtain supplies from either players or containers.
     if #config.supply.source_priority == 0 then
@@ -210,14 +243,15 @@ function M.take(rs, player, target, bot, name, count)
     for _, policy in ipairs(config.supply.source_priority) do
         use_containers = use_containers or policy == "containers"
     end
-    -- Lua's zero is truthy, so this `and/or` expression reliably yields zero
-    -- when the player policy is not first rather than evaluating another branch.
-    local got = player_first and M.player_take(player, name, count) or 0;
-    if got > 0 then
-        return got
+    local got = 0
+    if player_first then
+        got = take_from_player(rs, player, bot, name, count)
+        if got == nil then
+            return nil
+        end
     end
     if not use_containers then
-        return M.player_take(player, name, count)
+        return player_first and got or take_from_player(rs, player, bot, name, count)
     end
     rs.source_cache = rs.source_cache or {};
     local cached = rs.source_cache[name]
@@ -275,7 +309,7 @@ function M.take(rs, player, target, bot, name, count)
         rs.supply_job = nil;
         -- If player inventory was already checked first, zero is final. If
         -- containers were first, this is the deferred player fallback.
-        return player_first and 0 or M.player_take(player, name, count)
+        return player_first and 0 or take_from_player(rs, player, bot, name, count)
     end
     if not movement.step(bot, job.source.position) then
         return nil
@@ -320,13 +354,14 @@ function M.wait_for_item(rs, player, target, bot)
         rs.waiting_inventory = nil
         return true, "moving"
     end
-    -- `take` owns movement only after it has found a real container source.
-    -- Incremental scans and completed empty scans leave formation movement free.
+    -- `take` owns movement after finding either a real container source or
+    -- matching stock in the player's inventory. Empty scans leave formation
+    -- movement free.
     local cached = rs.source_cache and rs.source_cache[name]
     local job = rs.supply_job
     local source = (cached and cached.valid and cached) or
                        (job and job.scan and job.scan.done and job.source and job.source.valid and job.source)
-    return false, source and "moving" or "idle"
+    return false, (rs.player_supply_name == name or source) and "moving" or "idle"
 end
 
 return M
