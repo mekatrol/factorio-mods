@@ -67,6 +67,10 @@ end
 ---responsiveness while the total cap prevents cost scaling without bound.
 function M.tick(event)
     local root = state.root();
+    -- Rendering survives save/load while the visual ownership index does not.
+    -- Reclaim orphaned target lines before any controller can draw this
+    -- session's active lines.
+    visuals.reclaim_session_lines()
     -- Saves from before cliff selection have no queue. Lazy initialization also
     -- keeps the optional feature safe when its queue has not been created yet.
     root.selection_jobs = root.selection_jobs or {}

@@ -4,6 +4,34 @@ local M = {};
 -- Rendering objects cannot be stored in persistent `storage`. This transient
 -- ownership map centralizes their lifetime and is rebuilt from logical state.
 local owned = {}
+local session_lines_reclaimed = false
+
+---Remove target lines left by a previous Lua session.
+---Render objects survive save/load, but the non-persistent `owned` index does
+---not. Target lines are the only line objects created by this mod, so reclaim
+---them once on the first runtime tick; active controllers recreate theirs.
+function M.reclaim_session_lines()
+    if session_lines_reclaimed then
+        return
+    end
+    session_lines_reclaimed = true
+    for _, object in pairs(rendering.get_all_objects(script.mod_name)) do
+        if object.valid and object.type == "line" then
+            object.destroy()
+        end
+    end
+    -- Do not retain invalid handles if this is invoked after initialization in
+    -- a newly created session rather than after loading an existing save.
+    for key, objects in pairs(owned) do
+        local retained = {}
+        for _, object in pairs(objects or {}) do
+            if object and object.valid then
+                retained[#retained + 1] = object
+            end
+        end
+        owned[key] = retained
+    end
+end
 
 ---Resolve which player may see a role-owned rendering.
 local function player_filter(player_index, key)
