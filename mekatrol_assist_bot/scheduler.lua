@@ -142,7 +142,10 @@ function M.tick(event)
                 end
                 if rs.task == "follow" then
                     visuals.clear_role(visual_key)
-                elseif rs.target and rs.target.valid then
+                -- Idle means formation-following. A role may retain a candidate
+                -- target while scanning or waiting, but that inactive target
+                -- must not leave a misleading action line on screen.
+                elseif rs.phase ~= "idle" and rs.target and rs.target.valid then
                     visuals.target_line(visual_key, rs.entity, rs.target, item.player_index)
                 elseif rs.task == "move_to" and rs.destination then
                     visuals.target_line(visual_key, rs.entity, rs.destination, item.player_index)

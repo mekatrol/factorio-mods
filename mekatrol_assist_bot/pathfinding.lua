@@ -54,6 +54,10 @@ function M.start(surface, from, to, max_radius, goal_distance)
         surface_index = surface.index,
         start = a,
         goal = b,
+        -- Keep the exact world coordinate as well as its tile.  Interaction
+        -- range is Euclidean; a Manhattan distance between tile coordinates
+        -- can claim success while the bot is still physically out of range.
+        goal_position = {x = to.x, y = to.y},
         -- Defaults keep the standalone helper useful: 96 tiles bounds an
         -- omitted search, while zero requires reaching the exact goal tile.
         max_radius = max_radius or 96,
@@ -71,6 +75,14 @@ function M.start(surface, from, to, max_radius, goal_distance)
         failed = false,
         path = nil
     }
+end
+
+---Return whether the centre of a candidate tile is inside interaction range.
+---Exported for deterministic geometry tests.
+function M.within_goal(p, goal_position, goal_distance)
+    local dx = p.x + 0.5 - goal_position.x
+    local dy = p.y + 0.5 - goal_position.y
+    return dx * dx + dy * dy <= goal_distance * goal_distance
 end
 
 ---Return whether the pathfinder treats this tile as occupied.
@@ -157,7 +169,10 @@ function M.step(job)
         job.failed = true;
         return true
     end
-    if h(node.p, job.goal) <= job.goal_distance then
+    -- Older in-progress saves have only `goal`; its centre is the closest
+    -- faithful reconstruction of the original continuous target position.
+    local goal_position = job.goal_position or {x = job.goal.x + 0.5, y = job.goal.y + 0.5}
+    if M.within_goal(node.p, goal_position, job.goal_distance) then
         job.path = {};
         job.reconstruct_key = key(node.p);
         job.phase = "reconstruct";

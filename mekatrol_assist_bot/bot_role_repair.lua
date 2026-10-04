@@ -96,7 +96,7 @@ end
 function M.navigate(rs, anchor, bot)
     if not rs.path_job then
         rs.path_job = pathfinding.start(anchor.surface, bot.position, rs.target.position,
-            config.tasks.repair.radius, math.max(1, math.floor(config.tasks.repair.interaction_distance)))
+            config.tasks.repair.radius, config.tasks.repair.interaction_distance)
         return "moving", false
     end
     if not rs.path_job.done then
@@ -118,7 +118,14 @@ function M.navigate(rs, anchor, bot)
     -- repair work unit while retaining the configured inclusive radius.
     local squared_distance_to_target = movement.distance2(bot.position, rs.target.position)
     local squared_interaction_distance = config.tasks.repair.interaction_distance ^ 2
-    return "working", squared_distance_to_target <= squared_interaction_distance
+    if squared_distance_to_target > squared_interaction_distance then
+        -- A target may move, and saves from the older tile-distance pathfinder
+        -- can contain a completed route whose endpoint is physically too far
+        -- away. Replan instead of remaining permanently in the working phase.
+        rs.path_job = nil
+        return "moving", false
+    end
+    return "working", true
 end
 
 return M

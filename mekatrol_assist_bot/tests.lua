@@ -12,6 +12,7 @@ local repair_role = require("bot_role_repair")
 local cleanup_role = require("bot_role_cleanup")
 local track_role = require("bot_role_track")
 local manager = require("bot_manager")
+local pathfinding = require("pathfinding")
 local M = {}
 
 ---Assert exact equality while adding consistent mod-specific context.
@@ -78,6 +79,10 @@ function M.run()
     damaged.force = enemy_force
     eq(repair_role.valid(damaged, nil, {force = player_force}), false,
         "repair rejects a damaged entity on another force")
+    eq(pathfinding.within_goal({x = 9, y = 10}, {x = 10.99, y = 10.99}, 1.5), false,
+        "repair path does not stop outside exact interaction range near a tile edge")
+    eq(pathfinding.within_goal({x = 10, y = 10}, {x = 10.99, y = 10.99}, 1.5), true,
+        "repair path accepts a tile centre inside exact interaction range")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity - 1}), false,
         "cleanup retains partial cargo while more items may remain")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity}), true,
