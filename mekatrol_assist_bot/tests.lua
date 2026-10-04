@@ -84,7 +84,10 @@ function M.run()
         "cleanup flushes partial cargo after exhausting its search")
     eq(cleanup_role.should_flush_cargo({task = "follow", cargo_count = 1}), true,
         "cleanup flushes retained cargo after changing tasks")
-    eq(cleanup_role.scan_phase, "moving", "cleanup does not follow formation between pickups")
+    eq(cleanup_role.scan_phase({cargo_count = 0}), "idle", "empty cleanup bot follows while watching")
+    eq(cleanup_role.scan_phase({cargo_count = 1}), "moving", "cleanup does not follow formation between pickups")
+    eq(cleanup_role.scan_phase({cargo_count = 0, target = {valid = true}}), "moving",
+        "cleanup stops following after selecting a target")
     eq(cleanup_role.cargo_phase(false), "working", "cleanup does not follow formation while finding a chest")
     eq(cleanup_role.cargo_phase(nil), "idle", "cleanup may follow while waiting for player inventory space")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")

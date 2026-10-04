@@ -8,6 +8,14 @@ local track = require("track")
 local visuals = require("visuals")
 local M = {}
 
+---Resolve either a fixed role scan phase or a state-dependent phase policy.
+local function scan_phase(def, rs)
+    if type(def.scan_phase) == "function" then
+        return def.scan_phase(rs)
+    end
+    return def.scan_phase or "idle"
+end
+
 ---Discard every transient calculation derived from the current target.
 local function clear_target(rs)
     rs.target, rs.target_visualized, rs.path_job, rs.best_distance = nil, nil, nil, nil
@@ -70,10 +78,10 @@ function M.step(role, rs, anchor, bot)
     end
     if not rs.scan and not rs.target then
         begin(def, rs, anchor)
-        -- Starting a scan is already active role work.  Returning idle for this
-        -- one scheduler opportunity allows formation following to move the bot
-        -- away before the first scan cell is examined.
-        return def.scan_phase or "idle"
+        -- Let each role decide whether beginning its scan is active work.  In
+        -- particular, cleanup follows formation during an empty watch scan but
+        -- stays active while carrying cargo or pursuing a selected stack.
+        return scan_phase(def, rs)
     end
     if rs.scan and not rs.scan.done then
         local _, found = scanner.step(rs.scan)
@@ -87,7 +95,7 @@ function M.step(role, rs, anchor, bot)
                 end
             end
         end
-        return def.scan_phase
+        return scan_phase(def, rs)
     end
     if rs.track_job and rs.track_job.done and (not rs.target or not rs.target.valid) then
         local candidate, complete = next_group_target(def, rs, anchor)
