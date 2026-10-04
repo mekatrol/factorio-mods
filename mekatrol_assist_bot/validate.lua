@@ -88,6 +88,7 @@ function M.run(c, known)
     for mode, radius in pairs(c.tasks.upgrade.mode_radii) do
         num("tasks.upgrade.mode_radii." .. mode, radius, 0.000001)
     end
+    num("tasks.upgrade.items_per_trip", c.tasks.upgrade.items_per_trip, 1, nil, true)
     num("tasks.lamp.darkness", c.tasks.lamp.darkness, 0, 1);
     num("tasks.repair.threshold", c.tasks.repair.threshold, 0, 1)
     num("tasks.repair.self_repair_threshold", c.tasks.repair.self_repair_threshold, 0, 1)

@@ -72,6 +72,8 @@ return {
     tasks = {
         upgrade = {
             radius = 64,
+            -- Maximum matching upgrade items collected for one work batch.
+            items_per_trip = 100,
             mode_radii = {
                 ["blue-to-green-inserters"] = 10
             },

@@ -40,6 +40,9 @@ local function take_from_player(rs, player, bot, name, count)
     }
     if got > 0 then
         rs.supplied[name] = (rs.supplied[name] or 0) + got
+        -- A player pickup has no container return destination. Clear any stale
+        -- source metadata left by an older staged batch of the same item.
+        rs.supplied_sources[name] = nil
         rs.last_source = nil
         return nil
     end
@@ -56,33 +59,45 @@ function M.player_give(player, stack)
     return inv.insert(stack)
 end
 
----Return a stack immediately or retain the uninserted remainder as bot cargo.
+---Queue a stack for physical delivery by the bot.
 ---A destination suppresses player insertion because the item should be
 ---returned to the container that originally supplied it.
 function M.give_or_carry(rs, player, stack, destination)
-    -- A non-nil destination means the item was borrowed from that container and
-    -- must be returned there; bypass the player even if they have room. With no
-    -- destination, insert into the player immediately. Lua's `and/or` idiom is
-    -- safe here because the chosen zero is truthy in Lua (unlike some languages).
-    local inserted = destination and 0 or M.player_give(player, stack);
-    local remaining = stack.count - inserted
+    local remaining = stack.count
     if remaining > 0 then
         rs.cargo = rs.cargo or {};
         rs.cargo_order = rs.cargo_order or {};
         rs.cargo_destinations = rs.cargo_destinations or {};
+        rs.cargo_count = rs.cargo_count or 0
         -- `cargo` is a count map for consolidation, while `cargo_order` provides
         -- deterministic iteration. Append a name only on its first queued unit.
         if not rs.cargo[stack.name] then
             rs.cargo_order[#rs.cargo_order + 1] = stack.name
         end
         rs.cargo[stack.name] = (rs.cargo[stack.name] or 0) + remaining;
+        rs.cargo_count = rs.cargo_count + remaining
         -- Only store a live LuaEntity. Invalid references cannot be dereferenced
         -- later; omitting it safely falls back to delivery to the player.
         if destination and destination.valid then
             rs.cargo_destinations[stack.name] = destination
         end
     end
-    return inserted
+    return 0
+end
+
+---Move every unused staged supply item into normal return cargo. Roles call
+---this after exhausting their targets so prefetched stock is never stranded.
+function M.return_staged(rs, player)
+    for name, count in pairs(rs.supplied or {}) do
+        if count > 0 then
+            local destination = rs.supplied_sources and rs.supplied_sources[name]
+            M.give_or_carry(rs, player, {name = name, count = count}, destination)
+        end
+        rs.supplied[name] = nil
+        if rs.supplied_sources then
+            rs.supplied_sources[name] = nil
+        end
+    end
 end
 
 ---Append collected material to the role's ordered cargo manifest.
@@ -176,6 +191,11 @@ function M.flush_cargo(rs, player, bot)
             count = count
         } or 0
     else
+        -- Never modify player inventory remotely. Fly to the player's live
+        -- position before returning recovered or unused items.
+        if not movement.step(bot, player.position) then
+            return false
+        end
         inserted = M.player_give(player, {
             name = name,
             count = count
@@ -217,8 +237,10 @@ function M.entity_inventory(e)
 end
 
 -- Returns nil while the bounded container search is incomplete, otherwise the amount obtained.
-function M.take(rs, player, target, bot, name, count)
+function M.take(rs, player, target, bot, name, count, withdraw_count)
     rs.supplied = rs.supplied or {};
+    rs.supplied_sources = rs.supplied_sources or {}
+    local requested = withdraw_count or count
     local carried = rs.supplied[name] or 0
     if carried > 0 then
         -- `supplied` is a one-call staging area. A container withdrawal returns
@@ -226,6 +248,10 @@ function M.take(rs, player, target, bot, name, count)
         -- controller call, preserving the bounded state-machine contract.
         local used = math.min(count, carried);
         rs.supplied[name] = carried - used;
+        rs.last_source = rs.supplied_sources[name]
+        if rs.supplied[name] == 0 then
+            rs.supplied_sources[name] = nil
+        end
         -- A player withdrawal keeps this marker through staging so target
         -- navigation cannot resume between pickup and this handoff.
         if rs.player_supply_name == name then
@@ -237,7 +263,7 @@ function M.take(rs, player, target, bot, name, count)
     -- that trip directly. Restarting the scan on every tick would prevent a
     -- distant bot from ever reaching the player.
     if rs.player_supply_name == name then
-        return take_from_player(rs, player, bot, name, count)
+        return take_from_player(rs, player, bot, name, requested)
     end
     -- An empty policy is an explicit configuration choice meaning bots may not
     -- obtain supplies from either players or containers.
@@ -254,13 +280,13 @@ function M.take(rs, player, target, bot, name, count)
     end
     local got = 0
     if player_first then
-        got = take_from_player(rs, player, bot, name, count)
+        got = take_from_player(rs, player, bot, name, requested)
         if got == nil then
             return nil
         end
     end
     if not use_containers then
-        return player_first and got or take_from_player(rs, player, bot, name, count)
+        return player_first and got or take_from_player(rs, player, bot, name, requested)
     end
     rs.source_cache = rs.source_cache or {};
     local cached = rs.source_cache[name]
@@ -274,7 +300,7 @@ function M.take(rs, player, target, bot, name, count)
             end
             got = inv.remove {
                 name = name,
-                count = count
+                count = requested
             };
             if got > 0 then
                 -- Stage the removed amount instead of returning it immediately.
@@ -282,6 +308,7 @@ function M.take(rs, player, target, bot, name, count)
                 -- spent travelling/withdrawing; the next call consumes it from
                 -- `supplied` and performs the actual target action.
                 rs.supplied[name] = got;
+                rs.supplied_sources[name] = cached;
                 rs.last_source = cached;
                 return nil
             end
@@ -318,7 +345,7 @@ function M.take(rs, player, target, bot, name, count)
         rs.supply_job = nil;
         -- If player inventory was already checked first, zero is final. If
         -- containers were first, this is the deferred player fallback.
-        return player_first and 0 or take_from_player(rs, player, bot, name, count)
+        return player_first and 0 or take_from_player(rs, player, bot, name, requested)
     end
     if not movement.step(bot, job.source.position) then
         return nil
@@ -330,11 +357,12 @@ function M.take(rs, player, target, bot, name, count)
     end
     got = inv.remove {
         name = name,
-        count = count
+        count = requested
     };
     rs.supply_job = nil
     if got > 0 then
         rs.supplied[name] = got;
+        rs.supplied_sources[name] = job.source;
         rs.last_source = job.source;
         rs.source_cache[name] = job.source;
         return nil
@@ -352,10 +380,13 @@ function M.wait_for_item(rs, player, target, bot)
         return true, "moving"
     end
     local got = M.take(rs, player, target, bot, name, 1)
+    local taken_source = rs.last_source
     local staged = rs.supplied and (rs.supplied[name] or 0) or 0
     if got and got > 0 then
         rs.supplied = rs.supplied or {}
+        rs.supplied_sources = rs.supplied_sources or {}
         rs.supplied[name] = staged + got
+        rs.supplied_sources[name] = taken_source
         rs.waiting_inventory = nil
         return true, "moving"
     end

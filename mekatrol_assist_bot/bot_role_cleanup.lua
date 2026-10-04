@@ -11,10 +11,10 @@ function M.scan_phase(rs)
     return ((rs.target and rs.target.valid) or (rs.cargo_count or 0) > 0) and "moving" or "idle"
 end
 
----Keep formation only while waiting for player inventory space.  A false
----destination means the bounded chest search is still active.
+---Cargo delivery owns movement until the bot reaches its container or player.
+---A false destination means the bounded chest search is still active.
 function M.cargo_phase(destination)
-    return destination == nil and "idle" or "working"
+    return destination == false and "working" or "moving"
 end
 
 function M.radius()

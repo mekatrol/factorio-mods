@@ -28,6 +28,12 @@ local function reset(rs)
     rs.survey_job, rs.scan, rs.phase = nil, nil, "idle"
 end
 
+local function finish(def, rs, anchor)
+    if def.finish then
+        def.finish(rs, anchor)
+    end
+end
+
 ---Create the role-defined bounded spatial scan.
 local function begin(def, rs, anchor, bot)
     local area = def.scan_area and def.scan_area(rs, anchor)
@@ -119,11 +125,13 @@ function M.step(role, rs, anchor, bot)
             return "moving"
         end
         if complete then
+            finish(def, rs, anchor)
             rs.track_job, rs.track_started, rs.scan, rs.best_distance = nil, nil, nil, nil
             return "idle"
         end
     end
     if not rs.target then
+        finish(def, rs, anchor)
         reset(rs)
         return "idle"
     end
@@ -153,6 +161,7 @@ function M.step(role, rs, anchor, bot)
                 return "moving"
             end
             if complete then
+                finish(def, rs, anchor)
                 rs.track_job, rs.track_started, rs.scan, rs.best_distance = nil, nil, nil, nil
                 return "idle"
             end
@@ -188,6 +197,7 @@ function M.step(role, rs, anchor, bot)
             return "working"
         end
         rs.track_job, rs.track_started = nil, nil
+        finish(def, rs, anchor)
     end
     reset(rs)
     return "working"

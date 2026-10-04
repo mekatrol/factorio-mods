@@ -1,6 +1,7 @@
 -- Upgrade role policy: replace configured entities while preserving topology.
 local config = require("config")
 local supply = require("supply")
+local movement = require("movement")
 local upgrades = config.tasks.upgrade.mappings
 local M = {
     tasks = {"follow", "yellow-to-red-belts", "red-to-blue-belts", "blue-to-green-inserters", "containers",
@@ -83,6 +84,71 @@ local function replace(entity, name)
     return entity.surface.create_entity(parameters) ~= nil
 end
 
+---Count the current entity plus matching remaining members of its discovered
+---belt graph, capped so one pickup never drains an unbounded inventory stack.
+local function supply_batch_size(rs, anchor, target_prototype_name)
+    local count = 1
+    local job = rs.track_job
+    if not job then
+        return config.tasks.upgrade.items_per_trip
+    end
+    if job and job.entities then
+        for i = job.action_index or 1, #job.entities do
+            local candidate = job.entities[i]
+            if candidate and candidate.valid and upgrades[candidate.name] == target_prototype_name and
+                M.valid(candidate, rs, anchor) then
+                count = count + 1
+                if count >= config.tasks.upgrade.items_per_trip then
+                    break
+                end
+            end
+        end
+    end
+    return count
+end
+
+---Keep recovered lower-tier items aboard until the prefetched upgrade batch is
+---spent, then let the scheduler return the consolidated cargo in one trip.
+function M.should_flush_cargo(rs)
+    for _, count in pairs(rs.supplied or {}) do
+        if count > 0 then
+            return false
+        end
+    end
+    return true
+end
+
+function M.finish(rs, anchor)
+    supply.return_staged(rs, anchor.player)
+end
+
+---Acquire upgrade stock before approaching the selected entity. This avoids a
+---wasted target visit followed by a return trip to the player for supplies.
+function M.navigate(rs, anchor, bot)
+    local entity = rs.target
+    local target_prototype_name = entity and entity.valid and upgrades[entity.name]
+    if not target_prototype_name then
+        return "working", true
+    end
+    local staged = rs.supplied and (rs.supplied[target_prototype_name] or 0) or 0
+    if staged == 0 then
+        local supplied = supply.take(rs, anchor.player, entity, bot, target_prototype_name, 1,
+            supply_batch_size(rs, anchor, target_prototype_name))
+        if supplied == nil then
+            return "moving", false
+        end
+        if supplied == 0 then
+            rs.waiting_inventory = target_prototype_name
+            return "idle", false
+        end
+        -- `take` only returns a positive value from already staged stock. Put
+        -- it back because the action consumes it after reaching the target.
+        rs.supplied[target_prototype_name] = (rs.supplied[target_prototype_name] or 0) + supplied
+    end
+    local ready = movement.step(bot, entity.position)
+    return ready and "working" or "moving", ready
+end
+
 ---Consume the new item and return either the removed old item or the unused new
 ---item to its source, depending on whether fast replacement succeeds.
 function M.act(rs, anchor, entity)
@@ -91,7 +157,7 @@ function M.act(rs, anchor, entity)
     local target_recipe = target_prototype_name and anchor.force.recipes[target_prototype_name]
     if target_prototype_name and (not target_recipe or target_recipe.enabled) then
         local upgrade_items_supplied = supply.take(rs, anchor.player, entity, rs.entity or entity,
-            target_prototype_name, 1)
+            target_prototype_name, 1, supply_batch_size(rs, anchor, target_prototype_name))
         if upgrade_items_supplied == nil then
             return false
         end

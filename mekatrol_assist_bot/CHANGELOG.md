@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Upgrade and track bots now collect up to 100 matching items per supply trip
+  instead of returning for every individual upgrade.
+- Bots now physically return recovered upgrade items to the player instead of
+  inserting them into the player's inventory remotely.
+- Upgrade bots now collect their required item before approaching a target, so
+  containers are no longer visited once before supply and again for replacement.
+- Standalone container upgrades now share a prefetched supply batch across
+  successive targets and return recovered or unused items after the scan ends.
 - Assist bots can no longer be collected by holding the mine control while one
   flies beneath the cursor.
 - Removed the custom repair health arc; repaired entities use Factorio's native
