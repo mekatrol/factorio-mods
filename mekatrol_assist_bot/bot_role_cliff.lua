@@ -1,5 +1,6 @@
 -- Cliff role policy: demolish only cliffs explicitly selected by the player.
 local config = require("config")
+local discovery = require("discovery")
 local state = require("state")
 local supply = require("supply")
 local visuals = require("visuals")
@@ -35,7 +36,7 @@ end
 
 ---Selection state is keyed by stable discovery identity, not LuaEntity handle.
 function M.valid(entity)
-    return state.root().cliffs[require("discovery").identity(entity)] == true
+    return state.root().cliffs[discovery.identity(entity)] == true
 end
 
 ---Launch one explosive projectile and clear the mark after successful creation.
@@ -51,7 +52,7 @@ function M.act(rs, anchor, entity)
         -- Remember the exact player/container source so a failed projectile
         -- creation can return the explosive rather than losing inventory.
         local supply_source = rs.last_source
-        local cliff_identity = require("discovery").identity(entity)
+        local cliff_identity = discovery.identity(entity)
         rs.last_source = nil
         local projectile = entity.surface.create_entity {
             name = "cliff-explosives",

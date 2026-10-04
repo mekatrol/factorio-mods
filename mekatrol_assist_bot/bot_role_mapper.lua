@@ -1,5 +1,6 @@
 -- Mapper role policy: scan an unbounded square spiral and publish static entities.
 local config = require("config")
+local discovery = require("discovery")
 local M = {
     tasks = {"follow", "search"},
     scan_phase = "moving"
@@ -32,7 +33,7 @@ local mobile = {
 
 function M.command(action, context)
     if action == "clear" then
-        require("discovery").clear()
+        discovery.clear()
         context.say("map cleared")
         return true
     end
@@ -54,12 +55,12 @@ end
 ---Mapper consumes scan results directly instead of selecting a nearest target.
 function M.scan_entity(entity)
     if M.valid(entity) then
-        require("discovery").add(entity)
+        discovery.add(entity)
     end
 end
 
 function M.act(_, _, entity)
-    require("discovery").add(entity)
+    discovery.add(entity)
     return true
 end
 

@@ -1,5 +1,6 @@
 -- Repair role policy: find damaged friendly entities and approach them with A*.
 local config = require("config")
+local discovery = require("discovery")
 local movement = require("movement")
 local pathfinding = require("pathfinding")
 local supply = require("supply")
@@ -72,7 +73,6 @@ function M.act(rs, anchor, entity)
     local health_restored = math.min(health_needed_this_action, rs.repair_health_pool)
     entity.health = math.min(entity.max_health, entity.health + health_restored)
     rs.repair_health_pool = rs.repair_health_pool - health_restored
-    local discovery = require("discovery")
     visuals.health(discovery.identity(entity), entity)
     return entity.health >= entity.max_health * config.tasks.repair.threshold
 end

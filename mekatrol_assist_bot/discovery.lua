@@ -2,8 +2,15 @@
 local state = require("state")
 local config = require("config")
 local visuals = require("visuals")
-local registry = require("role_registry")
 local M = {}
+local registry
+
+---Supply the completed role registry after its role modules finish loading.
+---This avoids a discovery -> registry -> role -> discovery require cycle while
+---keeping every require in Factorio's permitted control.lua parsing phase.
+function M.set_registry(value)
+    registry = value
+end
 
 ---Insert or update a record while preserving first-seen order.
 function M.store(order, records, id, record)

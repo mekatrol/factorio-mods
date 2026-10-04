@@ -1,5 +1,6 @@
 -- Surveyor role policy: trace resource boundaries and publish polygon-backed groups.
 local config = require("config")
+local discovery = require("discovery")
 local polygon = require("polygon")
 local scanner = require("entity_scanner")
 local state = require("state")
@@ -21,7 +22,6 @@ end
 
 ---Reject resources already assigned to a completed survey group.
 function M.valid(entity)
-    local discovery = require("discovery")
     local index = state.root().discovery
     return not (index.grouped and index.grouped[discovery.identity(entity)])
 end
@@ -54,7 +54,6 @@ function M.prepare_action(rs, anchor)
         return "working", false
     end
     if not rs.survey_job.collect_scan.done then
-        local discovery = require("discovery")
         local _, found = scanner.step(rs.survey_job.collect_scan)
         for _, entity in ipairs(found) do
             -- The rectangular query is cheap; polygon containment removes
@@ -72,7 +71,7 @@ end
 
 ---Commit a completed survey to the shared discovery index.
 function M.act(rs, _, entity)
-    require("discovery").add(entity)
+    discovery.add(entity)
     local index = state.root().discovery
     local job = rs.survey_job
     -- Surface, prototype, and trace seed distinguish otherwise identical patches.
