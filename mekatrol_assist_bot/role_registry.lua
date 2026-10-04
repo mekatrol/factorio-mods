@@ -1,56 +1,24 @@
--- Canonical role/task metadata shared by command, manager, and controllers.
+-- Canonical role metadata. Behavior and task declarations are loaded from one
+-- conventionally named `bot_role_<role>` module per configured role.
 local config = require("config")
 local M = {
-    roles = {}
+    roles = {},
+    handoffs = {}
 }
-
-local tasks = {
-    builder = {"follow", "move_to", "construct"},
-    repair = {"follow", "move_to", "repair"},
-    upgrade = {"follow", "yellow-to-red-belts", "red-to-blue-belts", "blue-to-green-inserters", "containers", "combined"},
-    track = {"follow", "track"},
-    lamp = {"follow", "place"},
-    cliff = {"follow", "demolish"},
-    logistics = {"follow", "collect", "pickup"},
-    cleanup = {"follow", "cleanup"},
-    mapper = {"follow", "search"},
-    surveyor = {"follow", "search", "survey"}
-}
-
--- Discovery handoffs replace the legacy master controller. Producers publish
--- once; each consumer advances its own persistent queue under scheduler budget.
-M.handoffs = {
-    repair = {},
-    logistics = {types = {"item-entity", "simple-entity", "simple-entity-with-owner", "container", "resource"}},
-    surveyor = {types = {"resource"}}
-}
-
----Return whether a discovery record satisfies a role's subscription rule.
-function M.accepts_handoff(role, record)
-    local rule = M.handoffs[role]
-    if not rule then
-        return false
-    end
-    if rule.force and record.force_name ~= rule.force then
-        return false
-    end
-    if rule.types then
-        for _, entity_type in ipairs(rule.types) do
-            if record.type == entity_type then
-                return true
-            end
-        end
-        return false
-    end
-    return true
-end
 
 for _, name in ipairs(config.formation.role_order) do
+    local logic = require("bot_role_" .. name)
     M.roles[name] = {
         name = name,
         config = config.roles[name],
-        tasks = tasks[name]
+        tasks = logic.tasks,
+        logic = logic
     }
+    -- Discovery producers publish once. Each subscribing role receives an
+    -- independent queue and therefore never steals work from another consumer.
+    if logic.handoff then
+        M.handoffs[name] = {types = logic.handoff_types}
+    end
 end
 
 M.aliases = {
@@ -72,10 +40,27 @@ function M.get(name)
     return M.roles[M.aliases[name] or name]
 end
 
----Return whether a task name is supported by the supplied role metadata.
+---Return whether a task belongs to the supplied role definition.
 function M.has_task(role, task)
-    for _, v in ipairs(role.tasks) do
-        if v == task then
+    for _, value in ipairs(role.tasks) do
+        if value == task then
+            return true
+        end
+    end
+    return false
+end
+
+---Return whether a discovery record satisfies a role's subscription filter.
+function M.accepts_handoff(role, record)
+    local rule = M.handoffs[role]
+    if not rule then
+        return false
+    end
+    if not rule.types then
+        return true
+    end
+    for _, entity_type in ipairs(rule.types) do
+        if record.type == entity_type then
             return true
         end
     end

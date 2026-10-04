@@ -8,7 +8,7 @@ local discovery = require("discovery")
 local command = require("commands")
 local technology = require("technology")
 local logistics = require("logistics")
-local controllers = require("controllers")
+local repair_role = require("bot_role_repair")
 local M = {}
 
 ---Assert exact equality while adding consistent mod-specific context.
@@ -74,10 +74,10 @@ function M.run()
     local player_force = {}
     local enemy_force = {}
     local damaged = {name = "test", force = player_force, health = 50, max_health = 100}
-    eq(controllers.is_repair_target(damaged, {force = player_force}), true,
+    eq(repair_role.valid(damaged, nil, {force = player_force}), true,
         "repair accepts a damaged entity on the player's force")
     damaged.force = enemy_force
-    eq(controllers.is_repair_target(damaged, {force = player_force}), false,
+    eq(repair_role.valid(damaged, nil, {force = player_force}), false,
         "repair rejects a damaged entity on another force")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")

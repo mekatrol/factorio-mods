@@ -10,6 +10,7 @@ local migrations = require("migrations")
 local supply = require("supply")
 local visuals = require("visuals")
 local movement = require("movement")
+local registry = require("role_registry")
 local M = {}
 
 -- Rendering handles are deliberately non-persistent. Rebuild one destroyed-site
@@ -119,8 +120,8 @@ function M.tick(event)
                     -- A concrete destination still owns movement explicitly.
                     -- Lua has no ternary operator; `condition and A or B` works
                     -- here because both A and B are non-false strings.
-                    rs.phase = item.name == "cleanup" and
-                                   (destination == nil or destination == false) and "idle" or "working"
+                    local logic = registry.roles[item.name].logic
+                    rs.phase = logic.cargo_phase and logic.cargo_phase(destination) or "working"
                     manager.set_visual(item.name, rs, a, rs.phase)
                 elseif rs.task == "follow" then
                     rs.phase = "idle"

@@ -4,8 +4,6 @@ local registry = require("role_registry")
 local state = require("state")
 local manager = require("bot_manager")
 local technology = require("technology")
-local visuals = require("visuals")
-local discovery = require("discovery")
 local M = {}
 
 ---Split command text on whitespace into a compact argument array.
@@ -105,7 +103,7 @@ function M.execute(pi, text, forced)
         local requested = a[2] and registry.get(a[2]);
         if requested then
             say_localized(pi, "mab.help-role", requested.name, table.concat(requested.tasks, ", "),
-                requested.name == "cliff" and "/mark/clear" or "")
+                requested.logic.help_suffix or "")
         else
             say_localized(pi, "mab.help")
         end
@@ -122,46 +120,17 @@ function M.execute(pi, text, forced)
     end
     local name = parsed.role_name;
     local action = parsed.action
-    if bare_forced and name == "upgrade" then
-        local rs = state.player(pi).roles.upgrade;
-        local cycle = {"yellow-to-red-belts", "red-to-blue-belts", "blue-to-green-inserters", "containers", "combined"};
-        local next_index = 1;
-        for i, v in ipairs(cycle) do
-            if v == rs.task then
-                -- Lua arrays are one-based. `i % length + 1` maps the last item
-                -- back to one and every other item to its successor.
-                next_index = i % #cycle + 1
-            end
-        end
-        rs.task = cycle[next_index];
-        rs.scan = nil;
-        rs.target = nil;
-        manager.enable(pi, "upgrade", true);
-        say(pi, "upgrade task=" .. rs.task);
+    if bare_forced and role.logic.bare_command then
+        local message = role.logic.bare_command(state.player(pi).roles[name])
+        manager.enable(pi, name, true)
+        say(pi, message)
         return
     end
     if action == "status" then
         status(pi, name);
         return
     end
-    if name == "cliff" and action == "clear" then
-        local root = state.root();
-        root.cliffs = {};
-        visuals.begin_clear(root, "cliff:");
-        say(pi, "cliff marks cleared");
-        return
-    end
-    if name == "cliff" and action == "mark" then
-        local p = game.get_player(pi);
-        p.cursor_stack.set_stack {
-            name = "mekatrol-assist-cliff-planner",
-            count = 1
-        };
-        return
-    end
-    if name == "mapper" and action == "clear" then
-        discovery.clear();
-        say(pi, "map cleared");
+    if role.logic.command and role.logic.command(action, {player=game.get_player(pi),say=function(message) say(pi,message) end}) then
         return
     end
     if action == "tasks" then
@@ -217,19 +186,9 @@ function M.execute(pi, text, forced)
                 x = x,
                 y = y
             }
-        elseif name == "logistics" and task == "pickup" then
-            local count = tonumber(values.count)
-            -- `count % 1 ~= 0` rejects fractional quantities because Factorio
-            -- item stacks contain integral units.
-            if not values.name or not count or count < 1 or count % 1 ~= 0 then
-                say(pi, "pickup requires name=<item-or-entity> count=<positive integer>")
-                return
-            end
-            rs.pickup_name = values.name
-            rs.pickup_remaining = count
-        elseif name == "logistics" then
-            rs.pickup_name = nil
-            rs.pickup_remaining = nil
+        elseif role.logic.configure_task then
+            local ok, reason = role.logic.configure_task(rs, task, values)
+            if not ok then say(pi, reason); return end
         end
         rs.task = task;
         rs.scan = nil;
