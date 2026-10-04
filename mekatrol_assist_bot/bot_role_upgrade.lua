@@ -15,20 +15,6 @@ for name in pairs(upgrades) do
 end
 table.sort(names)
 
----Preserve the legacy bare `/ub` task cycle.
-function M.bare_command(rs)
-    local cycle = {"yellow-to-red-belts", "red-to-blue-belts", "blue-to-green-inserters", "containers",
-                   "combined"}
-    local next_index = 1
-    for i, value in ipairs(cycle) do
-        if value == rs.task then
-            next_index = i % #cycle + 1
-        end
-    end
-    rs.task, rs.scan, rs.target = cycle[next_index], nil, nil
-    return "upgrade task=" .. rs.task
-end
-
 function M.radius(rs)
     return config.tasks.upgrade.mode_radii[rs.task] or config.tasks.upgrade.radius
 end

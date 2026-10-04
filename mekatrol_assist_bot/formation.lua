@@ -23,12 +23,10 @@ local M = {}
 ---  down  = ( 0,  1)
 ---  up    = ( 0, -1)
 ---
----The numeric values 1 and -1 are accepted for compatibility with saves made
----before vertical formation tracking was added. Any missing or unknown value
----defaults to right, which is also the initial direction used by state.lua.
+---Any missing or unknown value defaults to right, which is also the initial
+---direction used by state.lua.
 local function heading(direction)
-    -- A legacy value of -1 meant that the player was travelling left.
-    if direction == "left" or direction == -1 then
+    if direction == "left" then
         return -1, 0
     -- Negative Y is upward in Factorio's world coordinate system.
     elseif direction == "up" then
@@ -38,13 +36,13 @@ local function heading(direction)
         return 0, 1
     end
 
-    -- "right", legacy 1, nil, and unexpected values all use the safe default.
+    -- "right", nil, and unexpected values all use the safe default.
     return 1, 0
 end
 
 ---Calculate player-relative slots for all active bot roles.
 ---@param active string[] Role names in their stable configured display order.
----@param direction string|number Cardinal direction, including legacy +/-1.
+---@param direction string Cardinal direction.
 ---@return table<string, FormationPosition> slots Offset indexed by role name.
 function M.slots(active, direction)
     -- heading_x/heading_y point in the direction the player is travelling.
@@ -134,7 +132,7 @@ end
 ---Update and return a player's most recent cardinal travel direction.
 ---@param ps table Persistent per-player state owned by state.lua.
 ---@param pos FormationPosition Current player/character anchor position.
----@return string|number|nil direction Current direction or legacy/default value.
+---@return string|nil direction Current direction or default value.
 function M.update_direction(ps, pos)
     -- A previous sample is required before a movement delta can be calculated.
     if ps.last_position then

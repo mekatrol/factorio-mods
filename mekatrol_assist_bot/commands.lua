@@ -1,4 +1,4 @@
--- One parser serves /mab and the five temporary compatibility aliases.
+-- Canonical /mab command parser and dispatcher.
 local config = require("config")
 local registry = require("role_registry")
 local state = require("state")
@@ -17,20 +17,13 @@ local function words(s)
     return out
 end
 
----Parse both canonical `/mab ROLE ACTION` and forced legacy role aliases.
-function M.parse(text, forced)
+---Parse canonical `/mab ROLE ACTION` input.
+function M.parse(text)
     local arguments = words(text)
-    -- Compatibility commands inject their role. Remember whether the user
-    -- supplied no other text because bare `/gamebot` retains legacy cycling.
-    local bare_forced = forced ~= nil and #arguments == 0
-    if forced then
-        table.insert(arguments, 1, forced)
-    end
     -- The registry expects a string; empty input intentionally resolves to nil.
     local role = registry.get(arguments[1] or "")
     return {
         arguments = arguments,
-        bare_forced = bare_forced,
         role = role,
         -- A registry match is canonicalized; `all` is a command pseudo-role;
         -- anything else stays nil so execute can report an unknown role.
@@ -91,14 +84,13 @@ local function operate(pi, name, action)
 end
 
 ---Validate and execute one parsed command without throwing on user mistakes.
-function M.execute(pi, text, forced)
+function M.execute(pi, text)
     if not pi then
         game.print("[MAB] command must be run by a player")
         return
     end
-    local parsed = M.parse(text, forced);
+    local parsed = M.parse(text);
     local a = parsed.arguments;
-    local bare_forced = parsed.bare_forced;
     if #a == 0 or a[1] == "help" then
         local requested = a[2] and registry.get(a[2]);
         if requested then
@@ -120,12 +112,6 @@ function M.execute(pi, text, forced)
     end
     local name = parsed.role_name;
     local action = parsed.action
-    if bare_forced and role.logic.bare_command then
-        local message = role.logic.bare_command(state.player(pi).roles[name])
-        manager.enable(pi, name, true)
-        say(pi, message)
-        return
-    end
     if action == "status" then
         status(pi, name);
         return
@@ -204,22 +190,11 @@ function M.execute(pi, text, forced)
     end
 end
 
----Register the canonical command and compatibility aliases with Factorio.
+---Register the canonical command with Factorio.
 function M.register()
     commands.add_command("mab", {"mab.command-description"}, function(c)
         M.execute(c.player_index, c.parameter)
     end)
-    for alias, role in pairs {
-        ub = "upgrade",
-        tb = "track",
-        cb = "cleanup",
-        lb = "lamp",
-        db = "cliff"
-    } do
-        commands.add_command(alias, {"mab.alias-description", role}, function(c)
-            M.execute(c.player_index, c.parameter, role)
-        end)
-    end
 end
 
 return M

@@ -108,11 +108,6 @@ function M.run(c, known)
             fail("controls." .. action, key, "non-empty Factorio key sequence")
         end
     end
-    num("compatibility.snapshot_limit", c.compatibility.snapshot_limit, 1, nil, true)
-    if type(c.compatibility.mapping_remote_interface) ~= "string" or c.compatibility.mapping_remote_interface == "" then
-        fail("compatibility.mapping_remote_interface", c.compatibility.mapping_remote_interface,
-            "non-empty remote interface name")
-    end
     return true
 end
 

@@ -8,14 +8,12 @@ local manager = require("bot_manager")
 local scheduler = require("scheduler")
 local scanner = require("entity_scanner")
 local discovery = require("discovery")
-local migrations = require("migrations")
 local technology = require("technology")
 local command = require("commands")
 local tests = require("tests")
 local runtime_tests = require("runtime_tests")
 local visuals = require("visuals")
 
-discovery.register()
 command.register()
 
 ---Initialize validated persistent/runtime state after creation or mod changes.
@@ -26,9 +24,6 @@ local function initialize()
     technology.validate();
     local root = state.root();
     root.destroyed_visual_job = {cursor = nil}
-    discovery.ensure_events();
-    runtime_tests.seed();
-    migrations.run()
     runtime_tests.run()
     for _, p in pairs(game.players) do
         local ps = state.player(p.index);

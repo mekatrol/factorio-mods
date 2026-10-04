@@ -31,11 +31,10 @@ M.aliases = {
     g = "logistics",
     c = "cleanup",
     m = "mapper",
-    s = "surveyor",
-    v = "surveyor"
+    s = "surveyor"
 }
 
----Resolve a canonical role name or configured short/legacy alias.
+---Resolve a canonical role name or configured short alias.
 function M.get(name)
     return M.roles[M.aliases[name] or name]
 end

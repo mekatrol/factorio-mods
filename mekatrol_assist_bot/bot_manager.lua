@@ -64,9 +64,7 @@ function M.enable(index, role, quiet)
     rs.enabled = true;
     rs.visual_key = index .. ":" .. role
     if not rs.entity or not rs.entity.valid then
-        -- Saves predating direction tracking may contain nil. Legacy value 1
-        -- means right and yields the same initial formation as old versions.
-        local slots = formation.slots(active_names(ps), ps.direction or 1);
+        local slots = formation.slots(active_names(ps), ps.direction or "right");
         local slot = slots[role] or {
             -- The fallback is defensive: a newly enabled role should normally
             -- be in `active_names`, but origin is safer than indexing nil if a
@@ -177,8 +175,7 @@ function M.remove_player(index)
             if rs.entity and rs.entity.valid then
                 rs.entity.destroy()
             end
-            -- `visual_key` was introduced after early saves. Reconstructing its
-            -- deterministic format lets cleanup remove legacy players' renders.
+            -- Disabled roles may not have created a visual key yet.
             local visual_key = rs.visual_key or (index .. ":" .. role)
             visuals.clear_role(visual_key)
             visuals.clear_role("label:" .. visual_key)

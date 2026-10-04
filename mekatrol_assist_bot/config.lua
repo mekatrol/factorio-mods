@@ -21,7 +21,7 @@ return {
     scheduler = {
         -- Total scheduler work units shared by all players and roles each tick; integer >=1.
         work_per_tick = 24,
-        -- Maximum units per tick spent on migration, clearing, selection, and visual rebuilds; integer >=1.
+        -- Maximum units per tick spent on clearing, selection, and visual rebuilds; integer >=1.
         background_work_per_tick = 4,
         -- Ticks between formation-follow passes; keep at 1 for smooth pursuit.
         -- 60 ticks = one second.
@@ -240,14 +240,6 @@ return {
             technology_mode = "all",
             default_task = "survey"
         }
-    },
-    compatibility = {
-        -- Non-empty Factorio remote-interface name retained for mapping consumers.
-        mapping_remote_interface = "mapping_bot_mod",
-        -- When true, recognized old storage roots are imported once on configuration change.
-        import_legacy_state = true,
-        -- Maximum copied records returned by a synchronous compatibility snapshot; integer >=1.
-        snapshot_limit = 1000
     },
     -- Runs destructive integration fixtures during initialization; keep false outside disposable saves.
     debug = false

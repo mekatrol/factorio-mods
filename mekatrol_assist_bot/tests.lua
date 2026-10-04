@@ -22,12 +22,11 @@ end
 ---Run deterministic unit-style checks that require no temporary world fixture.
 function M.run()
     validate.run(config, registry.roles)
-    local odd = formation.slots({"builder", "repair", "upgrade"}, 1);
+    local odd = formation.slots({"builder", "repair", "upgrade"}, "right");
     eq(odd.repair.y, 0, "odd formation centers middle slot")
-    local even = formation.slots({"builder", "repair"}, 1);
+    local even = formation.slots({"builder", "repair"}, "right");
     eq(even.builder.y, -even.repair.y, "even formation is symmetric")
-    eq(registry.get("s").name, "surveyor", "s alias");
-    eq(registry.get("v").name, "surveyor", "legacy v alias")
+    eq(registry.get("s").name, "surveyor", "s alias")
     eq(registry.has_task(registry.get("builder"), "construct"), true, "builder construct task")
     eq(registry.has_task(registry.get("logistics"), "pickup"), true, "logistics pickup task")
     eq(logistics.first_product_name({{name = "rail", count = 1}}, "straight-rail"), "rail",
@@ -66,9 +65,6 @@ function M.run()
     eq(parsed.role_name, "upgrade", "command parser expands role alias")
     eq(parsed.action, "task", "command parser extracts action")
     eq(parsed.arguments[3], "combined", "command parser preserves task")
-    local legacy = command.parse("", "upgrade");
-    eq(legacy.bare_forced, true, "legacy bare command is identified")
-    eq(legacy.action, "toggle", "legacy bare command defaults action")
     eq(#technology.missing_from({a = true}, {"a", "b"}, "all"), 1, "all gate reports missing technology")
     eq(#technology.missing_from({a = true}, {"a", "b"}, "any"), 0, "any gate accepts one technology")
     eq(#technology.missing_from({}, {}, "all"), 0, "empty technology gate is open")
@@ -91,11 +87,11 @@ function M.run()
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
     local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
-                                  "mapper", "surveyor"}, 1);
+                                  "mapper", "surveyor"}, "right");
     eq(many.surveyor.x, many.builder.x, "all roles remain in one trailing column")
     eq(formation.has_unique_slots(many), true, "formation slots never overlap")
     local mirrored = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
-                                      "mapper", "surveyor"}, -1)
+                                      "mapper", "surveyor"}, "left")
     for role, slot in pairs(many) do
         eq(mirrored[role].x, -slot.x, "formation mirrors role " .. role)
         eq(mirrored[role].y, slot.y, "formation mirror preserves row for " .. role)
@@ -107,7 +103,7 @@ function M.run()
     eq(downward.repair.y, -config.formation.side_distance, "downward travel puts bots above player")
     eq(downward.builder.x, -downward.upgrade.x, "downward formation spreads horizontally")
     eq(downward.builder.x, upward.builder.x, "vertical reversal preserves role order")
-    local reflowed = formation.slots({"builder", "upgrade", "track", "lamp", "cliff"}, 1)
+    local reflowed = formation.slots({"builder", "upgrade", "track", "lamp", "cliff"}, "right")
     eq(formation.has_unique_slots(reflowed), true, "formation remains unique after disable reflow")
     eq(reflowed.builder.y, -reflowed.cliff.y, "shortened column remains centered")
     return true

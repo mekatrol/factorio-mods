@@ -28,8 +28,7 @@ function M.root()
     }
     local r = storage.mekatrol_assist_bot;
     -- These additive defaults are intentionally outside the initial literal.
-    -- That makes loading an older schema safe before the incremental migration
-    -- has had scheduler time to finish.
+    -- This also keeps partially populated state safe for all callers.
     r.destroyed_sites = r.destroyed_sites or {};
     r.discovery.by_name = r.discovery.by_name or {}
     r.discovery.grouped = r.discovery.grouped or {}
@@ -52,11 +51,9 @@ function M.player(index)
     local r = M.root();
     local p = r.players[index]
     if not p then
-        -- Direction 1 is the legacy representation of "right" and remains
-        -- accepted by formation.lua, allowing old and new saves to coexist.
         p = {
             roles = {},
-            direction = 1,
+            direction = "right",
             last_position = nil
         };
         r.players[index] = p

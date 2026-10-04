@@ -1,4 +1,4 @@
--- Shared discovery index, subscriptions, and compatibility snapshots. Internal tables are never exposed.
+-- Shared discovery index and subscriptions. Internal tables are never exposed.
 local state = require("state")
 local config = require("config")
 local visuals = require("visuals")
@@ -87,13 +87,6 @@ function M.add(e)
         end
     end
     visuals.map_marker(id, e)
-    local event = d.events and d.events.mapped;
-    if event and inserted then
-        script.raise_event(event, {
-            entity = e,
-            id = id
-        })
-    end
 end
 
 ---Atomically expose an empty discovery database and schedule old data cleanup.
@@ -117,10 +110,6 @@ function M.clear()
     -- Consumers compare this number to reset cursors after an atomic clear.
     d.generation = (d.generation or 0) + 1;
     visuals.begin_clear(root, "map:")
-    local event = d.events and d.events.cleared;
-    if event then
-        script.raise_event(event, {reason = "remote_or_input", tick = game.tick})
-    end
 end
 
 -- Releases one record from a detached map after clear, bounding cleanup cost.
@@ -166,44 +155,6 @@ function M.prune(limit)
     end
 end
 
----Return a bounded, copied page of valid discovery metadata.
----Copies prevent remote-interface consumers from mutating internal state or
----retaining the mod's authoritative record tables.
-function M.snapshot_page(cursor, limit)
-    local out = {};
-    local d = state.root().discovery;
-    local first = math.max(1, tonumber(cursor) or 1);
-    local count = math.min(config.compatibility.snapshot_limit,
-        math.max(1, tonumber(limit) or config.compatibility.snapshot_limit));
-    -- The page is inclusive, so N items end at first + N - 1.
-    local last = math.min(#d.order, first + count - 1)
-    for i = first, last do
-        local id = d.order[i];
-        local r = d.records[id];
-        if r and r.entity and r.entity.valid then
-            out[#out + 1] = {
-                id = id,
-                name = r.name,
-                type = r.type,
-                surface_index = r.surface_index,
-                position = {
-                    x = r.position.x,
-                    y = r.position.y
-                }
-            }
-        end
-    end
-    return {
-        records = out,
-        next_cursor = last < #d.order and last + 1 or nil
-    }
-end
-
----Return the first compatibility-sized page for legacy remote consumers.
-function M.snapshot()
-    return M.snapshot_page(1, config.compatibility.snapshot_limit).records
-end
-
 -- Advances at most one shared record. Callers persist their own cursor and may fall back to scanning at end.
 function M.next_for(rs, role)
     local d = state.root().discovery;
@@ -231,57 +182,6 @@ function M.next_for(rs, role)
     end
     local r = d.records[id];
     return r and r.entity or nil, false
-end
-
----Allocate stable custom event IDs once and persist them with the save.
-function M.ensure_events()
-    local d = state.root().discovery;
-    d.events = d.events or {
-        mapped = script.generate_event_name(),
-        cleared = script.generate_event_name()
-    }
-end
-
-
---- Returns copied metadata for valid records of an exact prototype name.
-function M.by_name_page(name, cursor, limit)
-    local d = state.root().discovery
-    local first = math.max(1, tonumber(cursor) or 1)
-    local count = math.min(config.compatibility.snapshot_limit,
-        math.max(1, tonumber(limit) or config.compatibility.snapshot_limit))
-    local out = {}
-    local last = math.min(#d.order, first + count - 1)
-    for i = first, last do
-        local id = d.order[i]
-        local r = d.records[id]
-        if r and r.name == name and r.entity and r.entity.valid then
-            out[#out + 1] = {id = id, name = r.name, type = r.type,
-                surface_index = r.surface_index, position = {x = r.position.x, y = r.position.y}}
-        end
-    end
-    return {records = out, next_cursor = last < #d.order and last + 1 or nil}
-end
-
----Publish the backward-compatible remote API used by other mods.
-function M.register()
-    local mapped = function()
-        local e = state.root().discovery.events
-        return e and e.mapped
-    end
-    local cleared = function()
-        local e = state.root().discovery.events
-        return e and e.cleared
-    end
-    remote.add_interface(config.compatibility.mapping_remote_interface, {
-        get_mapped_entities = M.snapshot,
-        get_mapped_entities_page = M.snapshot_page,
-        get_mapped_entities_by_name_page = M.by_name_page,
-        get_event = mapped,
-        get_clear_event = cleared,
-        clear_mapped_entities = M.clear,
-        get_entity_mapped_event = mapped,
-        get_map_cleared_event = cleared
-    })
 end
 
 return M

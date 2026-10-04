@@ -6,7 +6,6 @@ local manager = require("bot_manager")
 local controllers = require("controllers")
 local discovery = require("discovery")
 local scanner = require("entity_scanner")
-local migrations = require("migrations")
 local supply = require("supply")
 local visuals = require("visuals")
 local movement = require("movement")
@@ -63,13 +62,13 @@ local function selection_job(root)
 end
 
 ---Spend this tick's global work budget across maintenance and role state machines.
----A "work unit" is deliberately coarse: one scan cell, migration item, visual
+---A "work unit" is deliberately coarse: one scan cell, cleanup item, visual
 ---item, or controller transition. The background cap preserves foreground bot
 ---responsiveness while the total cap prevents cost scaling without bound.
 function M.tick(event)
     local root = state.root();
     -- Saves from before cliff selection have no queue. Lazy initialization also
-    -- avoids requiring a schema migration for an empty optional feature.
+    -- keeps the optional feature safe when its queue has not been created yet.
     root.selection_jobs = root.selection_jobs or {}
     local budget = config.scheduler.work_per_tick;
     local background = 0
@@ -79,8 +78,6 @@ function M.tick(event)
             if visuals.step_clear(root) then
                 did_background = true
             elseif discovery.step_clear(root) then
-                did_background = true
-            elseif migrations.step() then
                 did_background = true
             elseif destroyed_visual_job(root) then
                 did_background = true

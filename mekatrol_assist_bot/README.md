@@ -1,23 +1,6 @@
 # Mekatrol Assist Bot
 
-`mekatrol_assist_bot` consolidates the former repair, mapping, gameplay, and
-game-bot mods for Factorio 2.0. The old mods must be disabled. Back up a save
-before first enabling this mod; configuration-change migration imports their
-enabled roles and mapping data once, without retaining old bot entities.
-
-Upgrade procedure:
-
-1. Make a named backup of the save while the old mods are still installed.
-2. Save and quit, remove or disable all four old mods, and enable only
-   `mekatrol_assist_bot`.
-3. Load the backup copy. The first configuration-change pass imports role
-   intent immediately and queues mapping, gameplay discovery, and destroyed-site
-   records for bounded background migration.
-4. Confirm `/mab status all`, then save under a new name. Do not overwrite the
-   backup until the imported bots and map have been checked.
-
-The four source mods are declared incompatible, so Factorio cannot run both
-implementations and create duplicate bots during the transition.
+`mekatrol_assist_bot` provides ten coordinated helper roles for Factorio 2.0.
 
 ## Roles
 
@@ -46,8 +29,7 @@ selection rectangles, pruning, and target planning resume from persistent cell
 cursors under one global per-tick budget.
 
 Mapper discoveries are published into independent persistent repair, logistics,
-and surveyor queues declared by the role registry. This replaces the legacy
-master controller; each consumer advances only when the shared scheduler grants
+and surveyor queues declared by the role registry. Each consumer advances only when the shared scheduler grants
 it a work unit, then falls back to a bounded local scan after its queue ends.
 
 Repair work is split into `tasks.repair.health_per_action` health-point steps.
@@ -102,11 +84,7 @@ the item reported by the ghost prototype. `/mab mapper clear` clears discovery;
 its configured task starts a fresh search.
 
 Role aliases are `b` builder, `r` repair, `u` upgrade, `t` track, `l` lamp,
-`d` cliff, `g` logistics, `c` cleanup, `m` mapper, and `s` surveyor; legacy
-`v` also resolves to surveyor. `/ub`,
-`/tb`, `/cb`, `/lb`, and `/db` forward to upgrade, track, cleanup, lamp, and
-cliff for the 1.0 compatibility cycle. A bare `/ub` cycles the five upgrade
-tasks. `/bot`, `/b`, and `/bot-status` are not registered.
+`d` cliff, `g` logistics, `c` cleanup, `m` mapper, and `s` surveyor.
 
 ## Configuration reference
 
@@ -115,14 +93,14 @@ reference. Defaults and accepted values are summarized below. Distances and
 radii are in tiles and radius comparisons are inclusive. Counts are integers;
 60 ticks equal one second at normal game speed. The top-level sections are
 `controls`, `scheduler`, `formation`, `movement`, `scanning`, `supply`, `tasks`,
-`visuals`, `roles`, `compatibility`, plus `schema_version` and `debug`.
+`visuals`, `roles`, plus `schema_version` and `debug`.
 
 | Setting | Default | Purpose and accepted value |
 | --- | ---: | --- |
-| `schema_version` | `6` | Positive persistent-state schema integer; change only with a migration. |
+| `schema_version` | `7` | Positive persistent-state schema integer. |
 | `controls.<action>` | See Controls | Non-empty Factorio key sequence for every role, `all`, `clear_map`, and `cliff_planner`. |
 | `scheduler.work_per_tick` | `24` | Global work units per tick; integer >= 1. |
-| `scheduler.background_work_per_tick` | `4` | Maximum units used by migration, clearing, selection, and visual rebuilds per tick; integer >= 1. |
+| `scheduler.background_work_per_tick` | `4` | Maximum units used by clearing, selection, and visual rebuilds per tick; integer >= 1. |
 | `scheduler.idle_interval` | `1` | Ticks between formation-follow passes; integer >= 1. Keep at `1` for smooth pursuit. |
 | `scheduler.role_intervals.<role>` | `1`, except lamp `6`, mapper/surveyor `2` | Ticks between eligible role work units; integer >= 1. |
 | `formation.role_order` | Ten roles above | Every registered role exactly once; fixes deterministic slot and scheduler order. |
@@ -160,15 +138,12 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 | `roles.<role>.required_technologies` | Per role | Technology prototype-name array; empty means no gate. |
 | `roles.<role>.technology_mode` | `all` | `all` or `any` requirement semantics. |
 | `roles.<role>.default_task` | Per role | Registered task assigned to new role state. |
-| `compatibility.mapping_remote_interface` | `mapping_bot_mod` | Stable compatibility interface name. |
-| `compatibility.import_legacy_state` | `true` | Whether the one-time import reads recognized legacy storage roots. |
-| `compatibility.snapshot_limit` | `1000` | Maximum records returned synchronously; integer >= 1. |
 | `debug` | `false` | Runs destructive integration fixtures when true; use only in a disposable save. |
 
 The default upgrade mappings are yellow to red, red to blue, and blue to turbo
 belts/underground belts/splitters; burner to standard to fast to bulk inserters;
-and wooden to iron to steel chests. The `blue-to-green-inserters` compatibility
-task name selects the configured fast-to-bulk inserter step. A mapping is used
+and wooden to iron to steel chests. The `blue-to-green-inserters` task name
+selects the configured fast-to-bulk inserter step. A mapping is used
 only when its target entity/item exists and its recipe is available.
 
 Invalid values fail early with the full configuration path, supplied value, and
@@ -193,50 +168,22 @@ work unit. Increasing budgets improves task latency at the cost of simulation
 time; increasing cell size reduces cursor overhead but makes an individual
 query more expensive.
 
-## Compatibility and state
+## State
 
-The only persistent root is `storage.mekatrol_assist_bot` (schema 6). It contains
+The only persistent root is `storage.mekatrol_assist_bot` (schema 7). It contains
 per-player role state, resumable jobs, discoveries, groups, and marked cliffs.
-Rendering objects are not persisted. On first configuration migration the mod
-imports recognizable state from `mekatrol_game_bot`,
-`mekatrol_game_play_bot`, `mapping_bot_mod`, and `mekatrol_repair_mod` if those
-tables are present. It never creates duplicate legacy entities.
-Role enablement and tasks import immediately. Mapping records, gameplay
-discoveries, and destroyed sites use a persistent scheduler job and therefore
-may take multiple ticks. Entity and rendering handles are deliberately not
-copied. Existing custom-input assignments cannot be migrated.
-
-The remote interface `mapping_bot_mod` is retained for one compatibility cycle:
-
-```lua
-remote.call("mapping_bot_mod", "get_mapped_entities")
-remote.call("mapping_bot_mod", "get_mapped_entities_page", cursor, limit)
-remote.call("mapping_bot_mod", "get_mapped_entities_by_name_page", name, cursor, limit)
-remote.call("mapping_bot_mod", "clear_mapped_entities")
-remote.call("mapping_bot_mod", "get_entity_mapped_event")
-remote.call("mapping_bot_mod", "get_map_cleared_event")
--- Older synonyms retained for the same compatibility cycle:
-remote.call("mapping_bot_mod", "get_event")
-remote.call("mapping_bot_mod", "get_clear_event")
-```
-
-Snapshots contain up to `compatibility.snapshot_limit` copied metadata records
-and positions, not mutable internal tables or entity references. Mapping and
-clear events retain the legacy accessors; clearing swaps the live index
-immediately and releases old records and renderings incrementally. Save/load,
-configuration changes, invalid entities, player
-removal, and research reversal are handled at their lifecycle boundaries.
+Rendering objects are not persisted. Save/load, configuration changes, invalid
+entities, player removal, and research reversal are handled at their lifecycle
+boundaries.
 
 ## Release verification
 
-Phase 7 was verified on Factorio 2.0.77 with an isolated new-game load and the
-opt-in migrated-state fixture. The fixture is implemented in
+The mod can be verified with an isolated new-game load and the opt-in runtime fixture. The fixture is implemented in
 `runtime_tests.lua`; it does not require a checked-in test directory. Set
 `debug=true` only in a copied mod inside a disposable Factorio write-data and
-create a new save. The fixture imports all legacy role families and a mapping
-record, drains the resumable migration job, validates role technology and visual
-prototypes, and repeats the 10-bot and 4,096-resource bounded-work baselines. A
-successful run logs `[MAB test] consolidated fixture passed`. Restore
+create a new save. The fixture validates role technology and visual prototypes,
+then runs the 10-bot and 4,096-resource bounded-work baselines. A successful run
+logs `[MAB test] headless baseline passed`. Restore
 `debug=false` afterward. Details are recorded in `PHASE7_CONSOLIDATION.md`.
 
 ## Maintainer checks
