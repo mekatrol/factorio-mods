@@ -68,8 +68,8 @@ end
 function M.tick(event)
     local root = state.root();
     -- Rendering survives save/load while the visual ownership index does not.
-    -- Reclaim orphaned target lines before any controller can draw this
-    -- session's active lines.
+    -- Reclaim orphaned target lines and labels before any controller can draw
+    -- this session's active UI.
     visuals.reclaim_session_lines()
     -- Saves from before cliff selection have no queue. Lazy initialization also
     -- keeps the optional feature safe when its queue has not been created yet.

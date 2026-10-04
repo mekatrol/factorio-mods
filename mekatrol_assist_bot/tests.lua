@@ -84,6 +84,13 @@ function M.run()
         "repair path does not stop outside exact interaction range near a tile edge")
     eq(pathfinding.within_goal({x = 10, y = 10}, {x = 10.99, y = 10.99}, 1.5), true,
         "repair path accepts a tile centre inside exact interaction range")
+    local repair_position = {x = 17, y = -4}
+    local repair_scan_state = {repair_chain_scan = true}
+    eq(repair_role.scan_center(repair_scan_state, {position = {x = 0, y = 0}}, {position = repair_position}),
+        repair_position,
+        "repair chains its next scan from the bot position")
+    eq(repair_role.scan_phase(repair_scan_state), "moving",
+        "repair remains in place during a chained scan")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity - 1}), false,
         "cleanup retains partial cargo while more items may remain")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity}), true,

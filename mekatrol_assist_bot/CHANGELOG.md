@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Repair bots now fly directly over walls and other ground obstacles instead
+  of planning a ground-style route around them.
+- Stale bot labels are now reclaimed after save/load, preventing overlapping
+  `follow` and active-task text from appearing to flicker between states.
+- Repair bots now scan for their next target from their current position and
+  no longer return toward formation during that scan.
+- Fixed repair bots becoming stuck in the working state on a damaged target
+  when no repair packs were available. They now follow formation while waiting
+  and automatically resume once a pack becomes available.
+
 - Track bots now follow their player while searching for a belt graph, matching
   the idle-search behaviour of repair and cleanup bots.
 - Capped each assist bot's combined movement to 0.18 tiles per game tick, so

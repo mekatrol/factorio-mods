@@ -6,17 +6,19 @@ local M = {};
 local owned = {}
 local session_lines_reclaimed = false
 
----Remove target lines left by a previous Lua session.
+---Remove transient bot UI left by a previous Lua session.
 ---Render objects survive save/load, but the non-persistent `owned` index does
----not. Target lines are the only line objects created by this mod, so reclaim
----them once on the first runtime tick; active controllers recreate theirs.
+---not. Reclaim target lines and bot labels once on the first runtime tick;
+---active controllers recreate both. Without reclaiming text, each load leaves
+---an immutable old label underneath the current one, making state changes look
+---like flickering or doubled text.
 function M.reclaim_session_lines()
     if session_lines_reclaimed then
         return
     end
     session_lines_reclaimed = true
     for _, object in pairs(rendering.get_all_objects(script.mod_name)) do
-        if object.valid and object.type == "line" then
+        if object.valid and (object.type == "line" or object.type == "text") then
             object.destroy()
         end
     end

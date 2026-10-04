@@ -7,7 +7,7 @@
 | Role | Tasks | Behaviour | Technology |
 | --- | --- | --- | --- |
 | builder | `follow`, `move_to`, `construct` | Builds nearby same-force ghosts using the prototype-defined placement item. | Construction robotics |
-| repair | `follow`, `move_to`, `repair` | Repairs damaged player-force entities using repair packs and resumable wall-aware A*. | Repair pack |
+| repair | `follow`, `move_to`, `repair` | Flies directly to damaged player-force entities and repairs them using repair packs. | Repair pack |
 | upgrade | `follow`, `yellow-to-red-belts`, `red-to-blue-belts`, `blue-to-green-inserters`, `containers`, `combined` | Replaces the configured belts, inserters, and chests. | Construction robotics plus an available target recipe |
 | track | `follow`, `track` | Locks and traverses one connected belt component, including underground peers, then progressively upgrades it. | Construction robotics; later stages wait for their recipes |
 | lamp | `follow`, `place` | Places lamps beside nearby electric poles after configured darkness. | Construction robotics + lamp |
@@ -37,9 +37,8 @@ Each consumed repair pack contributes exactly
 `supply.repair_pack_durability` points to a persistent pool, including the
 remainder after a target is healed. The bot self-repairs below
 `tasks.repair.self_repair_threshold`, consumes shared discoveries progressively,
-and uses bounded four-neighbour A* to approach targets within
-`tasks.repair.interaction_distance`. A failed route releases its target instead
-of travelling through a wall. Destroyed entity sites remain highlighted until
+and flies directly over obstacles to targets within
+`tasks.repair.interaction_distance`. Destroyed entity sites remain highlighted until
 an entity is rebuilt at that site.
 
 ## Controls

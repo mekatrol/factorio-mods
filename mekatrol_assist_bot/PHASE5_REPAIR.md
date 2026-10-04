@@ -10,10 +10,8 @@ remainder persists in role state. Supply lookup follows the configured priority
 and uses the resumable scanner. The same pool self-repairs the bot below its
 configured threshold.
 
-Travel uses deterministic, resumable four-neighbour A*. It expands one node per
-scheduler unit and stops within interaction distance, allowing walls and gates
-to be repaired without routing onto their occupied tile. Failed routes release
-their target instead of falling back to travel through a wall.
+Travel is direct flight and stops within interaction distance. Walls, gates,
+and other ground obstacles do not affect the route of the airborne repair bot.
 
 Destroyed sites are recorded on death and highlighted until a build, revive, or
 clone replaces the entity at that site. Legacy repair enabled state, destroyed

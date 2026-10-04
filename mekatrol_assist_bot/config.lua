@@ -122,7 +122,7 @@ return {
         }, -- Darkness is [0,1].
         repair = {
             radius = 64,
-            threshold = 0.999,
+            threshold = 1.0,
             self_repair_threshold = 0.9, -- Health ratio [0,1]; repair the bot before seeking another target.
             health_per_action = 25, -- Maximum health points restored by one scheduled work unit; finite >0.
             interaction_distance = 1.5, -- Inclusive tile distance from the target at which repair may begin; >0.

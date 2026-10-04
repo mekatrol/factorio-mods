@@ -29,12 +29,13 @@ local function reset(rs)
 end
 
 ---Create the role-defined bounded spatial scan.
-local function begin(def, rs, anchor)
+local function begin(def, rs, anchor, bot)
     local area = def.scan_area and def.scan_area(rs, anchor)
     if area then
         rs.scan = scanner.start_area(anchor.surface, area, def.filter(rs, anchor))
     else
-        rs.scan = scanner.start(anchor.surface, anchor.position, def.radius(rs), def.filter(rs, anchor))
+        local center = def.scan_center and def.scan_center(rs, anchor, bot) or anchor.position
+        rs.scan = scanner.start(anchor.surface, center, def.radius(rs), def.filter(rs, anchor))
     end
     rs.phase = "scan"
 end
@@ -91,7 +92,7 @@ function M.step(role, rs, anchor, bot)
         end
     end
     if not rs.scan and not rs.target then
-        begin(def, rs, anchor)
+        begin(def, rs, anchor, bot)
         -- Let each role decide whether beginning its scan is active work.  In
         -- particular, cleanup follows formation during an empty watch scan but
         -- stays active while carrying cargo or pursuing a selected stack.

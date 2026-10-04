@@ -1,14 +1,12 @@
--- Repair role policy: find damaged friendly entities and approach them with A*.
+-- Repair role policy: find damaged friendly entities and fly directly to them.
 local config = require("config")
 local discovery = require("discovery")
 local movement = require("movement")
-local pathfinding = require("pathfinding")
 local supply = require("supply")
 local visuals = require("visuals")
 local M = {
     tasks = {"follow", "move_to", "repair"},
-    handoff = true,
-    scan_phase = "idle"
+    handoff = true
 }
 
 -- Target checks are frequent, so convert the configured ignore array to an
@@ -20,6 +18,28 @@ end
 
 function M.radius()
     return config.tasks.repair.radius
+end
+
+---Chain the first search after a completed repair from the bot's current
+---location. If that search is empty, later watch scans return to the normal
+---player-centred, formation-following behaviour.
+function M.scan_center(rs, anchor, bot)
+    if rs.repair_chain_scan then
+        rs.repair_chain_scan = nil
+        rs.repair_scan_active = true
+        return bot.position
+    end
+    return anchor.position
+end
+
+function M.scan_phase(rs)
+    return rs.repair_scan_active and "moving" or "idle"
+end
+
+function M.normalize(rs)
+    if rs.repair_scan_active and rs.scan and rs.scan.done and not rs.target then
+        rs.repair_scan_active = nil
+    end
 end
 
 function M.filter(_, anchor)
@@ -66,15 +86,26 @@ function M.act(rs, anchor, entity)
                 anchor.player.print("[MAB] repair bot is out of repair packs")
                 rs.out_of_repair_packs_warned = true
             end
-            return true
+            -- Do not report the repair as complete: the target is still
+            -- damaged, so keep_target would retain it and leave the bot in a
+            -- permanent working state.  The shared inventory wait polls the
+            -- configured sources and lets the bot follow formation until a
+            -- pack becomes available.
+            rs.waiting_inventory = "repair-pack"
+            return false
         end
+        rs.waiting_inventory = nil
         rs.out_of_repair_packs_warned = nil
     end
     local health_restored = math.min(health_needed_this_action, rs.repair_health_pool)
     entity.health = math.min(entity.max_health, entity.health + health_restored)
     rs.repair_health_pool = rs.repair_health_pool - health_restored
     visuals.health(discovery.identity(entity), entity)
-    return entity.health >= entity.max_health * config.tasks.repair.threshold
+    local complete = entity.health >= entity.max_health * config.tasks.repair.threshold
+    if complete and entity ~= rs.entity then
+        rs.repair_chain_scan = true
+    end
+    return complete
 end
 
 ---Retain a partially repaired target for the next bounded scheduler action.
@@ -86,43 +117,18 @@ end
 function M.before_step(rs, anchor, bot)
     if bot.health and bot.max_health and bot.health < bot.max_health * config.tasks.repair.self_repair_threshold then
         M.act(rs, anchor, bot)
-        return "working"
+        return rs.waiting_inventory and "idle" or "working"
     end
 end
 
----Advance resumable four-neighbour A* and stop within interaction distance.
----Failed routes release their target instead of allowing direct movement through
----walls. Each call performs at most one pathfinding or movement work unit.
-function M.navigate(rs, anchor, bot)
-    if not rs.path_job then
-        rs.path_job = pathfinding.start(anchor.surface, bot.position, rs.target.position,
-            config.tasks.repair.radius, config.tasks.repair.interaction_distance)
-        return "moving", false
-    end
-    if not rs.path_job.done then
-        pathfinding.step(rs.path_job)
-        return "moving", false
-    end
-    if rs.path_job.failed then
-        rs.target, rs.target_visualized = nil, nil
-        rs.path_job, rs.best_distance, rs.scan = nil, nil, nil
-        return "idle", false
-    end
-    if rs.path_job.path and rs.path_job.cursor >= 1 then
-        if movement.step(bot, rs.path_job.path[rs.path_job.cursor]) then
-            rs.path_job.cursor = rs.path_job.cursor - 1
-        end
-        return "moving", false
-    end
-    -- Both sides are squared tile distances, avoiding a square root on every
-    -- repair work unit while retaining the configured inclusive radius.
-    local squared_distance_to_target = movement.distance2(bot.position, rs.target.position)
-    local squared_interaction_distance = config.tasks.repair.interaction_distance ^ 2
-    if squared_distance_to_target > squared_interaction_distance then
-        -- A target may move, and saves from the older tile-distance pathfinder
-        -- can contain a completed route whose endpoint is physically too far
-        -- away. Replan instead of remaining permanently in the working phase.
-        rs.path_job = nil
+---Fly directly toward a target and stop within repair interaction distance.
+---Assist bots are airborne, so walls and gates must not influence their route.
+function M.navigate(rs, _, bot)
+    -- Discard a persisted route from versions which treated repair movement as
+    -- ground navigation.
+    rs.path_job = nil
+    if movement.distance2(bot.position, rs.target.position) > config.tasks.repair.interaction_distance ^ 2 then
+        movement.step(bot, rs.target.position)
         return "moving", false
     end
     return "working", true
