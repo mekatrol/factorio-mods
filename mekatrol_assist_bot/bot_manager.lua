@@ -9,6 +9,14 @@ local technology = require("technology")
 local visuals = require("visuals")
 local M = {}
 
+---Describe the visible activity independently of the configured task.
+function M.activity(rs)
+    if rs.phase ~= "idle" then
+        return rs.task
+    end
+    return rs.waiting_inventory and ("follow (" .. rs.waiting_inventory .. ")") or "follow"
+end
+
 ---List enabled roles in configured formation order.
 local function active_names(ps)
     local out = {};
@@ -79,7 +87,7 @@ function M.enable(index, role, quiet)
     end
     -- Idle means the controller is not performing its configured task, so show
     -- the user-facing activity "follow" rather than a misleading task label.
-    visuals.bot_label(rs.visual_key, rs.entity, role, rs.phase == "idle" and "follow" or rs.task, index)
+    visuals.bot_label(rs.visual_key, rs.entity, role, M.activity(rs), index)
     if not quiet then
         a.player.print("[MAB] " .. role .. " enabled")
     end
@@ -98,6 +106,7 @@ function M.disable(index, role, reason)
     rs.survey_job = nil;
     rs.track_job = nil;
     rs.track_started = nil;
+    rs.waiting_inventory = nil;
     visuals.clear_role(index .. ":" .. role)
     visuals.clear_role("label:" .. index .. ":" .. role)
     if rs.entity and rs.entity.valid then

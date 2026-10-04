@@ -92,6 +92,10 @@ function M.act(rs, anchor, entity)
         if upgrade_items_supplied == nil then
             return false
         end
+        if upgrade_items_supplied == 0 then
+            rs.waiting_inventory = target_prototype_name
+            return false
+        end
         if upgrade_items_supplied > 0 then
             local supply_source = rs.last_source
             rs.last_source = nil

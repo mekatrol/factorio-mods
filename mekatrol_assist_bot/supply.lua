@@ -299,4 +299,34 @@ function M.take(rs, player, target, bot, name, count)
     return 0
 end
 
+---Poll for an item after a role has exhausted every configured supply source.
+---The bot remains formation-idle while searches find nothing.  Once a player
+---or container inventory has stock, stage the item for the original action and
+---allow normal target movement to resume.
+function M.wait_for_item(rs, player, target, bot)
+    local name = rs.waiting_inventory
+    if not name then
+        return true, "moving"
+    end
+    local got = M.take(rs, player, target, bot, name, 1)
+    local staged = rs.supplied and (rs.supplied[name] or 0) or 0
+    if got and got > 0 then
+        rs.supplied = rs.supplied or {}
+        rs.supplied[name] = staged + got
+        rs.waiting_inventory = nil
+        return true, "moving"
+    end
+    if staged > 0 then
+        rs.waiting_inventory = nil
+        return true, "moving"
+    end
+    -- `take` owns movement only after it has found a real container source.
+    -- Incremental scans and completed empty scans leave formation movement free.
+    local cached = rs.source_cache and rs.source_cache[name]
+    local job = rs.supply_job
+    local source = (cached and cached.valid and cached) or
+                       (job and job.scan and job.scan.done and job.source and job.source.valid and job.source)
+    return false, source and "moving" or "idle"
+end
+
 return M

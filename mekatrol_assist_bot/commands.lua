@@ -131,6 +131,7 @@ function M.execute(pi, text)
         rs.survey_job = nil;
         rs.track_job = nil;
         rs.track_started = nil;
+        rs.waiting_inventory = nil;
         say(pi, name .. " refreshed");
         return
     end
@@ -179,6 +180,7 @@ function M.execute(pi, text)
         rs.task = task;
         rs.scan = nil;
         rs.target = nil
+        rs.waiting_inventory = nil
         manager.enable(pi, name, true);
         say(pi, name .. " task=" .. task);
         return

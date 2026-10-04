@@ -5,6 +5,7 @@ local scanner = require("entity_scanner")
 local discovery = require("discovery")
 local movement = require("movement")
 local track = require("track")
+local supply = require("supply")
 local visuals = require("visuals")
 local M = {}
 
@@ -59,9 +60,22 @@ function M.step(role, rs, anchor, bot)
     end
     if rs.target and not rs.target.valid then
         clear_target(rs)
+        rs.waiting_inventory = nil
     end
     if def.normalize then
         def.normalize(rs)
+    end
+
+    -- Upgrade roles retain their selected target while waiting for stock, but
+    -- surrender movement to formation-following until a supply source appears.
+    if rs.waiting_inventory and not rs.target then
+        rs.waiting_inventory = nil
+    end
+    if rs.waiting_inventory then
+        local ready, phase = supply.wait_for_item(rs, anchor.player, rs.target, bot)
+        if not ready then
+            return phase
+        end
     end
 
     -- Shared discoveries are considered before starting a new local scan.
@@ -158,7 +172,7 @@ function M.step(role, rs, anchor, bot)
         end
     end
     if not def.act(rs, anchor, rs.target) then
-        return "working"
+        return rs.waiting_inventory and "idle" or "working"
     end
     if def.keep_target and def.keep_target(rs.target, rs, anchor) then
         return "working"

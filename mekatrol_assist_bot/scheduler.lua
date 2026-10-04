@@ -151,7 +151,7 @@ function M.tick(event)
                 end
                 -- An idle controller is physically following formation even if
                 -- its configured task remains repair/search/etc.
-                local current_task = rs.phase == "idle" and "follow" or rs.task
+                local current_task = manager.activity(rs)
                 visuals.bot_label(visual_key, rs.entity, item.name, current_task, item.player_index)
             end
             budget = budget - 1
