@@ -1,9 +1,7 @@
 -- Repair role policy: find damaged friendly entities and fly directly to them.
 local config = require("config")
-local discovery = require("discovery")
 local movement = require("movement")
 local supply = require("supply")
-local visuals = require("visuals")
 local M = {
     tasks = {"follow", "move_to", "repair"},
     handoff = true
@@ -100,7 +98,6 @@ function M.act(rs, anchor, entity)
     local health_restored = math.min(health_needed_this_action, rs.repair_health_pool)
     entity.health = math.min(entity.max_health, entity.health + health_restored)
     rs.repair_health_pool = rs.repair_health_pool - health_restored
-    visuals.health(discovery.identity(entity), entity)
     local complete = entity.health >= entity.max_health * config.tasks.repair.threshold
     if complete and entity ~= rs.entity then
         rs.repair_chain_scan = true

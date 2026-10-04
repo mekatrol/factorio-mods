@@ -179,38 +179,6 @@ function M.cliff_marker(id, entity)
     end
 end
 
----Visualize remaining health as both arc length and a red-to-green gradient.
-function M.health(key, entity)
-    if not (entity and entity.valid and entity.health and entity.max_health) then
-        return
-    end
-    -- Normalize health to [0,1]. The arc API also interprets its angle as a
-    -- fraction of a full revolution, so this value drives length directly.
-    local ratio = entity.health / entity.max_health;
-    M.clear_role("health:" .. key)
-    local bad, good = config.visuals.colors.health_bad, config.visuals.colors.health_good;
-    -- Linear interpolation per channel: bad + (good - bad) * ratio. At zero it
-    -- is exactly the bad color; at one it is exactly the good color.
-    local color = {
-        r = bad.r + (good.r - bad.r) * ratio,
-        g = bad.g + (good.g - bad.g) * ratio,
-        b = bad.b + (good.b - bad.b) * ratio,
-        a = bad.a + (good.a - bad.a) * ratio
-    }
-    owned["health:" .. key] = {rendering.draw_arc {
-        color = color,
-        max_radius = 0.65,
-        min_radius = 0.56,
-        start_angle = 0,
-        -- Factorio's draw_arc uses a fraction of one turn, not radians. The
-        -- normalized health ratio therefore maps directly to visible arc length.
-        angle = ratio,
-        target = entity,
-        surface = entity.surface,
-        time_to_live = 180
-    }}
-end
-
 ---Schedule incremental deletion for all rendering keys with a prefix.
 function M.begin_clear(root, prefix)
     root.visual_clear = {

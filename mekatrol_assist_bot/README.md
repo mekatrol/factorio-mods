@@ -131,7 +131,7 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 | `tasks.repair.health_per_action` | `25` | Maximum health restored in one work unit; finite > 0. |
 | `tasks.repair.interaction_distance` | `1.5` | Distance at which repair can begin; finite > 0. |
 | `tasks.repair.ignored_names` | Empty | Exact entity prototype names excluded from repair. |
-| `visuals.colors.<use>.<channel>` | See `config.lua` | Target, map, cliff, destroyed-site, and health RGBA channels, each in `[0,1]`. |
+| `visuals.colors.<use>.<channel>` | See `config.lua` | Target, map, cliff, and destroyed-site RGBA channels, each in `[0,1]`. |
 | `visuals.lifetime_ticks` | `3600` | Lifetime for temporary render objects; integer >= 1. |
 | `roles.<role>.prototype_family` | Per role | `construction` or `logistic`; selects the cloned vanilla graphic family. |
 | `roles.<role>.required_technologies` | Per role | Technology prototype-name array; empty means no gate. |

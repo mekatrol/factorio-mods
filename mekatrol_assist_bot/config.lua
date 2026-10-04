@@ -163,18 +163,6 @@ return {
                 g = 0.15,
                 b = 0.1,
                 a = 0.8
-            },
-            health_good = {
-                r = 0,
-                g = 1,
-                b = 0,
-                a = 0.9
-            },
-            health_bad = {
-                r = 1,
-                g = 0,
-                b = 0,
-                a = 0.9
             }
         },
         lifetime_ticks = 3600 -- Positive integer ticks; temporary objects expire safely after save/load.

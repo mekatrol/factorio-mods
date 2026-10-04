@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Removed the custom repair health arc; repaired entities use Factorio's native
+  health bar instead.
 - Fixed supply-seeking bots oscillating between the player and their work
   target while travelling to withdraw an item from player inventory.
 - Bots now fly to the live position of a player before withdrawing supplies
