@@ -36,6 +36,10 @@ local function build(role, family, state, name)
     prototype.localised_name = {"entity-name.mekatrol-assist-bot", role}
     prototype.flags = {"placeable-off-grid", "not-on-map", "not-blueprintable", "not-deconstructable",
                        "not-selectable-in-game"}
+    -- The vanilla robot clones inherit a mining result.  Clear it explicitly:
+    -- holding the mine control over a ground entity must not collect an assist
+    -- bot that happens to fly beneath the cursor.
+    prototype.minable = nil
     -- Zero payload/radii retain animation and attackability while preventing
     -- autonomous logistic-network assignments.
     prototype.max_payload_size = 0

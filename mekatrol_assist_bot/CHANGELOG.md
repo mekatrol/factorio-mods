@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Assist bots can no longer be collected by holding the mine control while one
+  flies beneath the cursor.
 - Removed the custom repair health arc; repaired entities use Factorio's native
   health bar instead.
 - Fixed supply-seeking bots oscillating between the player and their work
