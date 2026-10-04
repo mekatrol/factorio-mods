@@ -2,6 +2,19 @@
 -- template selection can be changed without editing prototype-building logic.
 local config = require("config")
 
+-- Give firearm magazines their own compatibility category. Ordinary bullet
+-- weapons are extended to accept it in data-final-fixes.lua, while this turret
+-- deliberately keeps the original "bullet" category used by piercing and
+-- uranium magazines. Inserters can therefore reject yellow magazines before
+-- picking them up instead of a runtime script having to eject them afterward.
+data:extend({
+  {
+    type = "ammo-category",
+    name = config.combat.basic_ammo_category
+  }
+})
+data.raw.ammo["firearm-magazine"].ammo_category = config.combat.basic_ammo_category
+
 -- Recolour only vanilla runtime-colour masks so the turret reads as red while
 -- preserving the original metal detail, lighting, animation, and shadows.
 local function tint_runtime_layers(value)

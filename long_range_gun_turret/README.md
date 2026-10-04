@@ -11,10 +11,10 @@ Adds a long range variant of the vanilla gun turret.
 The mod reuses the vanilla graphics and tints their mask layers red, so it does
 not duplicate Factorio's image assets.
 
-Factorio groups yellow, red, and uranium magazines into one ammunition category.
-A small runtime check returns yellow magazines to the ground beside the turret,
-allowing the new turret to enforce the red-or-better ammunition requirement
-without changing the behaviour of vanilla weapons or ammunition.
+The mod assigns yellow magazines a separate ammunition category and extends
+ordinary bullet weapons to accept both categories. The long-range turret accepts
+only the original category used by red and uranium magazines, so inserters leave
+yellow magazines on their belt instead of loading and spilling them.
 
 All mod-specific prototype names, balance values, appearance values, recipe
 ingredients, crafting time, output, source-prototype selections, and ammunition

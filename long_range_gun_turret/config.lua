@@ -19,7 +19,7 @@ local config = {
   combat = {
     maximum_range = 60,
     damage_modifier = 2,
-    forbidden_ammo = "firearm-magazine"
+    basic_ammo_category = "basic-bullet"
   },
 
   -- Use a muted red on the vanilla colour-mask artwork so the variant remains
