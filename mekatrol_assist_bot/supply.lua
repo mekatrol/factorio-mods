@@ -24,9 +24,17 @@ local function take_from_player(rs, player, bot, name, count)
     local inv = player.get_main_inventory()
     if not inv or inv.get_item_count(name) <= 0 then
         rs.player_supply_name = nil
+        rs.player_supply_count = nil
         return 0
     end
+    -- Preserve the original batch size while travelling. Inventory-wait polls
+    -- request one item merely to test availability and must not shrink an
+    -- already-started batch pickup to one item.
+    if rs.player_supply_name ~= name then
+        rs.player_supply_count = count
+    end
     rs.player_supply_name = name
+    local requested = rs.player_supply_count or count
     -- Mark the role as supply-waiting before yielding movement.  Controllers
     -- process inventory waits before target navigation, so this prevents the
     -- next work unit from pulling the bot back toward its repair/build target.
@@ -36,7 +44,7 @@ local function take_from_player(rs, player, bot, name, count)
     end
     local got = inv.remove {
         name = name,
-        count = count
+        count = requested
     }
     if got > 0 then
         rs.supplied[name] = (rs.supplied[name] or 0) + got
@@ -44,9 +52,11 @@ local function take_from_player(rs, player, bot, name, count)
         -- source metadata left by an older staged batch of the same item.
         rs.supplied_sources[name] = nil
         rs.last_source = nil
+        rs.player_supply_count = nil
         return nil
     end
     rs.player_supply_name = nil
+    rs.player_supply_count = nil
     return 0
 end
 

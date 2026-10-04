@@ -104,12 +104,12 @@ function M.act(rs, anchor, entity)
         if upgrade_items_supplied > 0 then
             local supply_source = rs.last_source
             rs.last_source = nil
+            local last_user = entity.last_user
             local parameters = {
                 name = target_prototype_name,
                 position = entity.position,
                 direction = entity.direction,
                 force = entity.force,
-                player = entity.last_user,
                 fast_replace = true,
                 spill = false,
                 raise_built = true
@@ -119,8 +119,11 @@ function M.act(rs, anchor, entity)
             end
             -- Choose which physical item must be returned based on whether the
             -- world replacement consumed the supplied higher-tier item.
-            local returned_item_name = entity.surface.create_entity(parameters) and source_prototype_name or
-                                           target_prototype_name
+            local replacement = entity.surface.create_entity(parameters)
+            if replacement and last_user then
+                replacement.last_user = last_user
+            end
+            local returned_item_name = replacement and source_prototype_name or target_prototype_name
             supply.give_or_carry(rs, anchor.player, {name = returned_item_name, count = 1}, supply_source)
         end
     end

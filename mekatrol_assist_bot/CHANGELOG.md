@@ -10,6 +10,10 @@
   containers are no longer visited once before supply and again for replacement.
 - Standalone container upgrades now share a prefetched supply batch across
   successive targets and return recovered or unused items after the scan ends.
+- Fixed player-bound supply trips losing their requested batch size while in
+  transit and withdrawing only one item on arrival.
+- Fast replacement no longer uses Factorio's simulated-player mode, which was
+  depositing removed entities directly into the player's remote inventory.
 - Assist bots can no longer be collected by holding the mine control while one
   flies beneath the cursor.
 - Removed the custom repair health arc; repaired entities use Factorio's native

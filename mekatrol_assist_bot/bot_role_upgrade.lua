@@ -66,14 +66,14 @@ function M.grouped(rs)
                    selected_entity.type == "splitter"))
 end
 
----Fast-replace while preserving direction, force, user, and underground type.
+---Fast-replace while preserving direction, force, last user, and underground type.
 local function replace(entity, name)
+    local last_user = entity.last_user
     local parameters = {
         name = name,
         position = entity.position,
         direction = entity.direction,
         force = entity.force,
-        player = entity.last_user,
         fast_replace = true,
         spill = false,
         raise_built = true
@@ -81,7 +81,14 @@ local function replace(entity, name)
     if entity.type == "underground-belt" then
         parameters.type = entity.belt_to_ground_type
     end
-    return entity.surface.create_entity(parameters) ~= nil
+    local replacement = entity.surface.create_entity(parameters)
+    if replacement and last_user then
+        -- Passing `player` to create_entity would simulate player fast-replace
+        -- and teleport the removed item directly into that player's inventory.
+        -- Restore attribution only after the bot-owned replacement is complete.
+        replacement.last_user = last_user
+    end
+    return replacement ~= nil
 end
 
 ---Count the current entity plus matching remaining members of its discovered
