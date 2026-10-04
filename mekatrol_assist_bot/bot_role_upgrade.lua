@@ -11,7 +11,11 @@ local M = {
 -- Supplying prototype names to the engine avoids scanning unrelated entities.
 local names = {}
 for name in pairs(upgrades) do
-    names[#names + 1] = name
+    -- Burner inserters are often the power-independent fallback that keeps
+    -- boiler fuel moving during a brownout, so never replace them.
+    if name ~= "burner-inserter" then
+        names[#names + 1] = name
+    end
 end
 table.sort(names)
 
@@ -25,6 +29,9 @@ end
 
 ---Validate prototype availability, recipe access, and the selected task subset.
 function M.valid(entity, rs, anchor)
+    if entity.name == "burner-inserter" then
+        return false
+    end
     local target_prototype_name = upgrades[entity.name]
     local target_recipe = target_prototype_name and anchor and anchor.force.recipes[target_prototype_name]
     -- Entity and item prototypes are both required: one is created in the world
