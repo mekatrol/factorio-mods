@@ -107,8 +107,13 @@ function M.tick(event)
             end
             if a and rs.enabled and rs.entity and rs.entity.valid and event.tick %
                 config.scheduler.role_intervals[item.name] == 0 then
+                local logic = registry.roles[item.name].logic
                 local visual_key = rs.visual_key or (item.player_index .. ":" .. item.name)
-                if not supply.flush_cargo(rs, a.player, rs.entity) then
+                -- Cleanup accumulates several ground stacks before delivery;
+                -- all other roles immediately return their unused supplies.
+                local should_flush = not logic.should_flush_cargo or logic.should_flush_cargo(rs)
+                local cargo_flushed = not should_flush or supply.flush_cargo(rs, a.player, rs.entity)
+                if not cargo_flushed then
                     -- Cargo delivery takes precedence over ordinary role work;
                     -- this prevents collected items from becoming stranded.
                     -- Cargo fields may not exist on roles/saves which have never
@@ -120,7 +125,6 @@ function M.tick(event)
                     -- A concrete destination still owns movement explicitly.
                     -- Lua has no ternary operator; `condition and A or B` works
                     -- here because both A and B are non-false strings.
-                    local logic = registry.roles[item.name].logic
                     rs.phase = logic.cargo_phase and logic.cargo_phase(destination) or "working"
                     manager.set_visual(item.name, rs, a, rs.phase)
                 elseif rs.task == "follow" then

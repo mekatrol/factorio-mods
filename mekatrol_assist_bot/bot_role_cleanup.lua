@@ -23,6 +23,19 @@ function M.valid()
     return true
 end
 
+---Return cargo only once the bot is full or its latest search found no item.
+---Other roles flush immediately because their cargo represents unused supplies,
+---whereas cleanup cargo is intentionally accumulated up to the configured cap.
+function M.should_flush_cargo(rs)
+    if rs.task ~= "cleanup" then
+        return true
+    end
+    if (rs.cargo_count or 0) >= config.supply.cleanup_capacity then
+        return true
+    end
+    return rs.scan ~= nil and rs.scan.done and not (rs.target and rs.target.valid)
+end
+
 ---Move as much of one ground stack as fits into the role's shared cargo cap.
 ---Cargo is stored as serializable counts rather than inventory objects, allowing
 ---delivery to resume safely after save/load or after the player changes surface.

@@ -9,6 +9,7 @@ local command = require("commands")
 local technology = require("technology")
 local logistics = require("logistics")
 local repair_role = require("bot_role_repair")
+local cleanup_role = require("bot_role_cleanup")
 local M = {}
 
 ---Assert exact equality while adding consistent mod-specific context.
@@ -79,6 +80,14 @@ function M.run()
     damaged.force = enemy_force
     eq(repair_role.valid(damaged, nil, {force = player_force}), false,
         "repair rejects a damaged entity on another force")
+    eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity - 1}), false,
+        "cleanup retains partial cargo while more items may remain")
+    eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity}), true,
+        "cleanup flushes cargo at capacity")
+    eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = 1, scan = {done = true}}), true,
+        "cleanup flushes partial cargo after exhausting its search")
+    eq(cleanup_role.should_flush_cargo({task = "follow", cargo_count = 1}), true,
+        "cleanup flushes retained cargo after changing tasks")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
     local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
