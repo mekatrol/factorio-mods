@@ -5,7 +5,10 @@ local upgrades = config.tasks.upgrade.mappings
 local M = {
     tasks = {"follow", "yellow-to-red-belts", "red-to-blue-belts", "blue-to-green-inserters", "containers",
              "combined"},
-    scan_phase = "moving"
+    -- A bounded scan does not own a movement destination. Keep formation while
+    -- it searches; active movement begins only after the nearest target has
+    -- been selected from the completed scan.
+    scan_phase = "idle"
 }
 
 -- Supplying prototype names to the engine avoids scanning unrelated entities.
