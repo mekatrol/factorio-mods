@@ -103,10 +103,9 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 | `scheduler.idle_interval` | `1` | Ticks between formation-follow passes; integer >= 1. Keep at `1` for smooth pursuit. |
 | `scheduler.role_intervals.<role>` | `1`, except lamp `6`, mapper/surveyor `2` | Ticks between eligible role work units; integer >= 1. |
 | `formation.role_order` | Ten roles above | Every registered role exactly once; fixes deterministic slot and scheduler order. |
-| `formation.slot_spacing` | `1.333` | Vertical separation between slots; finite > 0. |
-| `formation.side_distance` | `2` | Horizontal distance behind the player; finite > 0. |
-| `formation.column_spacing` | `2` | Horizontal separation between additional columns; finite > 0. |
-| `formation.max_slots_per_column` | `10` | Maximum bots in one centered column; integer >= 1. |
+| `formation.slot_spacing` | `3.5` | Minimum straight-line separation between adjacent bots; finite > 0. |
+| `formation.radius` | `6` | Minimum distance of the rear arc from the player; finite > 0. Crowded formations expand this automatically. |
+| `formation.arc_degrees` | `140` | Width of the circular arc behind movement; finite > 0 and < 180. |
 | `formation.direction_threshold` | `0.1` | Player movement needed to place the formation behind their cardinal heading; finite > 0. |
 | `movement.step` | `0.18` | Maximum movement per bot per game tick across all role work; finite > 0. |
 | `movement.arrival_distance` | `0.01` | Arrival dead band; finite > 0. |
@@ -151,7 +150,9 @@ accepted range. Unknown technologies fail during initialization.
 
 ## Formation, animation, and performance
 
-Active idle bots occupy centered, evenly spaced columns. The complete formation
+Active idle bots occupy a centered, evenly spaced circular arc behind the
+player's current movement direction. The arc expands to preserve bot and label
+clearance. The complete formation
 mirrors when horizontal player movement crosses the configured threshold, and
 bots ease back into their stable slots after work. Construction roles clone the
 full vanilla construction-robot graphics; logistics and cleanup clone the full

@@ -20,7 +20,7 @@ then creates and moves every role prototype.
 
 ## Formation and lifecycle
 
-Pure initialization checks cover odd and even centering, multiple columns,
+Pure initialization checks cover odd and even centering, rear-arc clearance,
 unique coordinates, whole-formation horizontal mirroring, and centered reflow
 after a role is removed. Stable configured role order is the only input, so
 coordinates remain deterministic across save/load and multiplayer peers.

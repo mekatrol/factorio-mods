@@ -31,10 +31,10 @@ function M.run(c, known)
         end
         num("scheduler.role_intervals." .. role, interval, 1, nil, true)
     end
-    for _, k in ipairs {"slot_spacing", "side_distance", "column_spacing", "direction_threshold"} do
+    for _, k in ipairs {"slot_spacing", "radius", "direction_threshold"} do
         num("formation." .. k, c.formation[k], 0.000001)
     end
-    num("formation.max_slots_per_column", c.formation.max_slots_per_column, 1, nil, true)
+    num("formation.arc_degrees", c.formation.arc_degrees, 0.000001, 179.999999)
     local seen = {};
     for i, r in ipairs(c.formation.role_order) do
         if not known[r] then

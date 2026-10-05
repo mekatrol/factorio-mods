@@ -58,41 +58,27 @@ function M.slots(active, direction)
         row_x, row_y = 1, 0
     end
 
-    -- Each role receives exactly one offset in this result table.
-    local result = {};
+    local result = {}
+    local count = #active
+    if count == 0 then
+        return result
+    end
 
-    -- A column may contain at most this many bots. The current configuration
-    -- sets it to ten, so all ten roles occupy one row perpendicular to travel.
-    local per = config.formation.max_slots_per_column
+    -- Distribute every active bot over a circular arc centred directly behind
+    -- the player's heading. The arc never reaches the player's forward half.
+    local arc = math.rad(config.formation.arc_degrees)
+    local angle_step = count > 1 and arc / (count - 1) or 0
+    local radius = config.formation.radius
+    if count > 1 then
+        -- Chord length is 2r*sin(angle/2). Enlarge crowded formations so the
+        -- requested clearance applies to actual world distance, not arc length.
+        radius = math.max(radius, config.formation.slot_spacing / (2 * math.sin(angle_step / 2)))
+    end
 
-    -- ipairs preserves the configured role order, making layout deterministic.
     for i, name in ipairs(active) do
-        -- Convert the one-based role index into a zero-based column index.
-        -- Indices 1..per are column 0, per+1..2*per are column 1, and so on.
-        local column = math.floor((i - 1) / per);
-
-        -- Record the first one-based role index belonging to this column.
-        local first = column * per + 1;
-
-        -- The final column may not be full, so use its actual remaining count.
-        -- Centering with the real count prevents a partially filled row from
-        -- being visually biased toward one side of the player.
-        local count = math.min(per, #active - first + 1);
-
-        -- Convert the global role index into its one-based row within a column.
-        local row = i - first + 1
-
-        -- Column 0 sits side_distance behind the player. Overflow columns are
-        -- placed another column_spacing farther behind the direction of travel.
-        local behind = config.formation.side_distance + column * config.formation.column_spacing
-
-        -- Center row positions around zero. For example, three rows become
-        -- -spacing, 0, +spacing; two rows become -spacing/2, +spacing/2.
-        local across = (row - (count + 1) / 2) * config.formation.slot_spacing
-
-        -- Negating the heading vector moves the slot behind the player.
-        -- Adding the perpendicular row vector spreads bots across that trailing
-        -- line. The result remains relative to the player's current position.
+        local angle = count > 1 and (-arc / 2 + (i - 1) * angle_step) or 0
+        local behind = radius * math.cos(angle)
+        local across = radius * math.sin(angle)
         result[name] = {
             x = -heading_x * behind + row_x * across,
             y = -heading_y * behind + row_y * across

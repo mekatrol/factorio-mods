@@ -43,12 +43,11 @@ return {
     formation = {
         role_order = {"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup", "mapper",
                       "surveyor"},
-        slot_spacing = 1.333,
-        side_distance = 2,
-        column_spacing = 2, -- Tiles, finite >0.
-        -- Keep every bot in one vertical column behind the player, as in the
-        -- pre-consolidation follow implementation.
-        max_slots_per_column = 10, -- Positive integer.
+        -- The radius grows when necessary so adjacent bots retain this much
+        -- straight-line clearance along the rear arc.
+        slot_spacing = 3.5,
+        radius = 6, -- Minimum distance from the player, in tiles; finite >0.
+        arc_degrees = 140, -- Rear arc width in degrees; >0 and <180.
         direction_threshold = 0.1 -- Tiles of movement before choosing the trailing side; >0.
     },
     movement = {

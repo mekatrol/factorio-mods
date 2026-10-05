@@ -25,13 +25,20 @@ local function eq(a, b, message)
     end
 end
 
+---Assert approximate equality for geometry calculated with trigonometry.
+local function near(a, b, message)
+    if math.abs(a - b) > 0.000001 then
+        error("MAB test failed: " .. message .. " (" .. tostring(a) .. " !~= " .. tostring(b) .. ")")
+    end
+end
+
 ---Run deterministic unit-style checks that require no temporary world fixture.
 function M.run()
     validate.run(config, registry.roles)
     local odd = formation.slots({"builder", "repair", "upgrade"}, "right");
-    eq(odd.repair.y, 0, "odd formation centers middle slot")
+    near(odd.repair.y, 0, "odd formation centers middle slot")
     local even = formation.slots({"builder", "repair"}, "right");
-    eq(even.builder.y, -even.repair.y, "even formation is symmetric")
+    near(even.builder.y, -even.repair.y, "even formation is symmetric")
     eq(registry.get("s").name, "surveyor", "s alias")
     eq(registry.has_task(registry.get("builder"), "construct"), true, "builder construct task")
     eq(registry.has_task(registry.get("logistics"), "pickup"), true, "logistics pickup task")
@@ -158,24 +165,36 @@ function M.run()
     eq(allowed, true, "track may wait for later recipe research")
     local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
                                   "mapper", "surveyor"}, "right");
-    eq(many.surveyor.x, many.builder.x, "all roles remain in one trailing column")
+    near(many.surveyor.x, many.builder.x, "arc endpoints have equal trailing distance")
+    near(many.builder.y, -many.surveyor.y, "arc endpoints are symmetric")
     eq(formation.has_unique_slots(many), true, "formation slots never overlap")
+    local previous
+    for _, role in ipairs(config.formation.role_order) do
+        local slot = many[role]
+        eq(slot.x < 0, true, "rightward arc keeps role " .. role .. " behind player")
+        if previous then
+            local dx, dy = slot.x - previous.x, slot.y - previous.y
+            eq(dx * dx + dy * dy >= config.formation.slot_spacing ^ 2 - 0.000001, true,
+                "adjacent arc slots preserve configured clearance")
+        end
+        previous = slot
+    end
     local mirrored = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
                                       "mapper", "surveyor"}, "left")
     for role, slot in pairs(many) do
-        eq(mirrored[role].x, -slot.x, "formation mirrors role " .. role)
-        eq(mirrored[role].y, slot.y, "formation mirror preserves row for " .. role)
+        near(mirrored[role].x, -slot.x, "formation mirrors role " .. role)
+        near(mirrored[role].y, slot.y, "formation mirror preserves row for " .. role)
     end
     local upward = formation.slots({"builder", "repair", "upgrade"}, "up")
-    eq(upward.repair.y, config.formation.side_distance, "upward travel puts bots below player")
-    eq(upward.builder.x, -upward.upgrade.x, "upward formation spreads horizontally")
+    near(upward.repair.y, config.formation.radius, "upward travel puts center bot below player")
+    near(upward.builder.x, -upward.upgrade.x, "upward formation spreads horizontally")
     local downward = formation.slots({"builder", "repair", "upgrade"}, "down")
-    eq(downward.repair.y, -config.formation.side_distance, "downward travel puts bots above player")
-    eq(downward.builder.x, -downward.upgrade.x, "downward formation spreads horizontally")
-    eq(downward.builder.x, upward.builder.x, "vertical reversal preserves role order")
+    near(downward.repair.y, -config.formation.radius, "downward travel puts center bot above player")
+    near(downward.builder.x, -downward.upgrade.x, "downward formation spreads horizontally")
+    near(downward.builder.x, upward.builder.x, "vertical reversal preserves role order")
     local reflowed = formation.slots({"builder", "upgrade", "track", "lamp", "cliff"}, "right")
     eq(formation.has_unique_slots(reflowed), true, "formation remains unique after disable reflow")
-    eq(reflowed.builder.y, -reflowed.cliff.y, "shortened column remains centered")
+    near(reflowed.builder.y, -reflowed.cliff.y, "shortened arc remains centered")
     return true
 end
 

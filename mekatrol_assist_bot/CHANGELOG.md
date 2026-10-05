@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Replaced the close trailing line with a wider rear circular arc. Bots now keep
+  at least 3.5 tiles apart and the arc expands as roles are enabled, preventing
+  bot labels from obscuring the player or one another.
+
 - Lamp bots now follow formation during daylight and idle scans, place only at
   night, and prefetch up to 100 lamps according to valid placement demand.
 - Upgrade and track bots now collect up to 100 matching items per supply trip
