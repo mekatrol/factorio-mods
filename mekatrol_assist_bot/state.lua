@@ -117,4 +117,13 @@ function M.next_role()
     }
 end
 
+---Return the number of registered player-role pairs in one scheduler cycle.
+---This is also the maximum useful number of foreground visits in one tick:
+---revisiting a pair merely repeats controller and rendering work.
+function M.role_count()
+    local s = M.root().scheduler
+    s.player_order = s.player_order or {}
+    return #s.player_order * #config.formation.role_order
+end
+
 return M

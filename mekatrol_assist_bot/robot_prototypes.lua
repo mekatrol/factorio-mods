@@ -36,6 +36,13 @@ local function build(role, family, state, name)
     prototype.localised_name = {"entity-name.mekatrol-assist-bot", role}
     prototype.flags = {"placeable-off-grid", "not-on-map", "not-blueprintable", "not-deconstructable",
                        "not-selectable-in-game"}
+    -- Assist bots are script-driven visual actors.  Do not inherit a collision
+    -- layer from the vanilla robot: several followers crossing or crowding the
+    -- character must never impede the character's running speed.
+    prototype.collision_mask = {
+        layers = {}
+    }
+    prototype.collision_box = {{0, 0}, {0, 0}}
     -- The vanilla robot clones inherit a mining result.  Clear it explicitly:
     -- holding the mine control over a ground entity must not collect an assist
     -- bot that happens to fly beneath the cursor.

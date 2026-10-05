@@ -76,6 +76,12 @@ function M.tick(event)
     root.selection_jobs = root.selection_jobs or {}
     local budget = config.scheduler.work_per_tick;
     local background = 0
+    -- A budget larger than the roster used to wrap the round-robin cursor and
+    -- run some controllers two or three times in one game tick.  Besides being
+    -- unfair at the wrap boundary, that made CPU/rendering cost jump as bots
+    -- were enabled.  One visit per pair is sufficient; movement already has a
+    -- separate per-tick allowance.
+    local foreground_remaining = state.role_count()
     while budget > 0 do
         local did_background = false
         if background < config.scheduler.background_work_per_tick then
@@ -93,6 +99,10 @@ function M.tick(event)
             background = background + 1;
             budget = budget - 1
         else
+            if foreground_remaining == 0 then
+                break
+            end
+            foreground_remaining = foreground_remaining - 1
             -- Round-robin selection gives every player-role pair an equal
             -- opportunity independent of how expensive its current task is.
             local item = state.next_role();
