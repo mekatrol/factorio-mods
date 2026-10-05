@@ -75,6 +75,23 @@ return {
             radius = 64,
             -- Maximum matching upgrade items collected for one work batch.
             items_per_trip = 100,
+            -- Familiar sprite colours used in inventory-wait labels. Prototype
+            -- names remain present so the label is still exact and searchable.
+            item_colors = {
+                ["fast-transport-belt"] = "red",
+                ["fast-underground-belt"] = "red",
+                ["fast-splitter"] = "red",
+                ["express-transport-belt"] = "blue",
+                ["express-underground-belt"] = "blue",
+                ["express-splitter"] = "blue",
+                ["turbo-transport-belt"] = "green",
+                ["turbo-underground-belt"] = "green",
+                ["turbo-splitter"] = "green",
+                ["fast-inserter"] = "blue",
+                ["bulk-inserter"] = "green",
+                ["iron-chest"] = "grey",
+                ["steel-chest"] = "grey"
+            },
             mode_radii = {
                 ["blue-to-green-inserters"] = 10
             },

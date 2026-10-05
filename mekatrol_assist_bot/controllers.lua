@@ -71,6 +71,7 @@ function M.step(role, rs, anchor, bot)
     if rs.target and not rs.target.valid then
         clear_target(rs)
         rs.waiting_inventory = nil
+        rs.waiting_accept_any_quality = nil
     end
     if def.normalize then
         def.normalize(rs)
@@ -80,6 +81,7 @@ function M.step(role, rs, anchor, bot)
     -- surrender movement to formation-following until a supply source appears.
     if rs.waiting_inventory and not rs.target then
         rs.waiting_inventory = nil
+        rs.waiting_accept_any_quality = nil
     end
     if rs.waiting_inventory then
         local ready, phase = supply.wait_for_item(rs, anchor.player, rs.target, bot)

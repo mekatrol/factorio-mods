@@ -20,11 +20,34 @@ end
 ---Returns zero when the player has no matching item, and nil while travelling
 ---or after withdrawing. Staging forces the role to travel back to its target
 ---before the next call consumes the item and performs the action.
-local function take_from_player(rs, player, bot, name, count)
+local function inventory_quality(inv, name, accept_any_quality, preferred)
+    if preferred and inv.get_item_count {name = name, quality = preferred} > 0 then
+        return preferred
+    end
+    if inv.get_item_count(name) > 0 then
+        return "normal"
+    end
+    if not accept_any_quality or not inv.get_item_quality_counts then
+        return nil
+    end
+    local best, best_level
+    for quality, amount in pairs(inv.get_item_quality_counts(name)) do
+        local prototype = prototypes.quality and prototypes.quality[quality]
+        local level = prototype and prototype.level or math.huge
+        if amount > 0 and (not best_level or level < best_level) then
+            best, best_level = quality, level
+        end
+    end
+    return best
+end
+
+local function take_from_player(rs, player, bot, name, count, accept_any_quality)
     local inv = player.get_main_inventory()
-    if not inv or inv.get_item_count(name) <= 0 then
+    local quality = inv and inventory_quality(inv, name, accept_any_quality, rs.player_supply_quality)
+    if not quality then
         rs.player_supply_name = nil
         rs.player_supply_count = nil
+        rs.player_supply_quality = nil
         return 0
     end
     -- Preserve the original batch size while travelling. Inventory-wait polls
@@ -34,6 +57,7 @@ local function take_from_player(rs, player, bot, name, count)
         rs.player_supply_count = count
     end
     rs.player_supply_name = name
+    rs.player_supply_quality = quality
     local requested = rs.player_supply_count or count
     -- Mark the role as supply-waiting before yielding movement.  Controllers
     -- process inventory waits before target navigation, so this prevents the
@@ -44,19 +68,24 @@ local function take_from_player(rs, player, bot, name, count)
     end
     local got = inv.remove {
         name = name,
-        count = requested
+        count = requested,
+        quality = quality
     }
     if got > 0 then
         rs.supplied[name] = (rs.supplied[name] or 0) + got
+        rs.supplied_qualities = rs.supplied_qualities or {}
+        rs.supplied_qualities[name] = quality
         -- A player pickup has no container return destination. Clear any stale
         -- source metadata left by an older staged batch of the same item.
         rs.supplied_sources[name] = nil
         rs.last_source = nil
         rs.player_supply_count = nil
+        rs.player_supply_quality = nil
         return nil
     end
     rs.player_supply_name = nil
     rs.player_supply_count = nil
+    rs.player_supply_quality = nil
     return 0
 end
 
@@ -78,18 +107,22 @@ function M.give_or_carry(rs, player, stack, destination)
         rs.cargo = rs.cargo or {};
         rs.cargo_order = rs.cargo_order or {};
         rs.cargo_destinations = rs.cargo_destinations or {};
+        rs.cargo_stacks = rs.cargo_stacks or {}
         rs.cargo_count = rs.cargo_count or 0
+        local quality = stack.quality or "normal"
+        local key = quality == "normal" and stack.name or (stack.name .. "\31" .. quality)
         -- `cargo` is a count map for consolidation, while `cargo_order` provides
         -- deterministic iteration. Append a name only on its first queued unit.
-        if not rs.cargo[stack.name] then
-            rs.cargo_order[#rs.cargo_order + 1] = stack.name
+        if not rs.cargo[key] then
+            rs.cargo_order[#rs.cargo_order + 1] = key
         end
-        rs.cargo[stack.name] = (rs.cargo[stack.name] or 0) + remaining;
+        rs.cargo[key] = (rs.cargo[key] or 0) + remaining;
+        rs.cargo_stacks[key] = {name = stack.name, quality = quality}
         rs.cargo_count = rs.cargo_count + remaining
         -- Only store a live LuaEntity. Invalid references cannot be dereferenced
         -- later; omitting it safely falls back to delivery to the player.
         if destination and destination.valid then
-            rs.cargo_destinations[stack.name] = destination
+            rs.cargo_destinations[key] = destination
         end
     end
     return 0
@@ -101,11 +134,18 @@ function M.return_staged(rs, player)
     for name, count in pairs(rs.supplied or {}) do
         if count > 0 then
             local destination = rs.supplied_sources and rs.supplied_sources[name]
-            M.give_or_carry(rs, player, {name = name, count = count}, destination)
+            M.give_or_carry(rs, player, {
+                name = name,
+                count = count,
+                quality = rs.supplied_qualities and rs.supplied_qualities[name]
+            }, destination)
         end
         rs.supplied[name] = nil
         if rs.supplied_sources then
             rs.supplied_sources[name] = nil
+        end
+        if rs.supplied_qualities then
+            rs.supplied_qualities[name] = nil
         end
     end
 end
@@ -115,17 +155,21 @@ function M.queue_cargo(rs, stack, prefer_existing_container)
     rs.cargo = rs.cargo or {};
     rs.cargo_order = rs.cargo_order or {};
     rs.cargo_destinations = rs.cargo_destinations or {};
+    rs.cargo_stacks = rs.cargo_stacks or {}
     rs.cargo_count = rs.cargo_count or 0
-    if not rs.cargo[stack.name] then
-        rs.cargo_order[#rs.cargo_order + 1] = stack.name
+    local quality = stack.quality or "normal"
+    local key = quality == "normal" and stack.name or (stack.name .. "\31" .. quality)
+    if not rs.cargo[key] then
+        rs.cargo_order[#rs.cargo_order + 1] = key
     end
-    rs.cargo[stack.name] = (rs.cargo[stack.name] or 0) + stack.count;
+    rs.cargo[key] = (rs.cargo[key] or 0) + stack.count;
+    rs.cargo_stacks[key] = {name = stack.name, quality = quality}
     rs.cargo_count = rs.cargo_count + stack.count
     if prefer_existing_container then
         -- Boolean false is an intentional sentinel distinct from nil:
         -- false = search for a suitable existing container;
         -- nil   = no container preference, deliver to the player.
-        rs.cargo_destinations[stack.name] = false
+        rs.cargo_destinations[key] = false
     end
 end
 
@@ -135,27 +179,30 @@ end
 function M.flush_cargo(rs, player, bot)
     rs.cargo_order = rs.cargo_order or {};
     rs.cargo_cursor = rs.cargo_cursor or 1;
-    local name = rs.cargo_order[rs.cargo_cursor]
-    if not name then
+    local key = rs.cargo_order[rs.cargo_cursor]
+    if not key then
         return true
     end
+    local stack = rs.cargo_stacks and rs.cargo_stacks[key] or {name = key, quality = "normal"}
+    local name, quality = stack.name, stack.quality
     -- Old saves or partially initialized roles may have an order array without
     -- a cargo table. The temporary empty table makes that mismatch a missing
     -- count, which the cursor repair branch below can skip safely.
-    local count = (rs.cargo or {})[name]
+    local count = (rs.cargo or {})[key]
     if not count then
         rs.cargo_cursor = rs.cargo_cursor + 1;
         return false
     end
-    local destination = rs.cargo_destinations and rs.cargo_destinations[name];
+    local destination = rs.cargo_destinations and rs.cargo_destinations[key];
     local inserted
     if destination == false then
         -- Cleanup prefers a nearby friendly container which already stores the
         -- same item, keeping factory organization intact. Search incrementally.
         local job = rs.drop_job
-        if not job or job.name ~= name then
+        if not job or job.name ~= name or job.quality ~= quality then
             job = {
                 name = name,
+                quality = quality,
                 scan = scanner.start(bot.surface, bot.position, config.supply.radius, {
                     type = {"container", "logistic-container"},
                     force = player.force
@@ -167,9 +214,10 @@ function M.flush_cargo(rs, player, bot)
             local _, found = scanner.step(job.scan);
             for _, e in ipairs(found) do
                 local inv = M.entity_inventory(e);
-                if inv and inv.get_item_count(name) > 0 and inv.can_insert {
+                if inv and inv.get_item_count {name = name, quality = quality} > 0 and inv.can_insert {
                     name = name,
-                    count = 1
+                    count = 1,
+                    quality = quality
                 } then
                     -- Only relative ordering matters, so squared distance is
                     -- both exact enough and cheaper than Euclidean distance.
@@ -185,7 +233,7 @@ function M.flush_cargo(rs, player, bot)
         -- `job.source` remains nil when no same-item container had capacity.
         -- In that case clearing the destination selects the player fallback.
         destination = job.source;
-        rs.cargo_destinations[name] = destination or nil;
+        rs.cargo_destinations[key] = destination or nil;
         rs.drop_job = nil
     end
     if destination and destination.valid then
@@ -198,7 +246,8 @@ function M.flush_cargo(rs, player, bot)
         -- inserted and retain the cargo for a later attempt.
         inserted = inv and inv.insert {
             name = name,
-            count = count
+            count = count,
+            quality = quality
         } or 0
     else
         -- Never modify player inventory remotely. Fly to the player's live
@@ -208,7 +257,8 @@ function M.flush_cargo(rs, player, bot)
         end
         inserted = M.player_give(player, {
             name = name,
-            count = count
+            count = count,
+            quality = quality
         })
     end
     count = count - inserted;
@@ -216,11 +266,12 @@ function M.flush_cargo(rs, player, bot)
     -- Removing a completed key rather than retaining zero keeps `cargo` a map
     -- of real outstanding work and allows a future stack of this name to be
     -- appended to the ordered manifest again.
-    rs.cargo[name] = count > 0 and count or nil
+    rs.cargo[key] = count > 0 and count or nil
     if count == 0 then
         if rs.cargo_destinations then
-            rs.cargo_destinations[name] = nil
+            rs.cargo_destinations[key] = nil
         end
+        if rs.cargo_stacks then rs.cargo_stacks[key] = nil end
         rs.cargo_cursor = rs.cargo_cursor + 1
     end
     -- Completion requires both the current type to be empty and no later
@@ -247,7 +298,7 @@ function M.entity_inventory(e)
 end
 
 -- Returns nil while the bounded container search is incomplete, otherwise the amount obtained.
-function M.take(rs, player, target, bot, name, count, withdraw_count)
+function M.take(rs, player, target, bot, name, count, withdraw_count, accept_any_quality)
     rs.supplied = rs.supplied or {};
     rs.supplied_sources = rs.supplied_sources or {}
     local requested = withdraw_count or count
@@ -259,8 +310,10 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
         local used = math.min(count, carried);
         rs.supplied[name] = carried - used;
         rs.last_source = rs.supplied_sources[name]
+        rs.last_quality = rs.supplied_qualities and rs.supplied_qualities[name] or "normal"
         if rs.supplied[name] == 0 then
             rs.supplied_sources[name] = nil
+            if rs.supplied_qualities then rs.supplied_qualities[name] = nil end
         end
         -- A player withdrawal keeps this marker through staging so target
         -- navigation cannot resume between pickup and this handoff.
@@ -273,7 +326,7 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
     -- that trip directly. Restarting the scan on every tick would prevent a
     -- distant bot from ever reaching the player.
     if rs.player_supply_name == name then
-        return take_from_player(rs, player, bot, name, requested)
+        return take_from_player(rs, player, bot, name, requested, accept_any_quality)
     end
     -- An empty policy is an explicit configuration choice meaning bots may not
     -- obtain supplies from either players or containers.
@@ -290,13 +343,13 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
     end
     local got = 0
     if player_first then
-        got = take_from_player(rs, player, bot, name, requested)
+        got = take_from_player(rs, player, bot, name, requested, accept_any_quality)
         if got == nil then
             return nil
         end
     end
     if not use_containers then
-        return player_first and got or take_from_player(rs, player, bot, name, requested)
+        return player_first and got or take_from_player(rs, player, bot, name, requested, accept_any_quality)
     end
     rs.source_cache = rs.source_cache or {};
     local cached = rs.source_cache[name]
@@ -304,13 +357,16 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
         -- Reusing a known source avoids repeating a radius scan for successive
         -- construction/upgrade items, but its live contents are revalidated.
         local inv = M.entity_inventory(cached);
-        if inv and inv.get_item_count(name) > 0 then
+        local quality = inv and inventory_quality(inv, name, accept_any_quality,
+            rs.supplied_qualities and rs.supplied_qualities[name])
+        if quality then
             if not movement.step(bot, cached.position) then
                 return nil
             end
             got = inv.remove {
                 name = name,
-                count = requested
+                count = requested,
+                quality = quality
             };
             if got > 0 then
                 -- Stage the removed amount instead of returning it immediately.
@@ -318,6 +374,8 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
                 -- spent travelling/withdrawing; the next call consumes it from
                 -- `supplied` and performs the actual target action.
                 rs.supplied[name] = got;
+                rs.supplied_qualities = rs.supplied_qualities or {}
+                rs.supplied_qualities[name] = quality
                 rs.supplied_sources[name] = cached;
                 rs.last_source = cached;
                 return nil
@@ -340,11 +398,13 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
         local _, found = scanner.step(job.scan)
         for _, e in ipairs(found) do
             local inv = M.entity_inventory(e);
-            if inv and inv.get_item_count(name) > 0 then
+            local quality = inv and inventory_quality(inv, name, accept_any_quality)
+            if quality then
                 -- Select the nearest source by squared Euclidean distance.
                 local d = movement.distance2(e.position, bot.position);
                 if not job.distance or d < job.distance then
                     job.source = e;
+                    job.quality = quality;
                     job.distance = d
                 end
             end
@@ -355,7 +415,7 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
         rs.supply_job = nil;
         -- If player inventory was already checked first, zero is final. If
         -- containers were first, this is the deferred player fallback.
-        return player_first and 0 or take_from_player(rs, player, bot, name, requested)
+        return player_first and 0 or take_from_player(rs, player, bot, name, requested, accept_any_quality)
     end
     if not movement.step(bot, job.source.position) then
         return nil
@@ -367,11 +427,14 @@ function M.take(rs, player, target, bot, name, count, withdraw_count)
     end
     got = inv.remove {
         name = name,
-        count = requested
+        count = requested,
+        quality = job.quality or "normal"
     };
     rs.supply_job = nil
     if got > 0 then
         rs.supplied[name] = got;
+        rs.supplied_qualities = rs.supplied_qualities or {}
+        rs.supplied_qualities[name] = job.quality or "normal"
         rs.supplied_sources[name] = job.source;
         rs.last_source = job.source;
         rs.source_cache[name] = job.source;
@@ -389,19 +452,24 @@ function M.wait_for_item(rs, player, target, bot)
     if not name then
         return true, "moving"
     end
-    local got = M.take(rs, player, target, bot, name, 1)
+    local got = M.take(rs, player, target, bot, name, 1, nil, rs.waiting_accept_any_quality)
     local taken_source = rs.last_source
+    local taken_quality = rs.last_quality
     local staged = rs.supplied and (rs.supplied[name] or 0) or 0
     if got and got > 0 then
         rs.supplied = rs.supplied or {}
         rs.supplied_sources = rs.supplied_sources or {}
         rs.supplied[name] = staged + got
         rs.supplied_sources[name] = taken_source
+        rs.supplied_qualities = rs.supplied_qualities or {}
+        rs.supplied_qualities[name] = taken_quality or "normal"
         rs.waiting_inventory = nil
+        rs.waiting_accept_any_quality = nil
         return true, "moving"
     end
     if staged > 0 then
         rs.waiting_inventory = nil
+        rs.waiting_accept_any_quality = nil
         return true, "moving"
     end
     -- `take` owns movement after finding either a real container source or

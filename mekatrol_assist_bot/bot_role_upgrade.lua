@@ -75,10 +75,11 @@ function M.grouped(rs)
 end
 
 ---Fast-replace while preserving direction, force, last user, and underground type.
-local function replace(entity, name)
+local function replace(entity, name, quality)
     local last_user = entity.last_user
     local parameters = {
         name = name,
+        quality = quality,
         position = entity.position,
         direction = entity.direction,
         force = entity.force,
@@ -148,12 +149,13 @@ function M.navigate(rs, anchor, bot)
     local staged = rs.supplied and (rs.supplied[target_prototype_name] or 0) or 0
     if staged == 0 then
         local supplied = supply.take(rs, anchor.player, entity, bot, target_prototype_name, 1,
-            supply_batch_size(rs, anchor, target_prototype_name))
+            supply_batch_size(rs, anchor, target_prototype_name), true)
         if supplied == nil then
             return "moving", false
         end
         if supplied == 0 then
             rs.waiting_inventory = target_prototype_name
+            rs.waiting_accept_any_quality = true
             return "idle", false
         end
         -- `take` only returns a positive value from already staged stock. Put
@@ -172,22 +174,28 @@ function M.act(rs, anchor, entity)
     local target_recipe = target_prototype_name and anchor.force.recipes[target_prototype_name]
     if target_prototype_name and (not target_recipe or target_recipe.enabled) then
         local upgrade_items_supplied = supply.take(rs, anchor.player, entity, rs.entity or entity,
-            target_prototype_name, 1, supply_batch_size(rs, anchor, target_prototype_name))
+            target_prototype_name, 1, supply_batch_size(rs, anchor, target_prototype_name), true)
         if upgrade_items_supplied == nil then
             return false
         end
         if upgrade_items_supplied == 0 then
             rs.waiting_inventory = target_prototype_name
+            rs.waiting_accept_any_quality = true
             return false
         end
         if upgrade_items_supplied > 0 then
             local supply_source = rs.last_source
+            local supplied_quality = rs.last_quality or "normal"
+            local source_quality = entity.quality and entity.quality.name or "normal"
             rs.last_source = nil
+            rs.last_quality = nil
             -- Successful replacement recovers the removed lower-tier item;
             -- failure returns the unused higher-tier item instead.
-            local returned_item_name = replace(entity, target_prototype_name) and source_prototype_name or
-                                           target_prototype_name
-            supply.give_or_carry(rs, anchor.player, {name = returned_item_name, count = 1}, supply_source)
+            local replaced = replace(entity, target_prototype_name, supplied_quality)
+            local returned_item_name = replaced and source_prototype_name or target_prototype_name
+            local returned_quality = replaced and source_quality or supplied_quality
+            supply.give_or_carry(rs, anchor.player,
+                {name = returned_item_name, count = 1, quality = returned_quality}, supply_source)
         end
     end
     return true

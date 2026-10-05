@@ -131,6 +131,30 @@ function M.run()
         "player supply travel suppresses target navigation")
     eq(supply_state.player_supply_name, "repair-pack",
         "player supply travel suppresses formation following")
+    local quality_count = 2
+    local quality_inventory = {
+        get_item_count = function(item)
+            return type(item) == "table" and item.quality == "rare" and quality_count or 0
+        end,
+        get_item_quality_counts = function(name)
+            return name == "bulk-inserter" and {rare = quality_count} or {}
+        end,
+        remove = function(stack)
+            local removed = stack.quality == "rare" and math.min(stack.count, quality_count) or 0
+            quality_count = quality_count - removed
+            return removed
+        end
+    }
+    local quality_player = {
+        position = {x = 0, y = 0},
+        get_main_inventory = function() return quality_inventory end
+    }
+    supply_bot.position = {x = 0, y = 0}
+    local quality_state = {}
+    eq(supply.take(quality_state, quality_player, {surface = {}}, supply_bot, "bulk-inserter", 1, 2, true), nil,
+        "upgrade supply accepts non-normal quality")
+    eq(quality_state.supplied_qualities["bulk-inserter"], "rare",
+        "upgrade supply records the withdrawn quality")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity - 1}), false,
         "cleanup retains partial cargo while more items may remain")
     eq(cleanup_role.should_flush_cargo({task = "cleanup", cargo_count = config.supply.cleanup_capacity}), true,
@@ -160,7 +184,11 @@ function M.run()
         "lamp work begins at the configured night threshold")
     eq(config.scheduler.role_intervals.lamp, 1, "lamp navigation runs every tick for smooth full-speed movement")
     eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "fast-transport-belt"}),
-        "follow (fast-transport-belt)", "inventory wait label names the required item")
+        "follow (red fast-transport-belt)", "upgrade inventory wait label includes the item colour")
+    eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "bulk-inserter"}),
+        "follow (green bulk-inserter)", "bulk inserter wait label distinguishes it from the blue fast inserter")
+    eq(manager.activity({phase = "idle", task = "repair", waiting_inventory = "repair-pack"}),
+        "follow (repair-pack)", "non-upgrade inventory wait labels remain unchanged")
     eq(manager.activity({phase = "idle", task = "track"}), "follow", "ordinary idle label remains follow")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")

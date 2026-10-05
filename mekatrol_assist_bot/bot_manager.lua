@@ -14,7 +14,12 @@ function M.activity(rs)
     if rs.phase ~= "idle" then
         return rs.task
     end
-    return rs.waiting_inventory and ("follow (" .. rs.waiting_inventory .. ")") or "follow"
+    if rs.waiting_inventory then
+        local color = config.tasks.upgrade.item_colors[rs.waiting_inventory]
+        local item_label = color and (rs.waiting_inventory .. ": " .. color) or rs.waiting_inventory
+        return "follow (" .. item_label .. ")"
+    end
+    return "follow"
 end
 
 ---List enabled roles in configured formation order.
@@ -116,6 +121,7 @@ function M.disable(index, role, reason)
     rs.track_job = nil;
     rs.track_started = nil;
     rs.waiting_inventory = nil;
+    rs.waiting_accept_any_quality = nil;
     visuals.clear_role(index .. ":" .. role)
     visuals.clear_role("label:" .. index .. ":" .. role)
     if rs.entity and rs.entity.valid then
