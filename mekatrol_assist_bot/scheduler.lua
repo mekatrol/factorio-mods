@@ -111,12 +111,19 @@ function M.tick(event)
             end
             local a = anchor.get(item.player_index);
             local rs = item.state
+            local paused = manager.is_temporarily_disabled(item.player_index, item.name)
             -- Recreate an enabled bot whose engine entity disappeared, but only
             -- when its player currently has a usable anchor.
             if a and rs.enabled and (not rs.entity or not rs.entity.valid) then
                 manager.enable(item.player_index, item.name, true)
             end
-            if a and rs.enabled and rs.entity and rs.entity.valid and event.tick %
+            -- Rendering ownership is transient across load. Recreate a paused
+            -- label without advancing or otherwise mutating the bot's work.
+            if paused and rs.entity and rs.entity.valid then
+                local visual_key = rs.visual_key or (item.player_index .. ":" .. item.name)
+                visuals.bot_label(visual_key, rs.entity, item.name, "paused", item.player_index)
+            end
+            if a and rs.enabled and not paused and rs.entity and rs.entity.valid and event.tick %
                 config.scheduler.role_intervals[item.name] == 0 then
                 local logic = registry.roles[item.name].logic
                 local visual_key = rs.visual_key or (item.player_index .. ":" .. item.name)

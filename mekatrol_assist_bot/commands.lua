@@ -61,7 +61,9 @@ local function status(pi, name)
     for _, r in ipairs(names) do
         local x = ps.roles[r];
         local missing = technology.missing(player.force, r);
-        say(pi, r .. ": " .. (x.enabled and "on" or "off") .. ", task=" .. x.task .. ", phase=" .. x.phase ..
+        local enabled_state = not x.enabled and "off" or
+                                  (ps.temporary_disable_active and ps.temporary_disabled[r] and "paused" or "on")
+        say(pi, r .. ": " .. enabled_state .. ", task=" .. x.task .. ", phase=" .. x.phase ..
             (#missing > 0 and ", missing=" .. table.concat(missing, ",") or ""))
     end
 end
@@ -80,6 +82,29 @@ local function operate(pi, name, action)
         elseif action == "toggle" then
             manager.toggle(pi, r)
         end
+    end
+end
+
+---Control the player-wide, save-persistent temporary disable mode.
+local function temporary_disable(pi, action)
+    local ps = state.player(pi)
+    if action == "status" then
+        local count = 0
+        for _ in pairs(ps.temporary_disabled) do count = count + 1 end
+        say(pi, ps.temporary_disable_active and ("bots paused (" .. count .. ")") or "bots not paused")
+        return
+    end
+    if action == "toggle" then
+        action = ps.temporary_disable_active and "off" or "on"
+    end
+    if action == "on" then
+        manager.temporary_disable(pi)
+        say(pi, "bots temporarily disabled")
+    elseif action == "off" then
+        manager.resume(pi)
+        say(pi, "bots resumed")
+    else
+        say(pi, "unknown pause action '" .. action .. "'; use on, off, toggle, or status")
     end
 end
 
@@ -103,6 +128,10 @@ function M.execute(pi, text)
     end
     if a[1] == "status" then
         status(pi, registry.get(a[2] or "") and registry.get(a[2]).name or a[2]);
+        return
+    end
+    if a[1] == "pause" or a[1] == "temporary-disable" then
+        temporary_disable(pi, a[2] or "toggle")
         return
     end
     local role = parsed.role;

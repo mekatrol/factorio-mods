@@ -70,6 +70,11 @@ function M.enable(index, role, quiet)
     local ps = state.player(index);
     local rs = ps.roles[role];
     rs.enabled = true;
+    -- Enabling a bot while temporary disable mode is active makes it visible,
+    -- but does not let it begin work until the player resumes the assistants.
+    if ps.temporary_disable_active then
+        ps.temporary_disabled[role] = true
+    end
     rs.visual_key = index .. ":" .. role
     if not rs.entity or not rs.entity.valid then
         local slots = formation.slots(active_names(ps), ps.direction or "right");
@@ -87,7 +92,8 @@ function M.enable(index, role, quiet)
     end
     -- Idle means the controller is not performing its configured task, so show
     -- the user-facing activity "follow" rather than a misleading task label.
-    visuals.bot_label(rs.visual_key, rs.entity, role, M.activity(rs), index)
+    visuals.bot_label(rs.visual_key, rs.entity, role,
+        ps.temporary_disable_active and ps.temporary_disabled[role] and "paused" or M.activity(rs), index)
     if not quiet then
         a.player.print("[MAB] " .. role .. " enabled")
     end
@@ -97,8 +103,11 @@ end
 ---Disable a role and discard all transient work/entity/render references.
 function M.disable(index, role, reason)
     local p = game.get_player(index);
-    local rs = state.player(index).roles[role];
+    local ps = state.player(index);
+    local rs = ps.roles[role];
     rs.enabled = false;
+    -- A normally disabled bot must not be resurrected by a later resume.
+    ps.temporary_disabled[role] = nil
     rs.scan = nil;
     rs.target = nil;
     rs.target_visualized = nil;
@@ -115,6 +124,45 @@ function M.disable(index, role, reason)
     rs.entity = nil
     if p and reason then
         p.print("[MAB] " .. role .. " disabled: " .. reason)
+    end
+end
+
+---Return whether one enabled role is currently frozen by temporary disable.
+function M.is_temporarily_disabled(index, role)
+    local ps = state.player(index)
+    return ps.temporary_disable_active and ps.temporary_disabled[role] == true
+end
+
+---Freeze every currently enabled bot in place without discarding its work.
+function M.temporary_disable(index)
+    local ps = state.player(index)
+    ps.temporary_disable_active = true
+    for _, role in ipairs(config.formation.role_order) do
+        local rs = ps.roles[role]
+        if rs.enabled then
+            ps.temporary_disabled[role] = true
+            local visual_key = rs.visual_key or (index .. ":" .. role)
+            visuals.clear_role(visual_key)
+            if rs.entity and rs.entity.valid then
+                visuals.bot_label(visual_key, rs.entity, role, "paused", index)
+            end
+        else
+            ps.temporary_disabled[role] = nil
+        end
+    end
+end
+
+---Resume only bots still enabled, preserving their controller state and task.
+function M.resume(index)
+    local ps = state.player(index)
+    ps.temporary_disable_active = false
+    ps.temporary_disabled = {}
+    for _, role in ipairs(config.formation.role_order) do
+        local rs = ps.roles[role]
+        if rs.enabled and rs.entity and rs.entity.valid then
+            local visual_key = rs.visual_key or (index .. ":" .. role)
+            visuals.bot_label(visual_key, rs.entity, role, M.activity(rs), index)
+        end
     end
 end
 
@@ -161,7 +209,7 @@ function M.follow(index)
     for _, role in ipairs(config.formation.role_order) do
         local rs = ps.roles[role];
         local slot = slots[role];
-        if slot and rs.phase == "idle" then
+        if slot and rs.phase == "idle" and not M.is_temporarily_disabled(index, role) then
             local target = {
                 x = a.position.x + slot.x,
                 y = a.position.y + slot.y

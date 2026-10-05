@@ -54,10 +54,16 @@ function M.player(index)
         p = {
             roles = {},
             direction = "right",
-            last_position = nil
+            last_position = nil,
+            temporary_disable_active = false,
+            temporary_disabled = {}
         };
         r.players[index] = p
     end
+    -- Temporary disable is player-scoped and save-persistent. Additive
+    -- defaults migrate saves created before the feature existed.
+    p.temporary_disable_active = p.temporary_disable_active or false
+    p.temporary_disabled = p.temporary_disabled or {}
     if not p.scheduler_registered then
         -- Stable numeric ordering makes round-robin behavior deterministic and
         -- ensures a player is registered exactly once across repeated calls.
