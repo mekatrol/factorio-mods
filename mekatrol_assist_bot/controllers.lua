@@ -43,6 +43,9 @@ local function begin(def, rs, anchor, bot)
         local center = def.scan_center and def.scan_center(rs, anchor, bot) or anchor.position
         rs.scan = scanner.start(anchor.surface, center, def.radius(rs), def.filter(rs, anchor))
     end
+    if def.begin_scan then
+        def.begin_scan(rs, anchor, bot)
+    end
     rs.phase = "scan"
 end
 

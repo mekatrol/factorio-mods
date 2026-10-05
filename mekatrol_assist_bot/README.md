@@ -126,6 +126,7 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 | `tasks.logistics.resource_units_per_action` | `1` | Resource units mined in one work unit; integer >= 1. |
 | `tasks.surveyor.boundary_max_steps` | `4096` | Maximum points in a resumable boundary trace; integer >= 1. |
 | `tasks.lamp.darkness` | `0.35` | Minimum surface darkness for placement, in `[0,1]`. |
+| `tasks.lamp.items_per_trip` | `100` | Lamp carrying capacity; each pickup is reduced to current valid-site demand. |
 | `tasks.repair.threshold` | `0.999` | Other-entity health ratio below which repair is eligible, in `[0,1]`. |
 | `tasks.repair.self_repair_threshold` | `0.9` | Bot health ratio below which self-repair takes priority, in `[0,1]`. |
 | `tasks.repair.health_per_action` | `25` | Maximum health restored in one work unit; finite > 0. |

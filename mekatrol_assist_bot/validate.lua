@@ -90,6 +90,7 @@ function M.run(c, known)
     end
     num("tasks.upgrade.items_per_trip", c.tasks.upgrade.items_per_trip, 1, nil, true)
     num("tasks.lamp.darkness", c.tasks.lamp.darkness, 0, 1);
+    num("tasks.lamp.items_per_trip", c.tasks.lamp.items_per_trip, 1, nil, true)
     num("tasks.repair.threshold", c.tasks.repair.threshold, 0, 1)
     num("tasks.repair.self_repair_threshold", c.tasks.repair.self_repair_threshold, 0, 1)
     num("tasks.repair.health_per_action", c.tasks.repair.health_per_action, 0.000001)

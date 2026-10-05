@@ -13,6 +13,7 @@ local supply = require("supply")
 local cleanup_role = require("bot_role_cleanup")
 local track_role = require("bot_role_track")
 local upgrade_role = require("bot_role_upgrade")
+local lamp_role = require("bot_role_lamp")
 local manager = require("bot_manager")
 local pathfinding = require("pathfinding")
 local M = {}
@@ -143,6 +144,13 @@ function M.run()
         "upgrade retains movement control between targets in a supply batch")
     eq(upgrade_role.scan_phase({cargo_count = 1}), "moving",
         "upgrade retains movement control while carrying recovered items")
+    eq(lamp_role.scan_phase({scan = {}}), "idle", "lamp follows formation while watching for night work")
+    eq(lamp_role.scan_phase({scan = {}, supplied = {["small-lamp"] = 4}}), "moving",
+        "lamp retains movement control while carrying a placement batch")
+    eq(lamp_role.before_step({}, {surface = {darkness = config.tasks.lamp.darkness - 0.01}}), "idle",
+        "lamp follows formation rather than working during daylight")
+    eq(lamp_role.before_step({}, {surface = {darkness = config.tasks.lamp.darkness}}), nil,
+        "lamp work begins at the configured night threshold")
     eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "fast-transport-belt"}),
         "follow (fast-transport-belt)", "inventory wait label names the required item")
     eq(manager.activity({phase = "idle", task = "track"}), "follow", "ordinary idle label remains follow")

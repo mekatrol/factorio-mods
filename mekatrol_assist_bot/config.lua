@@ -120,7 +120,10 @@ return {
         }, -- Inclusive radius/grouping width >0; trace cap integer >=1.
         lamp = {
             radius = 48,
-            darkness = 0.35
+            darkness = 0.35,
+            -- Maximum lamps carried for a placement batch; actual pickup is
+            -- reduced to the number of valid sites found in the current scan.
+            items_per_trip = 100
         }, -- Darkness is [0,1].
         repair = {
             radius = 64,
