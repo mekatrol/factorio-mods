@@ -184,9 +184,11 @@ function M.run()
         "lamp work begins at the configured night threshold")
     eq(config.scheduler.role_intervals.lamp, 1, "lamp navigation runs every tick for smooth full-speed movement")
     eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "fast-transport-belt"}),
-        "follow (red fast-transport-belt)", "upgrade inventory wait label includes the item colour")
+        "follow (fast-transport-belt: red)", "upgrade inventory wait label includes the item colour")
     eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "bulk-inserter"}),
-        "follow (green bulk-inserter)", "bulk inserter wait label distinguishes it from the blue fast inserter")
+        "follow (bulk-inserter: green)", "bulk inserter wait label distinguishes it from the blue fast inserter")
+    eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "iron-chest"}),
+        "follow (iron-chest)", "non-colour-coded upgrades omit a colour")
     eq(manager.activity({phase = "idle", task = "repair", waiting_inventory = "repair-pack"}),
         "follow (repair-pack)", "non-upgrade inventory wait labels remain unchanged")
     eq(manager.activity({phase = "idle", task = "track"}), "follow", "ordinary idle label remains follow")

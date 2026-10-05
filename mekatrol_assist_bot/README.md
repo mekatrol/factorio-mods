@@ -185,7 +185,7 @@ The mod can be verified with an isolated new-game load and the opt-in runtime fi
 create a new save. The fixture validates role technology and visual prototypes,
 then runs the 10-bot and 4,096-resource bounded-work baselines. A successful run
 logs `[MAB test] headless baseline passed`. Restore
-`debug=false` afterward. Details are recorded in `PHASE7_CONSOLIDATION.md`.
+`debug=false` afterward.
 
 ## Maintainer checks
 
@@ -194,11 +194,5 @@ mirroring, slot uniqueness and reflow, entity identity/deduplication, polygons,
 aliases, task registration, and technology gates during initialization. Setting
 `debug=true` runs the destructive headless fixture in a disposable save: it
 validates required Factorio 2.0 prototypes and role families, profiles ten role
-bots, and scans a 4,096-resource field. Never turn this on in a real save. Phase
-1 baselines are in `PHASE1_BASELINE.md`; Phase 2 architecture evidence is in
-`PHASE2_ARCHITECTURE.md`; Phase 3 visual and formation evidence is in
-`PHASE3_VISUALS_FORMATION.md`; Phase 4 mapping evidence is in
-`PHASE4_MAPPING_DISCOVERY.md`; Phase 5 repair evidence is in
-`PHASE5_REPAIR.md`; Phase 6 builder/logistics evidence is in
-`PHASE6_GAMEPLAY_BUILDER_LOGISTICS.md`; Phase 7 consolidation evidence is in
-`PHASE7_CONSOLIDATION.md`. Normal configuration keeps `debug=false`.
+bots, and scans a 4,096-resource field. Never turn this on in a real save.
+Normal configuration keeps `debug=false`.
