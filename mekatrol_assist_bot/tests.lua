@@ -158,6 +158,7 @@ function M.run()
         "lamp follows formation rather than working during daylight")
     eq(lamp_role.before_step({}, {surface = {darkness = config.tasks.lamp.darkness}}), nil,
         "lamp work begins at the configured night threshold")
+    eq(config.scheduler.role_intervals.lamp, 1, "lamp navigation runs every tick for smooth full-speed movement")
     eq(manager.activity({phase = "idle", task = "combined", waiting_inventory = "fast-transport-belt"}),
         "follow (fast-transport-belt)", "inventory wait label names the required item")
     eq(manager.activity({phase = "idle", task = "track"}), "follow", "ordinary idle label remains follow")

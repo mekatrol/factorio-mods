@@ -32,7 +32,9 @@ return {
             repair = 1,
             upgrade = 1,
             track = 1,
-            lamp = 6,
+            -- Lamp navigation uses the shared per-tick movement step, so it
+            -- must run every tick to fly at full speed without visible jumps.
+            lamp = 1,
             cliff = 1,
             logistics = 1,
             cleanup = 1,
