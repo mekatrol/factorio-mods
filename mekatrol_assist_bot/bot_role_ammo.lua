@@ -3,6 +3,7 @@
 local config = require("config")
 local movement = require("movement")
 local supply = require("supply")
+local scanner = require("entity_scanner")
 local M = {
     tasks = {"follow", "unload"}
 }
@@ -78,12 +79,36 @@ end
 -- and destination remain visible at the same time. Once ammo is onboard, the
 -- cargo destination is authoritative; before pickup, use the scan selection.
 function M.secondary_target(rs)
+    if rs.ammo_pickup_scan then return nil end
     local key = rs.cargo_order and rs.cargo_order[rs.cargo_cursor or 1]
     local destination = key and rs.cargo_destinations and rs.cargo_destinations[key]
     if destination and destination ~= false and destination.valid then
         return destination
     end
-    return rs.ammo_container and rs.ammo_container.valid and rs.ammo_container or nil
+    return nil
+end
+
+-- Before leaving the pickup turret, scan its neighbourhood and retain the
+-- nearest loaded turret as a fallback. Cargo delivery starts only after this
+-- bounded scan finishes, so the bot never has to travel back to run it later.
+function M.before_cargo(rs, _, bot)
+    local scan = rs.ammo_pickup_scan
+    if not scan then return nil end
+    if not scan.done then
+        local _, found = scanner.step(scan)
+        for _, entity in ipairs(found) do
+            if M.valid(entity) then
+                local distance = movement.distance2(entity.position, scan.center)
+                if not rs.ammo_fallback_distance or distance < rs.ammo_fallback_distance then
+                    rs.ammo_fallback_turret = entity
+                    rs.ammo_fallback_distance = distance
+                end
+            end
+        end
+    end
+    if not scan.done then return "moving" end
+    rs.ammo_pickup_scan = nil
+    rs.ammo_fallback_distance = nil
 end
 
 function M.begin_scan(rs)
@@ -132,6 +157,11 @@ function M.after_scan(rs)
     if not turret and rs.ammo_waiting_turret and M.valid(rs.ammo_waiting_turret) then
         turret = rs.ammo_waiting_turret
     end
+    if not turret and rs.ammo_fallback_turret and M.valid(rs.ammo_fallback_turret) then
+        turret = rs.ammo_fallback_turret
+    end
+    rs.ammo_fallback_turret = nil
+    rs.ammo_fallback_distance = nil
     if turret and rs.ammo_container and rs.ammo_container.valid then
         rs.target = turret
         rs.ammo_waiting_turret = nil
@@ -173,6 +203,12 @@ function M.act(rs, _, turret)
                         (config.tasks.ammo.item .. "\31" .. quality)
         rs.cargo_destinations[key] = destination
         rs.cargo_lowest_inventory[key] = true
+        rs.ammo_fallback_turret = nil
+        rs.ammo_fallback_distance = nil
+        rs.ammo_pickup_scan = scanner.start(turret.surface, turret.position, config.tasks.ammo.radius, {
+            type = "ammo-turret",
+            force = turret.force
+        })
     end
     rs.ammo_waiting_turret = nil
     rs.waiting_ammo_container = nil

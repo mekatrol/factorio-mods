@@ -242,8 +242,13 @@ function M.run()
         "ammo bot follows formation while carrying ammo without a destination")
     eq(ammo_role.cargo_phase(partial_destination), "working",
         "ammo bot owns movement while delivering to a concrete container")
-    eq(ammo_role.secondary_target({ammo_container = partial_destination}), partial_destination,
-        "ammo target visuals include the selected container before pickup")
+    eq(ammo_role.secondary_target({ammo_container = partial_destination}), nil,
+        "ammo target visuals do not draw the future container while approaching a turret")
+    eq(ammo_role.secondary_target({
+        cargo_order = {config.tasks.ammo.item},
+        cargo_cursor = 1,
+        cargo_destinations = {[config.tasks.ammo.item] = partial_destination}
+    }), partial_destination, "ammo target visuals draw the container while carrying ammo to it")
     eq(ammo_role.secondary_target(partial_delivery_state), nil,
         "ammo target visuals omit a container while searching for a cargo destination")
     eq(manager.activity({phase = "idle", task = "unload", waiting_ammo_container = true}), "follow (unload)",
@@ -272,6 +277,26 @@ function M.run()
     ammo_role.after_scan(completed_delivery_state)
     eq(completed_delivery_state.ammo_chain_scan, nil,
         "ammo bot releases its delivery position after the chained scan")
+    local fallback_inventory = {
+        get_item_count = function() return 5 end
+    }
+    local fallback_turret = {
+        valid = true,
+        type = "ammo-turret",
+        get_inventory = function(id)
+            return id == defines.inventory.turret_ammo and fallback_inventory or nil
+        end
+    }
+    local fallback_scan_state = {
+        ammo_chain_scan = true,
+        ammo_fallback_turret = fallback_turret,
+        ammo_container = partial_destination
+    }
+    ammo_role.after_scan(fallback_scan_state)
+    eq(fallback_scan_state.target, fallback_turret,
+        "empty container scan uses the turret result cached before delivery")
+    eq(fallback_scan_state.ammo_fallback_turret, nil,
+        "cached pickup-turret scan result is cleared after use")
     eq(track_role.scan_phase, "idle", "track follows formation while searching for a belt graph")
     eq(upgrade_role.scan_phase({}), "idle", "upgrade follows formation during an empty background scan")
     eq(upgrade_role.scan_phase({supplied = {["iron-chest"] = 4}}), "moving",

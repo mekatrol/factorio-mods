@@ -138,6 +138,9 @@ function M.disable(index, role, reason)
     rs.ammo_waiting_turret = nil;
     rs.ammo_container = nil;
     rs.ammo_chain_scan = nil;
+    rs.ammo_pickup_scan = nil;
+    rs.ammo_fallback_turret = nil;
+    rs.ammo_fallback_distance = nil;
     visuals.clear_role(index .. ":" .. role)
     visuals.clear_role("secondary:" .. index .. ":" .. role)
     visuals.clear_role("label:" .. index .. ":" .. role)

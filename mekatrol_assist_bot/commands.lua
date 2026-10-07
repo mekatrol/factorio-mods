@@ -166,6 +166,9 @@ function M.execute(pi, text)
         rs.ammo_waiting_turret = nil;
         rs.ammo_container = nil;
         rs.ammo_chain_scan = nil;
+        rs.ammo_pickup_scan = nil;
+        rs.ammo_fallback_turret = nil;
+        rs.ammo_fallback_distance = nil;
         say(pi, name .. " refreshed");
         return
     end
@@ -217,6 +220,9 @@ function M.execute(pi, text)
         rs.waiting_inventory = nil
         rs.waiting_accept_any_quality = nil
         rs.ammo_chain_scan = nil
+        rs.ammo_pickup_scan = nil
+        rs.ammo_fallback_turret = nil
+        rs.ammo_fallback_distance = nil
         manager.enable(pi, name, true);
         say(pi, name .. " task=" .. task);
         return

@@ -130,8 +130,14 @@ function M.tick(event)
                 -- Cleanup accumulates several ground stacks before delivery;
                 -- all other roles immediately return their unused supplies.
                 local should_flush = not logic.should_flush_cargo or logic.should_flush_cargo(rs)
-                local cargo_flushed = not should_flush or supply.flush_cargo(rs, a.player, rs.entity)
-                if not cargo_flushed then
+                local before_cargo_phase = should_flush and logic.before_cargo and
+                                               logic.before_cargo(rs, a, rs.entity)
+                local cargo_flushed = not should_flush or
+                                          (not before_cargo_phase and supply.flush_cargo(rs, a.player, rs.entity))
+                if before_cargo_phase then
+                    rs.phase = before_cargo_phase
+                    manager.set_visual(item.name, rs, a, rs.phase)
+                elseif not cargo_flushed then
                     -- Cargo delivery takes precedence over ordinary role work;
                     -- this prevents collected items from becoming stranded.
                     -- Cargo fields may not exist on roles/saves which have never
