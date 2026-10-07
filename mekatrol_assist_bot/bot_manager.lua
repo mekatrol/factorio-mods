@@ -137,6 +137,7 @@ function M.disable(index, role, reason)
     rs.waiting_ammo_container = nil;
     rs.ammo_waiting_turret = nil;
     rs.ammo_container = nil;
+    rs.ammo_chain_scan = nil;
     visuals.clear_role(index .. ":" .. role)
     visuals.clear_role("label:" .. index .. ":" .. role)
     if rs.entity and rs.entity.valid then

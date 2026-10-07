@@ -63,7 +63,8 @@ end
 -- passive so formation following can carry the bot toward a container while
 -- the bounded scan continues around its latest starting point.
 function M.scan_phase(rs)
-    return rs.ammo_container and (rs.target or rs.ammo_waiting_turret) and "moving" or "idle"
+    return (rs.ammo_chain_scan or
+               (rs.ammo_container and (rs.target or rs.ammo_waiting_turret))) and "moving" or "idle"
 end
 
 -- When carried ammo has no remaining matching destination, formation following
@@ -111,6 +112,10 @@ function M.valid(entity)
 end
 
 function M.after_scan(rs)
+    -- A completed delivery holds position only for this immediately chained
+    -- scan. Once its bounded search is complete, normal target/wait policy can
+    -- either start a job or release the bot back to formation following.
+    rs.ammo_chain_scan = nil
     local turret = rs.target
     if not turret and rs.ammo_waiting_turret and M.valid(rs.ammo_waiting_turret) then
         turret = rs.ammo_waiting_turret

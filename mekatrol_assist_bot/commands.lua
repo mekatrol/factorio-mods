@@ -165,6 +165,7 @@ function M.execute(pi, text)
         rs.waiting_ammo_container = nil;
         rs.ammo_waiting_turret = nil;
         rs.ammo_container = nil;
+        rs.ammo_chain_scan = nil;
         say(pi, name .. " refreshed");
         return
     end
@@ -215,6 +216,7 @@ function M.execute(pi, text)
         rs.target = nil
         rs.waiting_inventory = nil
         rs.waiting_accept_any_quality = nil
+        rs.ammo_chain_scan = nil
         manager.enable(pi, name, true);
         say(pi, name .. " task=" .. task);
         return

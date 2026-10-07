@@ -195,7 +195,15 @@ function M.flush_cargo(rs, player, bot)
         return false
     end
     local destination = rs.cargo_destinations and rs.cargo_destinations[key];
-    local prefer_lowest_inventory = rs.cargo_lowest_inventory and rs.cargo_lowest_inventory[key]
+    -- Cargo already in flight when this policy was introduced has no routing
+    -- marker. Recognize the ammo role's unload task and lazily migrate it so a
+    -- full saved destination cannot leave the bot hovering there forever.
+    local prefer_lowest_inventory = (rs.cargo_lowest_inventory and rs.cargo_lowest_inventory[key]) or
+                                        (rs.task == "unload" and name == config.tasks.ammo.item)
+    if prefer_lowest_inventory then
+        rs.cargo_lowest_inventory = rs.cargo_lowest_inventory or {}
+        rs.cargo_lowest_inventory[key] = true
+    end
     local inserted
     if destination == false then
         if prefer_lowest_inventory then
@@ -290,7 +298,13 @@ function M.flush_cargo(rs, player, bot)
         end
         if rs.cargo_stacks then rs.cargo_stacks[key] = nil end
         if rs.cargo_lowest_inventory then rs.cargo_lowest_inventory[key] = nil end
-        if prefer_lowest_inventory then rs.waiting_ammo_container = nil end
+        if prefer_lowest_inventory then
+            rs.waiting_ammo_container = nil
+            -- The ammo role's next bounded scan starts at this destination.
+            -- Hold position until that scan completes so formation following
+            -- cannot drag the bot back toward its old slot mid-scan.
+            rs.ammo_chain_scan = true
+        end
         rs.cargo_cursor = rs.cargo_cursor + 1
     elseif destination and prefer_lowest_inventory then
         -- Ammo delivery may fill a matching container before the carried stack

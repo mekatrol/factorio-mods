@@ -219,13 +219,13 @@ function M.run()
         end
     }
     local partial_delivery_state = {
+        task = "unload",
         cargo = {[config.tasks.ammo.item] = 8},
         cargo_order = {config.tasks.ammo.item},
         cargo_cursor = 1,
         cargo_count = 8,
         cargo_stacks = {[config.tasks.ammo.item] = {name = config.tasks.ammo.item, quality = "normal"}},
-        cargo_destinations = {[config.tasks.ammo.item] = partial_destination},
-        cargo_lowest_inventory = {[config.tasks.ammo.item] = true}
+        cargo_destinations = {[config.tasks.ammo.item] = partial_destination}
     }
     local stationary_bot = {valid = true, position = {x = 0, y = 0}}
     eq(supply.flush_cargo(partial_delivery_state, {}, stationary_bot), false,
@@ -236,12 +236,38 @@ function M.run()
         "partial ammo delivery searches for another matching container")
     eq(partial_delivery_state.waiting_ammo_container, true,
         "partial ammo delivery enters the ammo-container wait state")
+    eq(partial_delivery_state.cargo_lowest_inventory[config.tasks.ammo.item], true,
+        "ammo already in flight is migrated to lowest-inventory routing")
     eq(ammo_role.cargo_phase(false), "idle",
         "ammo bot follows formation while carrying ammo without a destination")
     eq(ammo_role.cargo_phase(partial_destination), "working",
         "ammo bot owns movement while delivering to a concrete container")
     eq(manager.activity({phase = "idle", task = "unload", waiting_ammo_container = true}), "follow (unload)",
         "carried ammo without container capacity is labelled follow unload")
+    local completed_delivery_inventory = {insert = function(stack) return stack.count end}
+    partial_destination.get_inventory = function(id)
+        return id == defines.inventory.chest and completed_delivery_inventory or nil
+    end
+    local completed_delivery_state = {
+        task = "unload",
+        cargo = {[config.tasks.ammo.item] = 5},
+        cargo_order = {config.tasks.ammo.item},
+        cargo_cursor = 1,
+        cargo_count = 5,
+        cargo_stacks = {[config.tasks.ammo.item] = {name = config.tasks.ammo.item, quality = "normal"}},
+        cargo_destinations = {[config.tasks.ammo.item] = partial_destination},
+        cargo_lowest_inventory = {[config.tasks.ammo.item] = true}
+    }
+    eq(supply.flush_cargo(completed_delivery_state, {}, stationary_bot), true,
+        "complete ammo delivery empties the cargo manifest")
+    eq(completed_delivery_state.ammo_chain_scan, true,
+        "complete ammo delivery requests a stationary chained scan")
+    ammo_role.begin_scan(completed_delivery_state)
+    eq(ammo_role.scan_phase(completed_delivery_state), "moving",
+        "ammo bot holds its delivery position during the chained scan")
+    ammo_role.after_scan(completed_delivery_state)
+    eq(completed_delivery_state.ammo_chain_scan, nil,
+        "ammo bot releases its delivery position after the chained scan")
     eq(track_role.scan_phase, "idle", "track follows formation while searching for a belt graph")
     eq(upgrade_role.scan_phase({}), "idle", "upgrade follows formation during an empty background scan")
     eq(upgrade_role.scan_phase({supplied = {["iron-chest"] = 4}}), "moving",

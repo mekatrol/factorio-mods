@@ -7,6 +7,9 @@
   and continue into another matching container when a delivery only partially fits.
   If all known matching containers are full, they retain the remainder and follow
   the player while scanning new areas instead of returning the ammo to the player.
+  Ammo already in flight when updating is migrated to the same routing policy.
+  After delivery, the next bounded scan now remains anchored at that container
+  instead of formation-following back toward the bot's earlier position mid-scan.
 
 - Fixed assist bots registering with the player's logistic network and raising
   "Not enough empty roboport robot slots available" alerts. Existing bots are
