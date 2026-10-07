@@ -242,6 +242,10 @@ function M.run()
         "ammo bot follows formation while carrying ammo without a destination")
     eq(ammo_role.cargo_phase(partial_destination), "working",
         "ammo bot owns movement while delivering to a concrete container")
+    eq(ammo_role.secondary_target({ammo_container = partial_destination}), partial_destination,
+        "ammo target visuals include the selected container before pickup")
+    eq(ammo_role.secondary_target(partial_delivery_state), nil,
+        "ammo target visuals omit a container while searching for a cargo destination")
     eq(manager.activity({phase = "idle", task = "unload", waiting_ammo_container = true}), "follow (unload)",
         "carried ammo without container capacity is labelled follow unload")
     local completed_delivery_inventory = {insert = function(stack) return stack.count end}

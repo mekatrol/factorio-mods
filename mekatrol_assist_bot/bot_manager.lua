@@ -139,6 +139,7 @@ function M.disable(index, role, reason)
     rs.ammo_container = nil;
     rs.ammo_chain_scan = nil;
     visuals.clear_role(index .. ":" .. role)
+    visuals.clear_role("secondary:" .. index .. ":" .. role)
     visuals.clear_role("label:" .. index .. ":" .. role)
     if rs.entity and rs.entity.valid then
         rs.entity.destroy()
@@ -165,6 +166,7 @@ function M.temporary_disable(index)
             ps.temporary_disabled[role] = true
             local visual_key = rs.visual_key or (index .. ":" .. role)
             visuals.clear_role(visual_key)
+            visuals.clear_role("secondary:" .. visual_key)
             if rs.entity and rs.entity.valid then
                 visuals.bot_label(visual_key, rs.entity, role, "paused", index)
             end
@@ -257,6 +259,7 @@ function M.remove_player(index)
             -- Disabled roles may not have created a visual key yet.
             local visual_key = rs.visual_key or (index .. ":" .. role)
             visuals.clear_role(visual_key)
+            visuals.clear_role("secondary:" .. visual_key)
             visuals.clear_role("label:" .. visual_key)
         end
         root.players[index] = nil

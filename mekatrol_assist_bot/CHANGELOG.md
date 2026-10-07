@@ -10,6 +10,8 @@
   Ammo already in flight when updating is migrated to the same routing policy.
   After delivery, the next bounded scan now remains anchored at that container
   instead of formation-following back toward the bot's earlier position mid-scan.
+  Active ammo jobs now draw separate target lines to both the gun turret and the
+  selected destination container.
 
 - Fixed assist bots registering with the player's logistic network and raising
   "Not enough empty roboport robot slots available" alerts. Existing bots are

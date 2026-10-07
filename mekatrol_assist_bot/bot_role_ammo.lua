@@ -74,6 +74,18 @@ function M.cargo_phase(destination)
     return destination == false and "idle" or "working"
 end
 
+-- The scheduler renders this with an independently owned line so the turret
+-- and destination remain visible at the same time. Once ammo is onboard, the
+-- cargo destination is authoritative; before pickup, use the scan selection.
+function M.secondary_target(rs)
+    local key = rs.cargo_order and rs.cargo_order[rs.cargo_cursor or 1]
+    local destination = key and rs.cargo_destinations and rs.cargo_destinations[key]
+    if destination and destination ~= false and destination.valid then
+        return destination
+    end
+    return rs.ammo_container and rs.ammo_container.valid and rs.ammo_container or nil
+end
+
 function M.begin_scan(rs)
     rs.ammo_container = nil
     rs.ammo_container_load = nil

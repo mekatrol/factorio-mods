@@ -173,6 +173,13 @@ function M.tick(event)
                 else
                     visuals.clear_role(visual_key)
                 end
+                local secondary_visual_key = "secondary:" .. visual_key
+                local secondary_target = logic.secondary_target and logic.secondary_target(rs)
+                if rs.task ~= "follow" and rs.phase ~= "idle" and secondary_target then
+                    visuals.target_line(secondary_visual_key, rs.entity, secondary_target, item.player_index)
+                else
+                    visuals.clear_role(secondary_visual_key)
+                end
                 -- An idle controller is physically following formation even if
                 -- its configured task remains repair/search/etc.
                 local current_task = manager.activity(rs)
