@@ -36,6 +36,20 @@ function M.root()
     r.discovery.by_name = r.discovery.by_name or {}
     r.discovery.grouped = r.discovery.grouped or {}
     r.discovery.queues = r.discovery.queues or {}
+    if r.enabled_role_count == nil then
+        -- One-time migration for saves created before enabled roles were
+        -- counted. Keeping this count current lets the tick handler return
+        -- without walking every player and role when all bots are off.
+        local count = 0
+        for _, player_state in pairs(r.players) do
+            for _, name in ipairs(config.formation.role_order) do
+                if player_state.roles and player_state.roles[name] and player_state.roles[name].enabled then
+                    count = count + 1
+                end
+            end
+        end
+        r.enabled_role_count = count
+    end
     if not r.discovery.index_version then
         -- Rebuild the secondary name index once for saves created before it
         -- existed. The authoritative records remain untouched.
@@ -47,6 +61,17 @@ function M.root()
         r.discovery.index_version = 1
     end
     return r
+end
+
+---Adjust the cached number of enabled roles after a lifecycle transition.
+function M.adjust_enabled_role_count(delta)
+    local r = M.root()
+    r.enabled_role_count = math.max(0, r.enabled_role_count + delta)
+end
+
+---Return the number of roles which are currently switched on.
+function M.enabled_role_count()
+    return M.root().enabled_role_count
 end
 
 ---Return or initialize one player's persistent state and every role record.
@@ -124,6 +149,23 @@ function M.next_role()
         name = name,
         state = p.roles[name]
     }
+end
+
+---Return the next enabled player/role pair without exposing disabled roles to
+---the scheduler. The bounded search preserves the persistent round-robin order.
+function M.next_enabled_role()
+    local remaining = M.role_count()
+    while remaining > 0 do
+        local item = M.next_role()
+        if not item then
+            return nil
+        end
+        if item.state.enabled then
+            return item
+        end
+        remaining = remaining - 1
+    end
+    return nil
 end
 
 ---Return the number of registered player-role pairs in one scheduler cycle.

@@ -80,7 +80,11 @@ function M.enable(index, role, quiet)
     end
     local ps = state.player(index);
     local rs = ps.roles[role];
+    local was_enabled = rs.enabled
     rs.enabled = true;
+    if not was_enabled then
+        state.adjust_enabled_role_count(1)
+    end
     -- Migrate active bots made by earlier versions. Configuration changes call
     -- this function for every enabled role.
     if rs.entity and rs.entity.valid and rs.entity.force.name ~= constants.visual_force then
@@ -122,7 +126,11 @@ function M.disable(index, role, reason)
     local p = game.get_player(index);
     local ps = state.player(index);
     local rs = ps.roles[role];
+    local was_enabled = rs.enabled
     rs.enabled = false;
+    if was_enabled then
+        state.adjust_enabled_role_count(-1)
+    end
     -- A normally disabled bot must not be resurrected by a later resume.
     ps.temporary_disabled[role] = nil
     rs.scan = nil;
@@ -232,8 +240,9 @@ function M.follow(index)
     end
     local ps = state.player(index);
     local direction = formation.update_direction(ps, a.position);
-    local slots = formation.slots(active_names(ps), direction)
-    for _, role in ipairs(config.formation.role_order) do
+    local names = active_names(ps)
+    local slots = formation.slots(names, direction)
+    for _, role in ipairs(names) do
         local rs = ps.roles[role];
         local slot = slots[role];
         if slot and rs.phase == "idle" and not M.is_temporarily_disabled(index, role) then
@@ -255,7 +264,11 @@ function M.remove_player(index)
     local root = state.root();
     local ps = root.players[index];
     if ps then
+        local enabled_removed = 0
         for role, rs in pairs(ps.roles) do
+            if rs.enabled then
+                enabled_removed = enabled_removed + 1
+            end
             if rs.entity and rs.entity.valid then
                 rs.entity.destroy()
             end
@@ -264,6 +277,9 @@ function M.remove_player(index)
             visuals.clear_role(visual_key)
             visuals.clear_role("secondary:" .. visual_key)
             visuals.clear_role("label:" .. visual_key)
+        end
+        if enabled_removed > 0 then
+            state.adjust_enabled_role_count(-enabled_removed)
         end
         root.players[index] = nil
     end

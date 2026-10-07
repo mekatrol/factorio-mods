@@ -67,6 +67,12 @@ end
 ---responsiveness while the total cap prevents cost scaling without bound.
 function M.tick(event)
     local root = state.root();
+    -- With no enabled bots there is no per-tick work to do. In particular,
+    -- avoid visual maintenance, background scans, role scheduling, formation
+    -- following, and discovery pruning until a bot is switched on again.
+    if state.enabled_role_count() == 0 then
+        return
+    end
     -- Rendering survives save/load while the visual ownership index does not.
     -- Reclaim orphaned target lines and labels before any controller can draw
     -- this session's active UI.
@@ -81,7 +87,7 @@ function M.tick(event)
     -- unfair at the wrap boundary, that made CPU/rendering cost jump as bots
     -- were enabled.  One visit per pair is sufficient; movement already has a
     -- separate per-tick allowance.
-    local foreground_remaining = state.role_count()
+    local foreground_remaining = state.enabled_role_count()
     while budget > 0 do
         local did_background = false
         if background < config.scheduler.background_work_per_tick then
@@ -105,7 +111,7 @@ function M.tick(event)
             foreground_remaining = foreground_remaining - 1
             -- Round-robin selection gives every player-role pair an equal
             -- opportunity independent of how expensive its current task is.
-            local item = state.next_role();
+            local item = state.next_enabled_role();
             if not item then
                 return
             end
