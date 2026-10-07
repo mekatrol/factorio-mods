@@ -1,0 +1,9 @@
+{
+  "name": "bot_charging_station",
+  "version": "1.0.0",
+  "title": "Bot Charging Station",
+  "author": "Mekatrol",
+  "factorio_version": "2.0",
+  "description": "Adds a compact charging-only station with ten charging points for logistic and construction robots.",
+  "dependencies": ["base >= 2.0", "space-age"]
+}
