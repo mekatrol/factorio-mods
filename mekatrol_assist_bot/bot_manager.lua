@@ -43,7 +43,10 @@ local function spawn(role, rs, a, position, visual)
         -- surprising animation and also guarantees a valid prototype suffix.
         name = constants.prototype(role, visual or "idle"),
         position = position,
-        force = a.force
+        -- The mod owns movement and tasks. A player force would make Factorio
+        -- treat this visual actor as a logistic-network robot and eventually
+        -- raise the empty-roboport-slot alert.
+        force = constants.visual_force
     };
     -- Mirror the exact fallback used for the prototype name so logical and
     -- rendered state cannot disagree.
@@ -78,6 +81,12 @@ function M.enable(index, role, quiet)
     local ps = state.player(index);
     local rs = ps.roles[role];
     rs.enabled = true;
+    -- Migrate active bots made by earlier versions. Configuration changes call
+    -- this function for every enabled role.
+    if rs.entity and rs.entity.valid and rs.entity.force.name ~= constants.visual_force then
+        rs.entity.destroy()
+        rs.entity = nil
+    end
     -- Enabling a bot while temporary disable mode is active makes it visible,
     -- but does not let it begin work until the player resumes the assistants.
     if ps.temporary_disable_active then

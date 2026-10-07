@@ -39,8 +39,10 @@ local function run_headless_baseline()
     local bots = {}
     for _, role in ipairs(config.formation.role_order) do
         bots[#bots + 1] = assert(create(surface, {
-            name = constants.prototype(role, "moving"), position = {0, 0}, force = "neutral"
+            name = constants.prototype(role, "moving"), position = {0, 0}, force = constants.visual_force
         }), "MAB baseline could not create role bot: " .. role)
+        assert(bots[#bots].force.name == constants.visual_force,
+            "MAB visual bot joined a player logistic network: " .. role)
     end
     for tick = 1, 900 do
         for i, role in ipairs(config.formation.role_order) do

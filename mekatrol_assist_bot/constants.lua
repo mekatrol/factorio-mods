@@ -2,6 +2,9 @@
 local M = {
     mod_name = "mekatrol_assist_bot",
     state_key = "mekatrol_assist_bot",
+    -- Player-force flying robots participate in that force's logistic network.
+    -- Scripted visual actors stay neutral so they never occupy roboport slots.
+    visual_force = "neutral",
     command = "mab"
 }
 

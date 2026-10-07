@@ -59,17 +59,13 @@ end)
 
 script.on_event({defines.events.on_research_finished, defines.events.on_research_reversed}, manager.enforce_gates)
 
--- Visual robots belong to a force. Recreate enabled bots after a force change,
--- then apply the destination force's technology requirements.
+-- Re-check destination-force technology requirements after a force change.
+-- Visual robots remain neutral and outside player logistic networks.
 script.on_event(defines.events.on_player_changed_force, function(e)
     local ps = state.player(e.player_index);
     for _, role in ipairs(config.formation.role_order) do
         local rs = ps.roles[role];
         if rs.enabled then
-            if rs.entity and rs.entity.valid then
-                rs.entity.destroy()
-            end
-            rs.entity = nil;
             local ok = manager.enable(e.player_index, role, true);
             if not ok then
                 manager.disable(e.player_index, role, "technology requirement on new force")

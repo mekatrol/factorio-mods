@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed assist bots registering with the player's logistic network and raising
+  "Not enough empty roboport robot slots available" alerts. Existing bots are
+  migrated to neutral visual actors when the updated mod loads.
+
 - Added the ammo assist bot, which incrementally finds yellow-ammo gun turrets,
   carries a configurable batch, and returns it only to an existing matching container.
 
