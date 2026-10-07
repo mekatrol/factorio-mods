@@ -1,0 +1,9 @@
+{
+  "name": "orange_requester_chest",
+  "version": "1.0.0",
+  "title": "Orange Requester Chest",
+  "author": "Mekatrol",
+  "factorio_version": "2.0",
+  "description": "Adds an orange requester chest unlocked alongside the passive provider chest.",
+  "dependencies": ["base >= 2.0"]
+}
