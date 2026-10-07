@@ -1,10 +1,11 @@
 -- Public configuration for both Factorio stages. Keep this file free of runtime globals.
 return {
     -- Persistent-state/configuration schema. Positive integer.
-    schema_version = 7,
+    schema_version = 8,
     controls = {
         -- Factorio key sequences. These defaults may be rebound in Controls > Mods.
         all = "CONTROL + SHIFT + A",
+        ammo = "CONTROL + SHIFT + Y",
         builder = "CONTROL + SHIFT + B",
         cleanup = "CONTROL + SHIFT + C",
         cliff = "CONTROL + SHIFT + D",
@@ -38,12 +39,13 @@ return {
             cliff = 1,
             logistics = 1,
             cleanup = 1,
+            ammo = 1,
             mapper = 2,
             surveyor = 2
         }
     },
     formation = {
-        role_order = {"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup", "mapper",
+        role_order = {"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup", "ammo", "mapper",
                       "surveyor"},
         -- The radius grows when necessary so adjacent bots retain this much
         -- straight-line clearance along the rear arc.
@@ -68,6 +70,7 @@ return {
         radius = 48, -- Inclusive tile distance, finite >0.
         source_priority = {"player", "containers"}, -- Ordered unique policies: player and/or containers.
         cleanup_capacity = 100, -- Items, integer >=0; zero disables pickup.
+        ammo_capacity = 100, -- Yellow magazines, integer >=0; zero disables removal.
         repair_pack_durability = 300 -- Health points per pack, finite >0.
     },
     tasks = {
@@ -118,6 +121,10 @@ return {
         },
         cleanup = {
             radius = 48
+        },
+        ammo = {
+            radius = 48,
+            item = "firearm-magazine"
         },
         cliff = {
             radius = 64,
@@ -236,6 +243,12 @@ return {
             required_technologies = {},
             technology_mode = "all",
             default_task = "cleanup"
+        },
+        ammo = {
+            prototype_family = "logistic",
+            required_technologies = {},
+            technology_mode = "all",
+            default_task = "unload"
         },
         mapper = {
             prototype_family = "construction",

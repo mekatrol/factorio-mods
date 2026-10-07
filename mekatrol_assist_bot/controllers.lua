@@ -113,7 +113,7 @@ function M.step(role, rs, anchor, bot)
         local _, found = scanner.step(rs.scan)
         for _, e in ipairs(found) do
             if def.scan_entity then
-                def.scan_entity(e, rs, anchor)
+                def.scan_entity(e, rs, anchor, bot)
             elseif def.valid(e, rs, anchor) then
                 local distance = movement.distance2(e.position, bot.position)
                 if not rs.best_distance or distance < rs.best_distance then
@@ -122,6 +122,9 @@ function M.step(role, rs, anchor, bot)
             end
         end
         return scan_phase(def, rs)
+    end
+    if rs.scan and rs.scan.done and def.after_scan then
+        def.after_scan(rs, anchor, bot)
     end
     if rs.track_job and rs.track_job.done and (not rs.target or not rs.target.valid) then
         local candidate, complete = next_group_target(def, rs, anchor)

@@ -27,6 +27,9 @@ function M.root()
         }
     }
     local r = storage.mekatrol_assist_bot;
+    -- Reaching this normalization path means the current additive schema has
+    -- been applied, including creation of any newly configured role records.
+    r.schema_version = config.schema_version
     -- These additive defaults are intentionally outside the initial literal.
     -- This also keeps partially populated state safe for all callers.
     r.destroyed_sites = r.destroyed_sites or {};

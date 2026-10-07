@@ -18,7 +18,7 @@ local function validate_catalogue()
     end
     for _, name in ipairs {"construction-robot", "logistic-robot", "repair-pack", "small-lamp",
                            "cliff-explosives", "transport-belt", "fast-transport-belt",
-                           "express-transport-belt", "turbo-transport-belt"} do
+                           "express-transport-belt", "turbo-transport-belt", "firearm-magazine", "gun-turret"} do
         assert(prototypes.item[name] or prototypes.entity[name],
             "MAB prototype catalogue missing item/entity: " .. name)
     end

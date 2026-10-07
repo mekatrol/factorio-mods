@@ -71,6 +71,7 @@ function M.run(c, known)
     num("movement.arrival_distance", c.movement.arrival_distance, 0.000001)
     num("supply.radius", c.supply.radius, 0.000001);
     num("supply.cleanup_capacity", c.supply.cleanup_capacity, 0, nil, true);
+    num("supply.ammo_capacity", c.supply.ammo_capacity, 0, nil, true);
     num("supply.repair_pack_durability", c.supply.repair_pack_durability, 0.000001)
     local priorities = {};
     for i, name in ipairs(c.supply.source_priority) do

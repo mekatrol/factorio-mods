@@ -1,6 +1,6 @@
 # Mekatrol Assist Bot
 
-`mekatrol_assist_bot` provides ten coordinated helper roles for Factorio 2.0.
+`mekatrol_assist_bot` provides eleven coordinated helper roles for Factorio 2.0.
 
 ## Roles
 
@@ -14,6 +14,7 @@
 | cliff | `follow`, `demolish` | Destroys only cliffs marked with the planner, consuming cliff explosives. | Cliff explosives |
 | logistics | `follow`, `collect`, `pickup` | Collects ground items, drains inventories in bounded batches, and incrementally mines recoverable neutral entities/resources. | Logistic robotics |
 | cleanup | `follow`, `cleanup` | Collects loose item entities and prefers a nearby container already holding that item. | None |
+| ammo | `follow`, `unload` | Removes yellow magazines from friendly gun turrets and returns them to a friendly container already holding yellow magazines. | None |
 | mapper | `follow`, `search` | Progressively scans an outward deterministic cell spiral and maps static entities into the shared discovery index. | Electronics |
 | surveyor | `follow`, `search`, `survey` | Traces resource boundaries and builds connected, polygon-backed discovery groups. | Electronics |
 
@@ -27,6 +28,10 @@ Bots are independently enabled. Locked bots are not created and report every
 missing technology. Research reversal recalls affected bots. All role searches,
 selection rectangles, pruning, and target planning resume from persistent cell
 cursors under one global per-tick budget.
+
+After delivering magazines, the ammo bot starts its next bounded scan at the
+destination container. It rejoins formation only after that scan finds no
+viable turret/container pair.
 
 Mapper discoveries are published into independent persistent repair, logistics,
 and surveyor queues declared by the role registry. Each consumer advances only when the shared scheduler grants
@@ -48,6 +53,7 @@ an entity is rebuilt at that site.
 | Toggle all unlocked bots | `Ctrl+Shift+A` |
 | Builder | `Ctrl+Shift+B` |
 | Cleanup | `Ctrl+Shift+C` |
+| Yellow-ammo recovery | `Ctrl+Shift+Y` |
 | Cliff | `Ctrl+Shift+D` |
 | Logistics | `Ctrl+Shift+G` |
 | Lamp | `Ctrl+Shift+L` |
@@ -83,7 +89,7 @@ the item reported by the ghost prototype. `/mab mapper clear` clears discovery;
 its configured task starts a fresh search.
 
 Role aliases are `b` builder, `r` repair, `u` upgrade, `t` track, `l` lamp,
-`d` cliff, `g` logistics, `c` cleanup, `m` mapper, and `s` surveyor.
+`d` cliff, `g` logistics, `c` cleanup, `a` ammo, `m` mapper, and `s` surveyor.
 
 ## Configuration reference
 
@@ -96,13 +102,13 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 
 | Setting | Default | Purpose and accepted value |
 | --- | ---: | --- |
-| `schema_version` | `7` | Positive persistent-state schema integer. |
+| `schema_version` | `8` | Positive persistent-state schema integer. |
 | `controls.<action>` | See Controls | Non-empty Factorio key sequence for every role, `all`, `clear_map`, and `cliff_planner`. |
 | `scheduler.work_per_tick` | `24` | Global work units per tick; integer >= 1. |
 | `scheduler.background_work_per_tick` | `4` | Maximum units used by clearing, selection, and visual rebuilds per tick; integer >= 1. |
 | `scheduler.idle_interval` | `1` | Ticks between formation-follow passes; integer >= 1. Keep at `1` for smooth pursuit. |
 | `scheduler.role_intervals.<role>` | `1`, except lamp `6`, mapper/surveyor `2` | Ticks between eligible role work units; integer >= 1. |
-| `formation.role_order` | Ten roles above | Every registered role exactly once; fixes deterministic slot and scheduler order. |
+| `formation.role_order` | Eleven roles above | Every registered role exactly once; fixes deterministic slot and scheduler order. |
 | `formation.slot_spacing` | `3.5` | Minimum straight-line separation between adjacent bots; finite > 0. |
 | `formation.radius` | `6` | Minimum distance of the rear arc from the player; finite > 0. Crowded formations expand this automatically. |
 | `formation.arc_degrees` | `140` | Width of the circular arc behind movement; finite > 0 and < 180. |
@@ -116,8 +122,9 @@ radii are in tiles and radius comparisons are inclusive. Counts are integers;
 | `supply.radius` | `48` | Player/container source-search radius; finite > 0. |
 | `supply.source_priority` | `player`, then `containers` | Ordered unique list containing either or both supported policies. |
 | `supply.cleanup_capacity` | `100` | Cleanup cargo capacity; integer >= 0, where zero disables pickup. |
+| `supply.ammo_capacity` | `100` | Maximum yellow magazines removed per trip; integer >= 0, where zero disables removal. |
 | `supply.repair_pack_durability` | `300` | Health points contributed by one repair pack; finite > 0. |
-| `tasks.<role>.radius` | upgrade/track/cliff/logistics/repair `64`; builder/cleanup/lamp `48`; surveyor `128` | Role search radius; finite > 0. |
+| `tasks.<role>.radius` | upgrade/track/cliff/logistics/repair `64`; builder/cleanup/ammo/lamp `48`; surveyor `128` | Role search radius; finite > 0. |
 | `tasks.upgrade.mode_radii.<mode>` | Inserters `10` | Optional per-mode radius override; finite > 0. |
 | `tasks.upgrade.mappings` | Vanilla belt/inserter/chest progression | Source-to-target prototype map; unavailable optional targets are skipped. |
 | `tasks.cliff.projectile_speed` | `0.3` | Scripted projectile speed; finite > 0. |
@@ -155,7 +162,7 @@ player's current movement direction. The arc expands to preserve bot and label
 clearance. The complete formation
 mirrors when horizontal player movement crosses the configured threshold, and
 bots ease back into their stable slots after work. Construction roles clone the
-full vanilla construction-robot graphics; logistics and cleanup clone the full
+full vanilla construction-robot graphics; logistics, cleanup, and ammo clone the full
 logistic-robot graphics. Factorio 2.0.77 has no dedicated logistic-robot working
 animation, so its working variant reuses the complete in-motion animation.
 Separate idle, moving, and working prototypes preserve directional animation
@@ -171,7 +178,7 @@ query more expensive.
 
 ## State
 
-The only persistent root is `storage.mekatrol_assist_bot` (schema 7). It contains
+The only persistent root is `storage.mekatrol_assist_bot` (schema 8). It contains
 per-player role state, resumable jobs, discoveries, groups, and marked cliffs.
 Rendering objects are not persisted. Save/load, configuration changes, invalid
 entities, player removal, and research reversal are handled at their lifecycle
@@ -183,7 +190,7 @@ The mod can be verified with an isolated new-game load and the opt-in runtime fi
 `runtime_tests.lua`; it does not require a checked-in test directory. Set
 `debug=true` only in a copied mod inside a disposable Factorio write-data and
 create a new save. The fixture validates role technology and visual prototypes,
-then runs the 10-bot and 4,096-resource bounded-work baselines. A successful run
+then runs the 11-bot and 4,096-resource bounded-work baselines. A successful run
 logs `[MAB test] headless baseline passed`. Restore
 `debug=false` afterward.
 
@@ -193,6 +200,6 @@ logs `[MAB test] headless baseline passed`. Restore
 mirroring, slot uniqueness and reflow, entity identity/deduplication, polygons,
 aliases, task registration, and technology gates during initialization. Setting
 `debug=true` runs the destructive headless fixture in a disposable save: it
-validates required Factorio 2.0 prototypes and role families, profiles ten role
+validates required Factorio 2.0 prototypes and role families, profiles eleven role
 bots, and scans a 4,096-resource field. Never turn this on in a real save.
 Normal configuration keeps `debug=false`.

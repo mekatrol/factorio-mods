@@ -30,6 +30,7 @@ M.aliases = {
     d = "cliff",
     g = "logistics",
     c = "cleanup",
+    a = "ammo",
     m = "mapper",
     s = "surveyor"
 }

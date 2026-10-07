@@ -11,6 +11,7 @@ local logistics = require("logistics")
 local repair_role = require("bot_role_repair")
 local supply = require("supply")
 local cleanup_role = require("bot_role_cleanup")
+local ammo_role = require("bot_role_ammo")
 local track_role = require("bot_role_track")
 local upgrade_role = require("bot_role_upgrade")
 local lamp_role = require("bot_role_lamp")
@@ -40,6 +41,7 @@ function M.run()
     local even = formation.slots({"builder", "repair"}, "right");
     near(even.builder.y, -even.repair.y, "even formation is symmetric")
     eq(registry.get("s").name, "surveyor", "s alias")
+    eq(registry.get("a").name, "ammo", "a alias")
     eq(registry.has_task(registry.get("builder"), "construct"), true, "builder construct task")
     eq(registry.has_task(registry.get("logistics"), "pickup"), true, "logistics pickup task")
     eq(logistics.first_product_name({{name = "rail", count = 1}}, "straight-rail"), "rail",
@@ -169,6 +171,13 @@ function M.run()
         "cleanup stops following after selecting a target")
     eq(cleanup_role.cargo_phase(false), "working", "cleanup does not follow formation while finding a chest")
     eq(cleanup_role.cargo_phase(nil), "moving", "cleanup physically returns cargo to the player")
+    local no_destination = {target = {valid = true}, best_distance = 1}
+    ammo_role.after_scan(no_destination)
+    eq(no_destination.target, nil, "ammo bot abandons turret when no yellow-ammo container exists")
+    eq(ammo_role.scan_phase, "moving", "ammo bot holds position throughout a bounded scan")
+    local ammo_scan_origin = {x = 12, y = -7}
+    eq(ammo_role.scan_center({}, {position = {x = 0, y = 0}}, {position = ammo_scan_origin}), ammo_scan_origin,
+        "ammo bot chains its next scan from its delivery position")
     eq(track_role.scan_phase, "idle", "track follows formation while searching for a belt graph")
     eq(upgrade_role.scan_phase({}), "idle", "upgrade follows formation during an empty background scan")
     eq(upgrade_role.scan_phase({supplied = {["iron-chest"] = 4}}), "moving",
@@ -194,8 +203,7 @@ function M.run()
     eq(manager.activity({phase = "idle", task = "track"}), "follow", "ordinary idle label remains follow")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
-    local many = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
-                                  "mapper", "surveyor"}, "right");
+    local many = formation.slots(config.formation.role_order, "right");
     near(many.surveyor.x, many.builder.x, "arc endpoints have equal trailing distance")
     near(many.builder.y, -many.surveyor.y, "arc endpoints are symmetric")
     eq(formation.has_unique_slots(many), true, "formation slots never overlap")
@@ -210,8 +218,7 @@ function M.run()
         end
         previous = slot
     end
-    local mirrored = formation.slots({"builder", "repair", "upgrade", "track", "lamp", "cliff", "logistics", "cleanup",
-                                      "mapper", "surveyor"}, "left")
+    local mirrored = formation.slots(config.formation.role_order, "left")
     for role, slot in pairs(many) do
         near(mirrored[role].x, -slot.x, "formation mirrors role " .. role)
         near(mirrored[role].y, slot.y, "formation mirror preserves row for " .. role)

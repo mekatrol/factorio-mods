@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added the ammo assist bot, which incrementally finds yellow-ammo gun turrets,
+  carries a configurable batch, and returns it only to an existing matching container.
+
 - Replaced the close trailing line with a wider rear circular arc. Bots now keep
   at least 3.5 tiles apart and the arc expands as roles are enabled, preventing
   bot labels from obscuring the player or one another.
