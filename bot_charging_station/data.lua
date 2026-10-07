@@ -3,7 +3,7 @@ local name = "bot-charging-station"
 local station = table.deepcopy(data.raw.roboport.roboport)
 station.name = name
 station.icon = "__bot_charging_station__/graphics/icons/bot-charging-station.png"
-station.icon_size = 1024
+station.icon_size = 1254
 station.minable = {mining_time = 0.2, result = name}
 station.max_health = 300
 station.corpse = "small-remnants"
@@ -30,13 +30,16 @@ station.base = {
   layers = {
     {
       filename = "__bot_charging_station__/graphics/entity/bot-charging-station.png",
-      width = 1024,
-      height = 1024,
-      scale = 0.095,
+      width = 1254,
+      height = 1254,
+      scale = 0.0775,
       shift = {0, -0.1}
     }
   }
 }
+-- The normal roboport draws this opaque housing over its base.  This station
+-- uses a complete custom base image, so retaining the patch obscures it.
+station.base_patch = nil
 station.base_animation = nil
 station.door_animation_up = nil
 station.door_animation_down = nil
@@ -51,7 +54,7 @@ local item = {
   type = "item",
   name = name,
   icon = "__bot_charging_station__/graphics/icons/bot-charging-station.png",
-  icon_size = 1024,
+  icon_size = 1254,
   subgroup = "logistic-network",
   order = "c[signal]-b[bot-charging-station]",
   place_result = name,
