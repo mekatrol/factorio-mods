@@ -7,6 +7,8 @@ station.icon_size = 1254
 station.minable = {mining_time = 0.2, result = name}
 station.max_health = 300
 station.corpse = "small-remnants"
+station.collision_box = {{-1.2, -1.2}, {1.2, 1.2}}
+station.selection_box = {{-1.5, -1.5}, {1.5, 1.5}}
 station.logistics_radius = 0
 station.construction_radius = 0
 station.logistics_connection_distance = 0
@@ -22,9 +24,11 @@ station.energy_source = {
 }
 station.energy_usage = "50kW"
 station.charging_offsets = {
-  {-1.05, -1.05}, {-0.35, -1.05}, {0.35, -1.05}, {1.05, -1.05},
+  {-0.55, -1.05}, {0.55, -1.05},
+  {-1.05, -0.55}, {1.05, -0.55},
   {-1.05,  0.00}, {1.05,  0.00},
-  {-1.05,  1.05}, {-0.35,  1.05}, {0.35,  1.05}, {1.05,  1.05}
+  {-1.05,  0.55}, {1.05,  0.55},
+  {-0.55,  1.05}, {0.55,  1.05}
 }
 station.base = {
   layers = {
@@ -32,7 +36,7 @@ station.base = {
       filename = "__bot_charging_station__/graphics/entity/bot-charging-station.png",
       width = 1254,
       height = 1254,
-      scale = 0.0775,
+      scale = 0.0875,
       shift = {0, -0.1}
     }
   }
