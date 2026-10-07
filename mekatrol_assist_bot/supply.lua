@@ -156,6 +156,7 @@ function M.queue_cargo(rs, stack, prefer_existing_container)
     rs.cargo_order = rs.cargo_order or {};
     rs.cargo_destinations = rs.cargo_destinations or {};
     rs.cargo_stacks = rs.cargo_stacks or {}
+    rs.cargo_lowest_inventory = rs.cargo_lowest_inventory or {}
     rs.cargo_count = rs.cargo_count or 0
     local quality = stack.quality or "normal"
     local key = quality == "normal" and stack.name or (stack.name .. "\31" .. quality)
@@ -194,8 +195,12 @@ function M.flush_cargo(rs, player, bot)
         return false
     end
     local destination = rs.cargo_destinations and rs.cargo_destinations[key];
+    local prefer_lowest_inventory = rs.cargo_lowest_inventory and rs.cargo_lowest_inventory[key]
     local inserted
     if destination == false then
+        if prefer_lowest_inventory then
+            rs.waiting_ammo_container = true
+        end
         -- Cleanup prefers a nearby friendly container which already stores the
         -- same item, keeping factory organization intact. Search incrementally.
         local job = rs.drop_job
@@ -222,18 +227,30 @@ function M.flush_cargo(rs, player, bot)
                     -- Only relative ordering matters, so squared distance is
                     -- both exact enough and cheaper than Euclidean distance.
                     local d = movement.distance2(e.position, bot.position);
-                    if not job.distance or d < job.distance then
+                    local load = prefer_lowest_inventory and inv.get_item_count() or nil
+                    if not job.source or (prefer_lowest_inventory and
+                        (load < job.load or (load == job.load and d < job.distance))) or
+                        (not prefer_lowest_inventory and d < job.distance) then
                         job.source = e;
+                        job.load = load
                         job.distance = d
                     end
                 end
             end
             return false
         end
-        -- `job.source` remains nil when no same-item container had capacity.
-        -- In that case clearing the destination selects the player fallback.
+        -- Cleanup falls back to the player when no same-item container has
+        -- capacity. Ammo remains onboard instead: formation following moves
+        -- the next bounded scan to a new area, matching its pre-pickup wait.
         destination = job.source;
+        if prefer_lowest_inventory and not destination then
+            rs.drop_job = nil
+            return false
+        end
         rs.cargo_destinations[key] = destination or nil;
+        if prefer_lowest_inventory then
+            rs.waiting_ammo_container = nil
+        end
         rs.drop_job = nil
     end
     if destination and destination.valid then
@@ -272,7 +289,16 @@ function M.flush_cargo(rs, player, bot)
             rs.cargo_destinations[key] = nil
         end
         if rs.cargo_stacks then rs.cargo_stacks[key] = nil end
+        if rs.cargo_lowest_inventory then rs.cargo_lowest_inventory[key] = nil end
+        if prefer_lowest_inventory then rs.waiting_ammo_container = nil end
         rs.cargo_cursor = rs.cargo_cursor + 1
+    elseif destination and prefer_lowest_inventory then
+        -- Ammo delivery may fill a matching container before the carried stack
+        -- is empty. Keep the remainder and find the next least-loaded matching
+        -- container instead of retrying the now-full destination forever.
+        rs.cargo_destinations[key] = false
+        rs.waiting_ammo_container = true
+        rs.drop_job = nil
     end
     -- Completion requires both the current type to be empty and no later
     -- ordered type. If insertion was partial, the same cursor resumes next call.

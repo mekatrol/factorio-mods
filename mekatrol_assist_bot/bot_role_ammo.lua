@@ -37,6 +37,10 @@ local function container_has_magazines(entity)
     return inv and magazine_quality(inv) ~= nil
 end
 
+local function inventory_load(inv)
+    return inv.get_item_count()
+end
+
 function M.radius()
     return config.tasks.ammo.radius
 end
@@ -62,8 +66,16 @@ function M.scan_phase(rs)
     return rs.ammo_container and (rs.target or rs.ammo_waiting_turret) and "moving" or "idle"
 end
 
+-- When carried ammo has no remaining matching destination, formation following
+-- moves the bot's next bounded cargo scan to a new area. A concrete container
+-- takes movement ownership again for delivery.
+function M.cargo_phase(destination)
+    return destination == false and "idle" or "working"
+end
+
 function M.begin_scan(rs)
     rs.ammo_container = nil
+    rs.ammo_container_load = nil
     rs.ammo_container_distance = nil
 end
 
@@ -77,9 +89,17 @@ function M.scan_entity(entity, rs, _, bot)
             end
         end
     elseif container_has_magazines(entity) then
+        local inv = container_inventory(entity)
+        local quality = magazine_quality(inv)
+        if not inv.can_insert {name = config.tasks.ammo.item, count = 1, quality = quality} then
+            return
+        end
+        local load = inventory_load(inv)
         local distance = movement.distance2(entity.position, bot.position)
-        if not rs.ammo_container_distance or distance < rs.ammo_container_distance then
-            rs.ammo_container, rs.ammo_container_distance = entity, distance
+        if not rs.ammo_container_load or load < rs.ammo_container_load or
+            (load == rs.ammo_container_load and
+                (not rs.ammo_container_distance or distance < rs.ammo_container_distance)) then
+            rs.ammo_container, rs.ammo_container_load, rs.ammo_container_distance = entity, load, distance
         end
     end
 end
@@ -135,6 +155,7 @@ function M.act(rs, _, turret)
         local key = quality == "normal" and config.tasks.ammo.item or
                         (config.tasks.ammo.item .. "\31" .. quality)
         rs.cargo_destinations[key] = destination
+        rs.cargo_lowest_inventory[key] = true
     end
     rs.ammo_waiting_turret = nil
     rs.waiting_ammo_container = nil
@@ -143,6 +164,7 @@ end
 
 function M.finish(rs)
     rs.ammo_container = nil
+    rs.ammo_container_load = nil
     rs.ammo_container_distance = nil
 end
 

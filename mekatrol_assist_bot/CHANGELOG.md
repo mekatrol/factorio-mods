@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Ammo bots now deposit magazines into the eligible container with the lowest
+  inventory load, ignore matching containers that cannot accept another magazine,
+  and continue into another matching container when a delivery only partially fits.
+  If all known matching containers are full, they retain the remainder and follow
+  the player while scanning new areas instead of returning the ammo to the player.
+
 - Fixed assist bots registering with the player's logistic network and raising
   "Not enough empty roboport robot slots available" alerts. Existing bots are
   migrated to neutral visual actors when the updated mod loads.

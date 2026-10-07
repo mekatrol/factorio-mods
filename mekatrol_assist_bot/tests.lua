@@ -180,6 +180,68 @@ function M.run()
     local ammo_scan_origin = {x = 12, y = -7}
     eq(ammo_role.scan_center({}, {position = {x = 0, y = 0}}, {position = ammo_scan_origin}), ammo_scan_origin,
         "ammo bot chains its next scan from its delivery position")
+    local function ammo_container(load, x, can_insert)
+        local inv = {
+            get_item_count = function(item)
+                if item == nil then return load end
+                return type(item) == "table" and item.name == config.tasks.ammo.item and 1 or 0
+            end,
+            can_insert = function() return can_insert end
+        }
+        return {
+            valid = true,
+            type = "container",
+            position = {x = x, y = 0},
+            get_inventory = function(id)
+                return id == defines.inventory.chest and inv or nil
+            end
+        }
+    end
+    local ammo_scan_state = {}
+    ammo_role.begin_scan(ammo_scan_state)
+    local full_near_container = ammo_container(100, 1, false)
+    local loaded_near_container = ammo_container(80, 2, true)
+    local empty_far_container = ammo_container(10, 20, true)
+    ammo_role.scan_entity(full_near_container, ammo_scan_state, nil, {position = {x = 0, y = 0}})
+    ammo_role.scan_entity(loaded_near_container, ammo_scan_state, nil, {position = {x = 0, y = 0}})
+    ammo_role.scan_entity(empty_far_container, ammo_scan_state, nil, {position = {x = 0, y = 0}})
+    eq(ammo_scan_state.ammo_container, empty_far_container,
+        "ammo bot prefers the container with the lowest inventory load")
+    eq(ammo_scan_state.ammo_container_load, 10, "ammo bot records the selected container load")
+    local partial_destination_inventory = {
+        insert = function(stack) return math.min(stack.count, 3) end
+    }
+    local partial_destination = {
+        valid = true,
+        position = {x = 0, y = 0},
+        get_inventory = function(id)
+            return id == defines.inventory.chest and partial_destination_inventory or nil
+        end
+    }
+    local partial_delivery_state = {
+        cargo = {[config.tasks.ammo.item] = 8},
+        cargo_order = {config.tasks.ammo.item},
+        cargo_cursor = 1,
+        cargo_count = 8,
+        cargo_stacks = {[config.tasks.ammo.item] = {name = config.tasks.ammo.item, quality = "normal"}},
+        cargo_destinations = {[config.tasks.ammo.item] = partial_destination},
+        cargo_lowest_inventory = {[config.tasks.ammo.item] = true}
+    }
+    local stationary_bot = {valid = true, position = {x = 0, y = 0}}
+    eq(supply.flush_cargo(partial_delivery_state, {}, stationary_bot), false,
+        "partial ammo delivery retains the undelivered magazines")
+    eq(partial_delivery_state.cargo[config.tasks.ammo.item], 5,
+        "partial ammo delivery removes only the inserted magazines from cargo")
+    eq(partial_delivery_state.cargo_destinations[config.tasks.ammo.item], false,
+        "partial ammo delivery searches for another matching container")
+    eq(partial_delivery_state.waiting_ammo_container, true,
+        "partial ammo delivery enters the ammo-container wait state")
+    eq(ammo_role.cargo_phase(false), "idle",
+        "ammo bot follows formation while carrying ammo without a destination")
+    eq(ammo_role.cargo_phase(partial_destination), "working",
+        "ammo bot owns movement while delivering to a concrete container")
+    eq(manager.activity({phase = "idle", task = "unload", waiting_ammo_container = true}), "follow (unload)",
+        "carried ammo without container capacity is labelled follow unload")
     eq(track_role.scan_phase, "idle", "track follows formation while searching for a belt graph")
     eq(upgrade_role.scan_phase({}), "idle", "upgrade follows formation during an empty background scan")
     eq(upgrade_role.scan_phase({supplied = {["iron-chest"] = 4}}), "moving",
