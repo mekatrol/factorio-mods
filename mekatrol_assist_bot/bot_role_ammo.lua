@@ -55,10 +55,12 @@ function M.filter(_, anchor)
     }
 end
 
--- Retain the position at which this bounded scan began. Returning "idle" here
--- would let formation following pull the bot back toward the player between
--- scan cells. The controller returns idle after an exhausted scan has no job.
-M.scan_phase = "moving"
+-- A known destination owns the bot's position. Without one, scanning remains
+-- passive so formation following can carry the bot toward a container while
+-- the bounded scan continues around its latest starting point.
+function M.scan_phase(rs)
+    return rs.ammo_container and (rs.target or rs.ammo_waiting_turret) and "moving" or "idle"
+end
 
 function M.begin_scan(rs)
     rs.ammo_container = nil
@@ -89,9 +91,24 @@ function M.valid(entity)
 end
 
 function M.after_scan(rs)
-    if not (rs.ammo_container and rs.ammo_container.valid) then
+    local turret = rs.target
+    if not turret and rs.ammo_waiting_turret and M.valid(rs.ammo_waiting_turret) then
+        turret = rs.ammo_waiting_turret
+    end
+    if turret and rs.ammo_container and rs.ammo_container.valid then
+        rs.target = turret
+        rs.ammo_waiting_turret = nil
+        rs.waiting_ammo_container = nil
+    elseif turret then
+        -- Preserve the remote turret while following the player. A later scan
+        -- may find the required container even after the turret leaves range.
+        rs.ammo_waiting_turret = turret
+        rs.waiting_ammo_container = true
         rs.target = nil
         rs.best_distance = nil
+    else
+        rs.ammo_waiting_turret = nil
+        rs.waiting_ammo_container = nil
     end
 end
 
@@ -119,6 +136,8 @@ function M.act(rs, _, turret)
                         (config.tasks.ammo.item .. "\31" .. quality)
         rs.cargo_destinations[key] = destination
     end
+    rs.ammo_waiting_turret = nil
+    rs.waiting_ammo_container = nil
     return true
 end
 

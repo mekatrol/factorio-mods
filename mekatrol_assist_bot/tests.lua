@@ -174,7 +174,9 @@ function M.run()
     local no_destination = {target = {valid = true}, best_distance = 1}
     ammo_role.after_scan(no_destination)
     eq(no_destination.target, nil, "ammo bot abandons turret when no yellow-ammo container exists")
-    eq(ammo_role.scan_phase, "moving", "ammo bot holds position throughout a bounded scan")
+    eq(ammo_role.scan_phase({}), "idle", "ammo bot follows while scanning without a container")
+    eq(ammo_role.scan_phase({ammo_container = {}, ammo_waiting_turret = {}}), "moving",
+        "ammo bot holds position once both ends of a job are known")
     local ammo_scan_origin = {x = 12, y = -7}
     eq(ammo_role.scan_center({}, {position = {x = 0, y = 0}}, {position = ammo_scan_origin}), ammo_scan_origin,
         "ammo bot chains its next scan from its delivery position")
@@ -201,6 +203,8 @@ function M.run()
     eq(manager.activity({phase = "idle", task = "repair", waiting_inventory = "repair-pack"}),
         "follow (repair-pack)", "non-upgrade inventory wait labels remain unchanged")
     eq(manager.activity({phase = "idle", task = "track"}), "follow", "ordinary idle label remains follow")
+    eq(manager.activity({phase = "idle", task = "unload", waiting_ammo_container = true}), "follow (unload)",
+        "ammo container wait is shown as a follow substate")
     local allowed = technology.task_allowed({recipes = {}}, "track", "track")
     eq(allowed, true, "track may wait for later recipe research")
     local many = formation.slots(config.formation.role_order, "right");

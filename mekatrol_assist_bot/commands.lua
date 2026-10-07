@@ -162,6 +162,9 @@ function M.execute(pi, text)
         rs.track_started = nil;
         rs.waiting_inventory = nil;
         rs.waiting_accept_any_quality = nil;
+        rs.waiting_ammo_container = nil;
+        rs.ammo_waiting_turret = nil;
+        rs.ammo_container = nil;
         say(pi, name .. " refreshed");
         return
     end

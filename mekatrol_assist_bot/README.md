@@ -30,8 +30,11 @@ selection rectangles, pruning, and target planning resume from persistent cell
 cursors under one global per-tick budget.
 
 After delivering magazines, the ammo bot starts its next bounded scan at the
-destination container. It rejoins formation only after that scan finds no
-viable turret/container pair.
+destination container. It holds position when both ends of another viable job
+are known; otherwise scanning remains compatible with formation following.
+When it finds an eligible turret but no suitable container, it remembers the
+turret and enters `follow (unload)`. It follows the player while continuing
+bounded scans, allowing the player to lead it to a matching container.
 
 Mapper discoveries are published into independent persistent repair, logistics,
 and surveyor queues declared by the role registry. Each consumer advances only when the shared scheduler grants

@@ -14,6 +14,9 @@ function M.activity(rs)
     if rs.phase ~= "idle" then
         return rs.task
     end
+    if rs.waiting_ammo_container then
+        return "follow (unload)"
+    end
     if rs.waiting_inventory then
         local color = config.tasks.upgrade.item_colors[rs.waiting_inventory]
         local item_label = color and (rs.waiting_inventory .. ": " .. color) or rs.waiting_inventory
@@ -122,6 +125,9 @@ function M.disable(index, role, reason)
     rs.track_started = nil;
     rs.waiting_inventory = nil;
     rs.waiting_accept_any_quality = nil;
+    rs.waiting_ammo_container = nil;
+    rs.ammo_waiting_turret = nil;
+    rs.ammo_container = nil;
     visuals.clear_role(index .. ":" .. role)
     visuals.clear_role("label:" .. index .. ":" .. role)
     if rs.entity and rs.entity.valid then
