@@ -11,7 +11,10 @@ station.collision_box = {{-1.2, -1.2}, {1.2, 1.2}}
 station.selection_box = {{-1.5, -1.5}, {1.5, 1.5}}
 station.logistics_radius = 0
 station.construction_radius = 0
-station.logistics_connection_distance = 0
+-- Vanilla derives its connection span from its 25-tile logistics radius. This
+-- station has no coverage, so set the equivalent 50-tile span explicitly or
+-- it will not join a nearby logistic network and bots will ignore it.
+station.logistics_connection_distance = 50
 station.robot_slots_count = 0
 station.material_slots_count = 0
 station.charging_energy = "1MW"
