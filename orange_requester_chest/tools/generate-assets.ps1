@@ -27,11 +27,16 @@ function Convert-BlueToOrange([System.Drawing.Color]$color) {
         return $color
     }
 
-    $targetHue = 30.0
-    $chroma = (1.0 - [Math]::Abs(2.0 * $brightness - 1.0)) * $saturation
+    # The requester sprite's blue paint is intentionally muted. Merely rotating
+    # its hue makes a brown chest, so boost both saturation and lightness to
+    # match the vivid safety-orange target while retaining per-pixel shading.
+    $targetHue = 24.0
+    $targetSaturation = [Math]::Min(1.0, [Math]::Max(0.88, $saturation * 1.5))
+    $targetBrightness = [Math]::Min(0.80, 0.14 + $brightness * 1.35)
+    $chroma = (1.0 - [Math]::Abs(2.0 * $targetBrightness - 1.0)) * $targetSaturation
     $segment = $targetHue / 60.0
     $x = $chroma * (1.0 - [Math]::Abs(($segment % 2.0) - 1.0))
-    $match = $brightness - $chroma / 2.0
+    $match = $targetBrightness - $chroma / 2.0
 
     $red = $chroma
     $green = $x
