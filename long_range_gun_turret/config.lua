@@ -18,17 +18,9 @@ local config = {
   -- turret's damage. The modifier stacks with ammunition and research bonuses.
   combat = {
     maximum_range = 60,
+    prepare_range = 65,
     damage_modifier = 2,
     basic_ammo_category = "basic-bullet"
-  },
-
-  -- Native turrets look for targets continuously. Long-range turrets instead
-  -- acquire targets incrementally: the surrounding square is split into this
-  -- many rows and columns and only one cell is queried per scheduler step.
-  targeting = {
-    sector_rows = 4,
-    sector_columns = 4,
-    scans_per_tick = 1
   },
 
   -- Use a muted red on the vanilla colour-mask artwork so the variant remains

@@ -44,6 +44,8 @@ turret.minable.result = config.prototype_name
 turret.next_upgrade = nil
 turret.attack_parameters.range = config.combat.maximum_range
 turret.attack_parameters.damage_modifier = config.combat.damage_modifier
+turret.prepare_range = config.combat.prepare_range
+turret.call_for_help_radius = config.combat.maximum_range
 tint_runtime_layers(turret)
 
 -- Reuse and tint the vanilla icon so inventories distinguish this turret while
