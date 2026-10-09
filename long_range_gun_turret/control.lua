@@ -23,7 +23,7 @@ local function register(turret)
   -- Keep idle turrets inactive so the native AI cannot perform a full-radius
   -- acquisition between the scheduled sector scans.
   turret.active = false
-  turret.ignore_unprioritised_targets = true
+  turret.ignore_unprioritised_targets = false
   turret.set_priority_target(1, nil)
 
   local state = ensure_state()
@@ -65,7 +65,7 @@ local function scan_sector(record)
   end
 
   turret.active = false
-  turret.ignore_unprioritised_targets = true
+  turret.ignore_unprioritised_targets = false
   if not has_ammunition(turret) then
     return false
   end
@@ -101,10 +101,9 @@ local function scan_sector(record)
   end
 
   if closest then
-    -- The priority entry permits this exact target type while the explicit
-    -- shooting target selects the individual entity. Idle turrets remain
-    -- inactive, so the engine never performs an automatic range search.
-    turret.set_priority_target(1, closest)
+    -- Select the individual entity directly. The turret is inactive between
+    -- scans, so it does not need "Ignore unlisted targets" to prevent native
+    -- full-radius acquisition while idle.
     turret.shooting_target = closest
     turret.active = true
     record.target = closest
@@ -116,6 +115,11 @@ local function maintain_targets(records)
   for _, record in pairs(records) do
     local turret = record.entity
     local target = record.target
+    if turret and turret.valid then
+      -- Keep the player-facing checkbox off, including for turrets carried
+      -- over from saves made with earlier versions of the mod.
+      turret.ignore_unprioritised_targets = false
+    end
     if turret and turret.valid and target then
       local in_range = false
       if target.valid and is_enemy(turret, target) then
