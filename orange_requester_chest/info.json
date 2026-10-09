@@ -4,6 +4,6 @@
   "title": "Orange Requester Chest",
   "author": "Mekatrol",
   "factorio_version": "2.0",
-  "description": "Adds an orange requester chest unlocked alongside the passive provider chest.",
+  "description": "Adds an orange requester chest that also provides its contents to logistic robots.",
   "dependencies": ["base >= 2.0"]
 }

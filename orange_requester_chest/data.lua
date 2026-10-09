@@ -2,6 +2,7 @@ local name = "orange-requester-chest"
 
 local entity = table.deepcopy(data.raw["logistic-container"]["requester-chest"])
 entity.name = name
+entity.logistic_mode = "buffer"
 entity.icon = "__orange_requester_chest__/graphics/icons/orange-requester-chest.png"
 entity.minable.result = name
 entity.animation.layers[1].filename =
